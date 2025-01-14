@@ -29,38 +29,41 @@ public:
 	ParaViewDataCollection* pvdc = nullptr;
 
 public:
-	double kinvis = 0.025;
-	double reynolds = 1.0 / kinvis;
-	double rhoinf = 0.5;
-
 	int nonlinear_form = INS_Solver::NonlinearFormType::Convective;
 	bool div_stress = true;
 	
-	bool total_integ = true;
+	bool total_integ = false; // This was true for the 2D case
 	bool equal_order = true;
-	bool supg_flag = equal_order;
-	bool pspg_flag = equal_order; // equal order must be true too!
-	bool vms_flag = equal_order;
-	bool mass_stab = equal_order;
+	bool supg_flag = true;
+	bool pspg_flag = true; // equal order must be true too!
+	bool vms_flag = true;
+	bool mass_stab = true;
 
 	bool scr_flag = false;
 	bool simple_flag = true;
 	bool ascr_flag = false;
 
+	// material parameters?
+	double fluid_density = 1.0;
+	double dyn_viscosity = 10.0;
+	double kinvis = dyn_viscosity / fluid_density; // = 0.025 for 2d Case
+	double reynolds = 1.0 / kinvis;
+	double rhoinf = 0.5;
+
 	// solver tolerances
-	double atol = 1e-10;
-	double rtol = 1e-6;
+	double atol = 1e-12;
+	double rtol = 1e-8;
 
 	// prec tolerances
-	double atol_prec = 1e-10;
-	double rtol_prec = 1e-6;
+	double atol_prec = 1e-12;
+	double rtol_prec = 1e-8;
 
 	// equal order
 	int order = 1;
 
 	int ts_method = INS_Solver::TS_Method::GeneralizedAlpha;
 
-public:
+public: // 2D case
 	void vel_exact(const Vector& x, double t, Vector& u)
 	{
 		double x1 = x(0);
@@ -206,6 +209,62 @@ public:
 		pn = nor;
 		pn *= p_exact(x, t);
 		gradun.Add(-1.0, pn);
+	}
+
+public: // 3D case
+	void vel_exact_3d(const Vector& xval, double t, Vector& u)
+	{
+		double x = xval(0);
+		double y = xval(1);
+		double z = xval(2);
+
+		double c = M_PI * exp(-M_PI * M_PI * kinvis * t / 4.0);
+
+		u(0) = -1.0 * c / 4.0 * (exp(M_PI * x / 4.0) * sin(M_PI * (y + 2.0 * z) / 4.0) + exp(M_PI * z / 4.0) * cos(M_PI * (x + 2.0 * y) / 4.0));
+		u(1) = -1.0 * c / 4.0 * (exp(M_PI * y / 4.0) * sin(M_PI * (2.0 * x + z) / 4.0) + exp(M_PI * x / 4.0) * cos(M_PI * (y + 2.0 * z) / 4.0));
+		u(2) = -1.0 * c / 4.0 * (exp(M_PI * z / 4.0) * sin(M_PI * (x + 2.0 * y) / 4.0) + exp(M_PI * y / 4.0) * cos(M_PI * (2.0 * x + z) / 4.0));
+	}
+
+	static void vel_exact_3d_static(const Vector& xval, double t, Vector& u)
+	{
+		This->vel_exact_3d(xval, t, u);
+	}
+
+	double p_exact_3d(const Vector& xval, double t)
+	{
+		double x = xval(0);
+		double y = xval(1);
+		double z = xval(2);
+
+		double time_part = -fluid_density * M_PI * M_PI / 32.0 * exp(-M_PI * M_PI * t * kinvis / 2.0);
+
+		double space_part = exp(M_PI * x / 2.0) + exp(M_PI * y / 2.0) + exp(M_PI * z / 2.0)
+			+ 2.0 * exp(M_PI * (x + y) / 4.0) * cos(M_PI * (y + 2.0 * z) / 4.0) * sin(M_PI * (2.0 * x + z) / 4.0)
+			+ 2.0 * exp(M_PI * (x + z) / 4.0) * cos(M_PI * (x + 2.0 * y) / 4.0) * sin(M_PI * (y + 2.0 * z) / 4.0)
+			+ 2.0 * exp(M_PI * (y + z) / 4.0) * cos(M_PI * (2.0 * x + z) / 4.0) * sin(M_PI * (x + 2.0 * y) / 4.0);
+
+		return time_part * space_part;
+	}
+
+	void traction_bc_3d(const Vector& xval, double t, Vector& tract)
+	{
+		double x = xval(0);
+		double y = xval(1);
+		double z = xval(2);
+
+		tract.SetSize(xval.Size());
+		tract = 0.0;
+
+		double p = p_exact(xval, t);
+
+		tract(0) = p + (M_PI * M_PI * dyn_viscosity * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * (exp((M_PI * x) / 4.0) * sin((M_PI * (y + 2.0 * z)) / 4.0) - exp((M_PI * z) / 4.0) * sin((M_PI * (x + 2.0 * y)) / 4.0))) / 8.0;
+		tract(1) = 2.0 * dyn_viscosity * ((M_PI * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * ((M_PI * exp((M_PI * x) / 4.0) * cos((M_PI * (y + 2.0 * z)) / 4.0)) / 4.0 + (M_PI * exp((M_PI * y) / 4.0) * cos((M_PI * (2.0 * x + z)) / 4.0)) / 2.0)) / 8.0 - (M_PI * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * ((M_PI * exp((M_PI * z) / 4.0) * sin((M_PI * (x + 2.0 * y)) / 4.0)) / 2.0 - (M_PI * exp((M_PI * x) / 4.0) * cos((M_PI * (y + 2.0 * z)) / 4.0)) / 4.0)) / 8.0);
+		tract(2) = 2.0 * dyn_viscosity * ((M_PI * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * ((M_PI * exp((M_PI * x) / 4.0) * cos((M_PI * (y + 2.0 * z)) / 4.0)) / 2.0 + (M_PI * exp((M_PI * z) / 4.0) * cos((M_PI * (x + 2.0 * y)) / 4.0)) / 4.0)) / 8.0 - (M_PI * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * ((M_PI * exp((M_PI * y) / 4.0) * sin((M_PI * (2.0 * x + z)) / 4.0)) / 2.0 - (M_PI * exp((M_PI * z) / 4.0) * cos((M_PI * (x + 2.0 * y)) / 4.0)) / 4.0)) / 8.0);
+	}
+
+	static void traction_bc_3d_static(const Vector& xval, double t, Vector& u)
+	{
+		This->traction_bc_3d(xval, t, u);
 	}
 };
 
@@ -365,8 +424,10 @@ bool MFEMSolver::Init()
 	// create the mfem mesh from the FEBio mesh
 	FEModel& fem = *GetFEModel();
 	FEMesh& femesh = fem.GetMesh();
-	m.mesh = CreateMFEMMesh(femesh);
+//	m.mesh = CreateMFEMMesh2D(femesh);
+	m.mesh = CreateMFEMMesh3D(femesh);
 	if (m.mesh == nullptr) return false;
+	m.mesh->PrintCharacteristics();
 
 	// create the mfem solver class
 	if (m.equal_order)
@@ -399,6 +460,9 @@ bool MFEMSolver::Init()
 	m.flowsolver->SetNewtonSolveMinIt(3);
 	m.flowsolver->SetNewtonSolveMaxIt(20);
 
+	// NOTE: This was not used in 2d example. Add solver parameter for this.
+	m.flowsolver->UseSIMPLEPreconditioner();
+
 	// set nonlinear form type
 	m.flowsolver->SetNonlinearFormType(m.nonlinear_form);
 
@@ -425,6 +489,7 @@ bool MFEMSolver::Init()
 	}
 
 	// Set the initial condition.
+/* 2D example
 	GridFunction* u_ic = m.flowsolver->GetCurrentVelocity();
 	m.u_excoeff = new VectorFunctionCoefficient(m.mesh->Dimension(), bind(&Imp::vel_exact, &m, _1, _2, _3));
 	m.u_excoeff->SetTime(0.0);
@@ -439,6 +504,34 @@ bool MFEMSolver::Init()
 	Array<int> attr(m.mesh->bdr_attributes.Max());
 	attr = 1;
 	m.flowsolver->AddTractionBC(&Imp::grad_vel_divstress_dot_n_exact, attr);
+*/
+
+// ---- 3D example boundary conditions ---
+  // Set the initial condition.
+	GridFunction* u_ic = m.flowsolver->GetCurrentVelocity();
+	m.u_excoeff = new VectorFunctionCoefficient(m.mesh->Dimension(), std::bind(&Imp::vel_exact_3d, &m, _1, _2, _3));
+	m.u_excoeff->SetTime(0.0);
+	u_ic->ProjectCoefficient(*m.u_excoeff);
+	GridFunction* p_ic = m.flowsolver->GetCurrentPressure();
+	m.p_excoeff = new FunctionCoefficient(std::bind(&Imp::p_exact_3d, &m, _1, _2));
+	m.p_excoeff->SetTime(0.0);
+	p_ic->ProjectCoefficient(*m.p_excoeff);
+
+	// set boundary conditions
+	// Add dirichlet velocity bc
+	Array<int> vel_bc_attr(m.mesh->bdr_attributes.Size());
+	vel_bc_attr = 1;
+	vel_bc_attr[4] = 0;
+	m.flowsolver->AddVelDirichletBC(&Imp::vel_exact_3d_static, vel_bc_attr);
+
+	// neumann bc
+	Array<int> vel_n_attr(m.mesh->bdr_attributes.Size());
+	vel_n_attr = 0;
+	vel_n_attr[4] = 1;
+
+	m.flowsolver->AddTractionBC(&Imp::traction_bc_3d_static, vel_n_attr);
+// ---------------------------------------
+
 
 	m.u_gf = m.flowsolver->GetCurrentVelocity();
 	m.p_gf = m.flowsolver->GetCurrentPressure();
@@ -534,7 +627,7 @@ bool MFEMSolver::SolveStep()
 		node.set(dofP, p[i]);
 		node.set(dofVX, v[i]);
 		node.set(dofVY, v[i + NN]);
-		node.set(dofVZ, 0);
+		node.set(dofVZ, v[i + 2*NN]);
 	}
 	fem.Update();
 

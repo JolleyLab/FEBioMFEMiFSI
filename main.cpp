@@ -55,7 +55,8 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 
 	// Domain factory
 	fecore.RegisterDomain(new MFEMDomainFactory);
-	REGISTER_FECORE_CLASS(MFEMDomain, "mfem domain");
+	REGISTER_FECORE_CLASS(MFEMDomain2D, "mfem domain 2d");
+	REGISTER_FECORE_CLASS(MFEMSolidDomain, "mfem domain 3d");
 
 	// feature classes
 	REGISTER_FECORE_CLASS(MFEMSolver, "mfem");

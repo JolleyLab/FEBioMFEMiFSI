@@ -6,5 +6,6 @@ namespace mfem {
 
 class FEMesh;
 
-mfem::Mesh* CreateMFEMMesh(FEMesh& mesh);
+mfem::Mesh* CreateMFEMMesh2D(FEMesh& mesh);
 
+mfem::Mesh* CreateMFEMMesh3D(FEMesh& mesh);

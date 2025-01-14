@@ -1,13 +1,15 @@
 #include "MFEMMesh.h"
 #include <FECore/FEMesh.h>
 #include <FECore/FEDomain.h>
+#include <FECore/FESurface.h>
 #include "mfem.hpp"
+#include <math.h>
 using namespace mfem;
 
 // This function constructs a mfem mesh from the FEBioMesh.
 // Note that this currently assumes a 2D geometry! 
 // TODO: Generalize this for 3D meshes.
-mfem::Mesh* CreateMFEMMesh(FEMesh& febioMesh)
+mfem::Mesh* CreateMFEMMesh2D(FEMesh& febioMesh)
 {
 	int nodes = febioMesh.Nodes();
 	int elems = febioMesh.Elements();
@@ -65,4 +67,69 @@ mfem::Mesh* CreateMFEMMesh(FEMesh& febioMesh)
 	mesh->Finalize(false, true);
 
 	return mesh;
+}
+
+mfem::Mesh* CreateMFEMMesh3D(FEMesh& febioMesh)
+{
+	const int N = 8;
+	double s = 2.0 * M_PI;
+	mfem::Mesh* mfemMesh = new Mesh(Mesh::MakeCartesian3D(N, N, N, Element::HEXAHEDRON, s, s, s));
+
+	FESurface* boundaryMesh = febioMesh.ElementBoundarySurface();
+
+	int nodes = febioMesh.Nodes();
+	int elems = febioMesh.Elements();
+	int nbndrElems = boundaryMesh->Elements();
+	mfem::Mesh* newMesh = new Mesh(3, nodes, elems, nbndrElems);
+	for (int i = 0; i < nodes; ++i)
+	{
+		FENode& node = febioMesh.Node(i);
+		vec3d& pos = node.m_r0;
+		double coords[3] = { pos.x, pos.y, pos.z };
+		newMesh->AddVertex(coords);
+	}
+
+	int indices[FEElement::MAX_NODES] = { 0 };
+	for (int n = 0; n < febioMesh.Domains(); ++n)
+	{
+		FEDomain& dom = febioMesh.Domain(n);
+		int elemsInDomain = dom.Elements();
+		for (int i = 0; i < elemsInDomain; i++) {
+			FEElement& el = dom.ElementRef(i);
+			for (int j = 0; j < el.Nodes(); j++) {
+				indices[j] = el.m_node[j];
+			}
+
+			switch (el.Shape())
+			{
+			case ET_HEX8: newMesh->AddHex(indices, n + 1); break;
+			default:
+				assert(false);
+			}
+		}
+	}
+
+	for (int n = 0; n < febioMesh.FacetSets(); ++n)
+	{
+		FEFacetSet& surf = febioMesh.FacetSet(n);
+		int faces = surf.Faces();
+		for (int i = 0; i < faces; ++i)
+		{
+			FEFacetSet::FACET& face = surf.Face(i);
+			for (int j = 0; j < face.Nodes(); j++) {
+				indices[j] = face.node[j];
+			}
+
+			if (face.ntype == FEFacetSet::FACET::QUAD4)
+			{
+				newMesh->AddBdrQuad(indices, n + 1);
+			}
+		}
+	}
+
+	newMesh->FinalizeTopology(false);
+	newMesh->Finalize(false, true);
+
+//	return mfemMesh;
+	return newMesh;
 }

@@ -6,17 +6,18 @@ FEDomain* MFEMDomainFactory::CreateDomain(const FE_Element_Spec& spec, FEMesh* p
 {
 	FEModel& fem = *pmat->GetFEModel();
 	FE_Element_Class eclass = spec.eclass;
-	const char* sztype = 0;
+	FEDomain* dom = nullptr;
 	if (dynamic_cast<MFEMMaterial*>(pmat))
 	{
-		if (eclass == FE_ELEM_SHELL) sztype = "mfem domain";
+		if (eclass == FE_ELEM_SHELL)
+		{
+			dom = fecore_new<FEShellDomainOld>("mfem domain 2d", &fem);
+		}
+		else if (eclass == FE_ELEM_SOLID)
+		{
+			dom = fecore_new<FESolidDomain>("mfem domain 3d", &fem);
+		}
+		if (dom) dom->SetMaterial(pmat);
 	}
-
-	if (sztype)
-	{
-		FEDomain* pd = fecore_new<FEShellDomainOld>(sztype, &fem);
-		if (pd) pd->SetMaterial(pmat);
-		return pd;
-	}
-	else return nullptr;
+	return dom;
 }

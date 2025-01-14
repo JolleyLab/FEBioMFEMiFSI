@@ -1,12 +1,13 @@
 #pragma once
 #include <FECore/FECoreFactory.h>
 #include <FECore/FEShellDomain.h>
+#include <FECore/FESolidDomain.h>
 #include "MFEMMaterial.h"
 
-class MFEMDomain : public FEShellDomainOld
+class MFEMDomain2D : public FEShellDomainOld
 {
 public:
-	MFEMDomain(FEModel* fem) : FEShellDomainOld(fem), dofs(fem) {}
+	MFEMDomain2D(FEModel* fem) : FEShellDomainOld(fem), dofs(fem), mat(nullptr) {}
 
 	const FEDofList& GetDOFList() const override
 	{
@@ -17,6 +18,30 @@ public:
 	{
 		mat = dynamic_cast<MFEMMaterial*>(pmat);
 		FEShellDomainOld::SetMaterial(pmat);
+	}
+
+	FEMaterial* GetMaterial() override { return mat; }
+
+private:
+	FEDofList dofs;
+	MFEMMaterial* mat;
+};
+
+
+class MFEMSolidDomain : public FESolidDomain
+{
+public:
+	MFEMSolidDomain(FEModel* fem) : FESolidDomain(fem), dofs(fem), mat(nullptr) {}
+
+	const FEDofList& GetDOFList() const override
+	{
+		return dofs;
+	}
+
+	void SetMaterial(FEMaterial* pmat) override
+	{
+		mat = dynamic_cast<MFEMMaterial*>(pmat);
+		FESolidDomain::SetMaterial(pmat);
 	}
 
 	FEMaterial* GetMaterial() override { return mat; }
