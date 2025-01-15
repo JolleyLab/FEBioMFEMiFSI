@@ -6,6 +6,7 @@
 #include "MFEMSolver.h"
 #include "MFEMMaterial.h"
 #include "MFEMPlotVariables.h"
+#include "MFEMInitialCondition.h"
 
 class FEMFEMiFSI : public FEModule
 {
@@ -61,6 +62,10 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 	// feature classes
 	REGISTER_FECORE_CLASS(MFEMSolver, "mfem");
 	REGISTER_FECORE_CLASS(MFEMMaterial, "mfem");
+
+	REGISTER_FECORE_CLASS(MFEMInitialPressure, "initial pressure");
+	REGISTER_FECORE_CLASS(MFEMInitialVelocity, "initial velocity");
+
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");
 	REGISTER_FECORE_CLASS(FEPltMFemVelocity, "mfem velocity");
 }

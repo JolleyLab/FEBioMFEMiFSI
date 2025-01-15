@@ -1680,6 +1680,10 @@
 	<MeshDomains>
 		<SolidDomain name="Part1" mat="Material1"/>
 	</MeshDomains>
+	<Initial>
+		<ic name="IC1" type="initial velocity"/>
+		<ic name="IC2" type="initial pressure"/>
+	</Initial>
 	<Output>
 		<plotfile type="febio">
 			<var type="mfem pressure"/>
