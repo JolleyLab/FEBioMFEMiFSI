@@ -70,67 +70,6 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
 	ADD_PARAMETER(m.rtol, "rtol");
 END_FECORE_CLASS();
 
-void zero_grad(const Vector& x, double t, DenseMatrix& gradu)
-{
-	double x1 = x(0);
-	double x2 = x(1);
-
-	gradu.SetSize(x.Size());
-	gradu = 0.0;
-}
-
-void zero_vec(const Vector& x, double t, Vector& u)
-{
-	u.SetSize(x.Size());
-	u = 0.0;
-}
-
-double ComputeVectorH1Error(GridFunction* u_gf, VectorCoefficient* ex_u, MatrixCoefficient* ex_gradu, const IntegrationRule* irs[]);
-
-double ComputeVectorH1Error(GridFunction* u_gf, VectorCoefficient* ex_u, MatrixCoefficient* ex_gradu, const IntegrationRule* irs[])
-{
-	double error_temp = 0.0;
-	const FiniteElement* fe;
-	ElementTransformation* Tr;
-	DenseMatrix grad;
-	int intorder;
-	int dim = u_gf->FESpace()->GetMesh()->SpaceDimension();
-	DenseMatrix mat(dim);
-	Vector uvec(dim), vec(dim);
-
-	for (int i = 0; i < u_gf->FESpace()->GetNE(); i++)
-	{
-		fe = u_gf->FESpace()->GetFE(i);
-		Tr = u_gf->FESpace()->GetElementTransformation(i);
-		intorder = 2 * fe->GetOrder() + 3; // <--------
-		const IntegrationRule* ir;
-		if (irs)
-		{
-			ir = irs[fe->GetGeomType()];
-		}
-		else
-		{
-			ir = &(IntRules.Get(fe->GetGeomType(), intorder));
-		}
-		for (int j = 0; j < ir->GetNPoints(); j++)
-		{
-			const IntegrationPoint& ip = ir->IntPoint(j);
-			Tr->SetIntPoint(&ip);
-			u_gf->GetVectorGradient(*Tr, grad);
-			ex_gradu->Eval(mat, *Tr, ip);
-			mat.Add(-1.0, grad);
-
-			u_gf->GetVectorValue(*Tr, ip, vec);
-			ex_u->Eval(uvec, *Tr, ip);
-			vec -= uvec;
-
-			error_temp += ip.weight * Tr->Weight() * (mat.FNorm2() + vec * vec);
-		}
-	}
-
-	return sqrt(abs(error_temp));
-}
-
 MFEMSolver::MFEMSolver(FEModel* fem) : FESolver(fem), m(*(new MFEMSolver::Imp))
 {
 
