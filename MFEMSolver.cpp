@@ -1,13 +1,12 @@
 #include "MFEMSolver.h"
 #include <FECore/FEModel.h>
-#include <FECore/FEDomain.h>
 #include <FECore/FEAnalysis.h>
 #include "ins_solver.hpp"
 #include "MFEMMesh.h"
 #include "MFEMInitialCondition.h"
-#include <math.h>
+#include "MFEMBoundaryCondition.h"
+#include "MFEMLoad.h"
 #include <FECore/log.h>
-#include <functional>
 
 using namespace ins_solver_serial;
 using namespace std;
@@ -61,62 +60,6 @@ public:
 	int order = 1;
 
 	int ts_method = INS_Solver::TS_Method::GeneralizedAlpha;
-
-public: // 3D case
-	void vel_exact_3d(const Vector& xval, double t, Vector& u)
-	{
-		double x = xval(0);
-		double y = xval(1);
-		double z = xval(2);
-
-		double c = M_PI * exp(-M_PI * M_PI * kinvis * t / 4.0);
-
-		u(0) = -1.0 * c / 4.0 * (exp(M_PI * x / 4.0) * sin(M_PI * (y + 2.0 * z) / 4.0) + exp(M_PI * z / 4.0) * cos(M_PI * (x + 2.0 * y) / 4.0));
-		u(1) = -1.0 * c / 4.0 * (exp(M_PI * y / 4.0) * sin(M_PI * (2.0 * x + z) / 4.0) + exp(M_PI * x / 4.0) * cos(M_PI * (y + 2.0 * z) / 4.0));
-		u(2) = -1.0 * c / 4.0 * (exp(M_PI * z / 4.0) * sin(M_PI * (x + 2.0 * y) / 4.0) + exp(M_PI * y / 4.0) * cos(M_PI * (2.0 * x + z) / 4.0));
-	}
-
-	static void vel_exact_3d_static(const Vector& xval, double t, Vector& u)
-	{
-		This->vel_exact_3d(xval, t, u);
-	}
-
-	double p_exact_3d(const Vector& xval, double t)
-	{
-		double x = xval(0);
-		double y = xval(1);
-		double z = xval(2);
-
-		double time_part = -fluid_density * M_PI * M_PI / 32.0 * exp(-M_PI * M_PI * t * kinvis / 2.0);
-
-		double space_part = exp(M_PI * x / 2.0) + exp(M_PI * y / 2.0) + exp(M_PI * z / 2.0)
-			+ 2.0 * exp(M_PI * (x + y) / 4.0) * cos(M_PI * (y + 2.0 * z) / 4.0) * sin(M_PI * (2.0 * x + z) / 4.0)
-			+ 2.0 * exp(M_PI * (x + z) / 4.0) * cos(M_PI * (x + 2.0 * y) / 4.0) * sin(M_PI * (y + 2.0 * z) / 4.0)
-			+ 2.0 * exp(M_PI * (y + z) / 4.0) * cos(M_PI * (2.0 * x + z) / 4.0) * sin(M_PI * (x + 2.0 * y) / 4.0);
-
-		return time_part * space_part;
-	}
-
-	void traction_bc_3d(const Vector& xval, double t, Vector& tract)
-	{
-		double x = xval(0);
-		double y = xval(1);
-		double z = xval(2);
-
-		tract.SetSize(xval.Size());
-		tract = 0.0;
-
-		double p = p_exact_3d(xval, t);
-
-		tract(0) = p + (M_PI * M_PI * dyn_viscosity * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * (exp((M_PI * x) / 4.0) * sin((M_PI * (y + 2.0 * z)) / 4.0) - exp((M_PI * z) / 4.0) * sin((M_PI * (x + 2.0 * y)) / 4.0))) / 8.0;
-		tract(1) = 2.0 * dyn_viscosity * ((M_PI * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * ((M_PI * exp((M_PI * x) / 4.0) * cos((M_PI * (y + 2.0 * z)) / 4.0)) / 4.0 + (M_PI * exp((M_PI * y) / 4.0) * cos((M_PI * (2.0 * x + z)) / 4.0)) / 2.0)) / 8.0 - (M_PI * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * ((M_PI * exp((M_PI * z) / 4.0) * sin((M_PI * (x + 2.0 * y)) / 4.0)) / 2.0 - (M_PI * exp((M_PI * x) / 4.0) * cos((M_PI * (y + 2.0 * z)) / 4.0)) / 4.0)) / 8.0);
-		tract(2) = 2.0 * dyn_viscosity * ((M_PI * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * ((M_PI * exp((M_PI * x) / 4.0) * cos((M_PI * (y + 2.0 * z)) / 4.0)) / 2.0 + (M_PI * exp((M_PI * z) / 4.0) * cos((M_PI * (x + 2.0 * y)) / 4.0)) / 4.0)) / 8.0 - (M_PI * exp(-(M_PI * M_PI * kinvis * t) / 4.0) * ((M_PI * exp((M_PI * y) / 4.0) * sin((M_PI * (2.0 * x + z)) / 4.0)) / 2.0 - (M_PI * exp((M_PI * z) / 4.0) * cos((M_PI * (x + 2.0 * y)) / 4.0)) / 4.0)) / 8.0);
-	}
-
-	static void traction_bc_3d_static(const Vector& xval, double t, Vector& u)
-	{
-		This->traction_bc_3d(xval, t, u);
-	}
 };
 
 MFEMSolver::Imp* MFEMSolver::Imp::This = nullptr;
@@ -210,6 +153,21 @@ mfem::GridFunction* MFEMSolver::GetCurrentVelocity()
 	return m.flowsolver->GetCurrentVelocity();
 }
 
+mfem::Mesh* MFEMSolver::GetMFEMMesh()
+{
+	return m.mesh;
+}
+
+void MFEMSolver::AddVelDirichletBC(VecFuncT* f, mfem::Array<int>& attr)
+{
+	m.flowsolver->AddVelDirichletBC(f, attr);
+}
+
+void MFEMSolver::AddTractionBC(VecFuncT* f, mfem::Array<int>& attr)
+{
+	m.flowsolver->AddTractionBC(f, attr);
+}
+
 double MFEMSolver::FluidDensity() const
 {
 	return m.fluid_density;
@@ -220,12 +178,16 @@ double MFEMSolver::KinematicViscosity() const
 	return m.kinvis;
 }
 
+double MFEMSolver::DynamicViscosity() const
+{
+	return m.dyn_viscosity;
+}
+
 bool MFEMSolver::Init()
 {
 	// create the mfem mesh from the FEBio mesh
 	FEModel& fem = *GetFEModel();
 	FEMesh& femesh = fem.GetMesh();
-//	m.mesh = CreateMFEMMesh2D(femesh);
 	m.mesh = CreateMFEMMesh3D(femesh);
 	if (m.mesh == nullptr) return false;
 	m.mesh->PrintCharacteristics();
@@ -299,21 +261,23 @@ bool MFEMSolver::Init()
 		}
 	}
 
-	// set boundary conditions
-	// Add dirichlet velocity bc
-	Array<int> vel_bc_attr(m.mesh->bdr_attributes.Size());
-	vel_bc_attr = 1;
-	vel_bc_attr[4] = 0;
-	m.flowsolver->AddVelDirichletBC(&Imp::vel_exact_3d_static, vel_bc_attr);
-
-	// neumann bc
-	Array<int> vel_n_attr(m.mesh->bdr_attributes.Size());
-	vel_n_attr = 0;
-	vel_n_attr[4] = 1;
-
-	m.flowsolver->AddTractionBC(&Imp::traction_bc_3d_static, vel_n_attr);
-// ---------------------------------------
-
+	// set boundary conditions and loads
+	for (int i=0; i<fem.BoundaryConditions(); ++i)
+	{
+		MFEMBoundaryCondition* bc = dynamic_cast<MFEMBoundaryCondition*>(fem.BoundaryCondition(i));
+		if (bc && bc->IsActive())
+		{
+			bc->Apply(this);
+		}
+	}
+	for (int i = 0; i < fem.ModelLoads(); ++i)
+	{
+		MFEMLoad* ml = dynamic_cast<MFEMLoad*>(fem.ModelLoad(i));
+		if (ml && ml->IsActive())
+		{
+			ml->Apply(this);
+		}
+	}
 
 	m.u_gf = m.flowsolver->GetCurrentVelocity();
 	m.p_gf = m.flowsolver->GetCurrentPressure();

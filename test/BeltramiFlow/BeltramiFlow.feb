@@ -1681,9 +1681,29 @@
 		<SolidDomain name="Part1" mat="Material1"/>
 	</MeshDomains>
 	<Initial>
-		<ic name="IC1" type="initial velocity"/>
-		<ic name="IC2" type="initial pressure"/>
+		<ic name="IC1" type="initial velocity">
+			<vx type="math">-pi / 4 * (exp(pi * X / 4) * sin(pi * (Y + 2 * Z) / 4) + exp(pi * Z / 4) * cos(pi * (X + 2 * Y) / 4))</vx>
+			<vy type="math">-pi / 4 * (exp(pi * Y / 4) * sin(pi * (2 * X + Z) / 4) + exp(pi * X / 4) * cos(pi * (Y + 2 * Z) / 4))</vy>
+			<vz type="math">-pi / 4 * (exp(pi * Z / 4) * sin(pi * (X + 2 * Y) / 4) + exp(pi * Y / 4) * cos(pi * (2 * X + Z) / 4))</vz>
+		</ic>
+		<ic name="IC2" type="initial pressure">
+			<pressure type="math">
+				fluid_density = 1;
+				time_part = -fluid_density*pi*pi/32;
+				space_part = exp(pi * X / 2) + exp(pi * Y / 2) + exp(pi * Z / 2)
+					+ 2 * exp(pi * (X + Y) / 4) * cos(pi * (Y + 2 * Z) / 4) * sin(pi * (Z + 2 * X) / 4)
+					+ 2 * exp(pi * (X + Z) / 4) * cos(pi * (X + 2 * Y) / 4) * sin(pi * (Y + 2 * Z) / 4)
+					+ 2 * exp(pi * (Y + Z) / 4) * cos(pi * (Z + 2 * X) / 4) * sin(pi * (X + 2 * Y) / 4);
+				time_part * space_part
+			</pressure>
+		</ic>
 	</Initial>
+	<Boundary>
+		<bc name="BC1" type="prescribed velocity"/>
+	</Boundary>
+	<Loads>
+		<surface_load name="LOAD1" type="traction" surface="Surface01"/>
+	</Loads>
 	<Output>
 		<plotfile type="febio">
 			<var type="mfem pressure"/>

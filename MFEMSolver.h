@@ -1,9 +1,7 @@
 #pragma once
 #include <FECore/FESolver.h>
 
-namespace mfem {
-	class GridFunction;
-}
+#include "ins_solver.hpp"
 
 class MFEMSolver : public FESolver
 {
@@ -21,8 +19,15 @@ public:
 	mfem::GridFunction* GetCurrentPressure();
 	mfem::GridFunction* GetCurrentVelocity();
 
+	mfem::Mesh* GetMFEMMesh();
+
+	void AddVelDirichletBC(VecFuncT* f, mfem::Array<int>& attr);
+
+	void AddTractionBC(VecFuncT* f, mfem::Array<int>& attr);
+
 	double FluidDensity() const;
 	double KinematicViscosity() const;
+	double DynamicViscosity() const;
 
 private:
 	Imp& m;
