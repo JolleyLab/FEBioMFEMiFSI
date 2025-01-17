@@ -1,6 +1,10 @@
 #include "MFEMInitialCondition.h"
 #include "MFEMSolver.h"
+#ifdef WIN32
 #include <mfem/fem/gridfunc.hpp>
+#else
+#include <fem/gridfunc.hpp>
+#endif
 #include "MFEMTools.h"
 
 BEGIN_FECORE_CLASS(MFEMInitialPressure, MFEMInitialCondition)

@@ -1,7 +1,11 @@
 #pragma once
 #include <FECore/FESolver.h>
 
+#ifdef WIN32
 #include "ins_solver.hpp"
+#else
+#include <Navier-Stokes-Serial/ins_solver.hpp>
+#endif
 
 class MFEMSolver : public FESolver
 {

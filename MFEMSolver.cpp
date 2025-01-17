@@ -1,7 +1,12 @@
 #include "MFEMSolver.h"
 #include <FECore/FEModel.h>
 #include <FECore/FEAnalysis.h>
+#ifdef WIN32
 #include "ins_solver.hpp"
+#else
+#include <Navier-Stokes-Serial/ins_solver.hpp>
+#include "mfem.hpp"
+#endif
 #include "MFEMMesh.h"
 #include "MFEMInitialCondition.h"
 #include "MFEMBoundaryCondition.h"

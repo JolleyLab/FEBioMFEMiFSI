@@ -45,7 +45,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 	// create the new module
 	const char* info = \
 		"{ "
-		"   \"title\" : \"MFM-iFSI\","
+		"   \"title\" : \"MFEM-iFSI\","
 		"   \"info\"  : \"Interface to MFEM based iFSI solver\","
 		"   \"author\": \"Ryan Black, Steve Maas\","
 		"   \"version\": \"1.0\""
