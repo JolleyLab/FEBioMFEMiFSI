@@ -97,14 +97,14 @@ mfem::Mesh* MFEMSolver::GetMFEMMesh()
 	return m.mesh;
 }
 
-void MFEMSolver::AddVelDirichletBC(VecFuncT* f, mfem::Array<int>& attr)
+void MFEMSolver::AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr)
 {
-	m.flowsolver->AddVelDirichletBC(f, attr);
+	m.flowsolver->AddVelDirichletBC(coeff, attr);
 }
 
-void MFEMSolver::AddTractionBC(VecFuncT* f, mfem::Array<int>& attr)
+void MFEMSolver::AddTractionBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr)
 {
-	m.flowsolver->AddTractionBC(f, attr);
+	m.flowsolver->AddTractionBC(coeff, attr);
 }
 
 double MFEMSolver::FluidDensity() const

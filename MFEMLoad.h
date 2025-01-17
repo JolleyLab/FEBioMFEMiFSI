@@ -1,5 +1,6 @@
 #pragma once
 #include <FECore/FESurfaceLoad.h>
+#include <FECore/FEModelParam.h>
 
 class MFEMSolver;
 
@@ -17,4 +18,11 @@ public:
 	MFEMNeumannBC(FEModel* fem) : MFEMLoad(fem) {}
 
 	void Apply(MFEMSolver* solver) override;
+
+private:
+	FEParamDouble m_tx;
+	FEParamDouble m_ty;
+	FEParamDouble m_tz;
+
+	DECLARE_FECORE_CLASS();
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include <FECore/FEBoundaryCondition.h>
+#include <FECore/FEModelParam.h>
 
 class MFEMSolver;
 
@@ -24,4 +25,11 @@ public:
 	MFEMVelDirichletBC(FEModel* fem) : MFEMBoundaryCondition(fem) {}
 
 	void Apply(MFEMSolver* solver) override;
+
+private:
+	FEParamDouble m_vx;
+	FEParamDouble m_vy;
+	FEParamDouble m_vz;
+
+	DECLARE_FECORE_CLASS();
 };

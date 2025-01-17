@@ -21,9 +21,9 @@ public:
 
 	mfem::Mesh* GetMFEMMesh();
 
-	void AddVelDirichletBC(VecFuncT* f, mfem::Array<int>& attr);
+	void AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);
 
-	void AddTractionBC(VecFuncT* f, mfem::Array<int>& attr);
+	void AddTractionBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);
 
 	double FluidDensity() const;
 	double KinematicViscosity() const;
