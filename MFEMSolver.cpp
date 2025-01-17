@@ -20,7 +20,7 @@ public:
 	Imp() { This = this; }
 
 public:
-	Mesh* mesh = nullptr;
+	MFEMMesh* mesh = nullptr;
 	INS_Solver* flowsolver = nullptr;
 	GridFunction* p_gf = nullptr;
 	GridFunction* u_gf = nullptr;
@@ -206,7 +206,10 @@ bool MFEMSolver::Init()
 		MFEMBoundaryCondition* bc = dynamic_cast<MFEMBoundaryCondition*>(fem.BoundaryCondition(i));
 		if (bc && bc->IsActive())
 		{
-			bc->Apply(this);
+			FESurface& surf = *bc->GetSurface();
+			FEFacetSet* set = surf.GetFacetSet();
+			int id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
+			bc->Apply(this, id - 1);
 		}
 	}
 	for (int i = 0; i < fem.ModelLoads(); ++i)
@@ -214,7 +217,10 @@ bool MFEMSolver::Init()
 		MFEMLoad* ml = dynamic_cast<MFEMLoad*>(fem.ModelLoad(i));
 		if (ml && ml->IsActive())
 		{
-			ml->Apply(this);
+			FESurface& surf = ml->GetSurface();
+			FEFacetSet* set = surf.GetFacetSet();
+			int id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
+			ml->Apply(this, id - 1);
 		}
 	}
 

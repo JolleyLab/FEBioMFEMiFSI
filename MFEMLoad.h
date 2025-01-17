@@ -9,7 +9,7 @@ class MFEMLoad : public FESurfaceLoad
 public:
 	MFEMLoad(FEModel* fem) : FESurfaceLoad(fem) {}
 
-	virtual void Apply(MFEMSolver* solver) = 0;
+	virtual void Apply(MFEMSolver* solver, int attr) = 0;
 };
 
 class MFEMNeumannBC : public MFEMLoad
@@ -17,7 +17,7 @@ class MFEMNeumannBC : public MFEMLoad
 public:
 	MFEMNeumannBC(FEModel* fem) : MFEMLoad(fem) {}
 
-	void Apply(MFEMSolver* solver) override;
+	void Apply(MFEMSolver* solver, int attr) override;
 
 private:
 	FEParamDouble m_tx;
