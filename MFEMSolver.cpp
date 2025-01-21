@@ -13,7 +13,7 @@
 #include "MFEMBoundaryCondition.h"
 #include "MFEMLoad.h"
 #include <FECore/log.h>
-#include "MFEMNewtonianFluid.h"
+#include "MFEMMaterial.h"
 
 using namespace ins_solver_serial;
 using namespace std;
@@ -151,9 +151,99 @@ void MFEMSolver::AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<i
 	m.flowsolver->AddVelDirichletBC(coeff, attr);
 }
 
+void MFEMSolver::AddVelDirichletBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int component)
+{
+	m.flowsolver->AddVelDirichletBC(coeff, attr, component);
+}
+
+void MFEMSolver::AddNoSlipBC(mfem::Array<int>& attr)
+{
+   m.flowsolver->AddNoSlipBC(attr);
+}
+
+void MFEMSolver::AddNormalVelocityBC(mfem::Coefficient* coeff, mfem::Array<int>& attr)
+{
+   m.flowsolver->AddLocalNormalVelDirichletBC(coeff, attr);
+}
+
 void MFEMSolver::AddTractionBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr)
 {
 	m.flowsolver->AddTractionBC(coeff, attr);
+}
+
+void MFEMSolver::AddTractionFreeBC(mfem::Array<int>& attr)
+{
+	m.flowsolver->AddTractionFreeBC(attr);
+} 
+
+void MFEMSolver::AddPressureBC(mfem::Coefficient* coeff, mfem::Array<int>& attr)
+{
+   m.flowsolver->AddPressureBC(coeff, attr);
+}
+
+void MFEMSolver::AddPeriodicBC(mfem::Array<int>& attr)
+{
+   m.flowsolver->AddPeriodicBC(attr);
+}
+
+void MFEMSolver::AddBackflowStabilizationBC(FEParamDouble beta, mfem::Array<int>& attr)
+{
+   if (beta.isConst() == false)
+   {
+      feLogError("Backflow stabilization coefficient must be constant");
+   }
+   double beta_val = beta.constValue();
+   m.flowsolver->UseBackflowStabilization(attr,beta_val);
+}
+
+void MFEMSolver::AddResistanceBC(FEParamDouble R, FEParamDouble p0, mfem::Array<int>& attr)
+{
+   if (R.isConst() == false)
+   {
+      feLogError("Resistance coefficient must be constant");
+   }
+   if (p0.isConst() == false)
+   {
+      feLogError("Initial pressure must be constant");
+   }
+   double R_val = R.constValue();
+   double p0_val = p0.constValue();
+   m.flowsolver->AddResistanceBC(attr,R_val,p0_val);
+}
+
+void MFEMSolver::AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDouble C, FEParamDouble p0, FEParamDouble pd, mfem::Array<int>& attr)
+{
+   if (R.isConst() == false)
+   {
+      feLogError("Proximal resistance coefficient must be constant");
+   }
+   if (Rd.isConst() == false)
+   {
+      feLogError("Distal resistance coefficient must be constant");
+   }
+   if (C.isConst() == false)
+   {
+      feLogError("Compliance coefficient must be constant");
+   }
+   if (p0.isConst() == false)
+   {
+      feLogError("Initial pressure must be constant");
+   }
+   if (pd.isConst() == false)
+   {
+      feLogError("Distal pressure must be constant");
+   }
+   double R_val = R.constValue();
+   double Rd_val = Rd.constValue();
+   double C_val = C.constValue();
+   double p0_val = p0.constValue();
+   double pd_val = pd.constValue();
+
+   // compute initial flow rate
+   GridFunction *u_ic = m.flowsolver->GetCurrentVelocity();
+   double Q0 = m.flowsolver->ComputeMassFlowThruSurf(*u_ic, attr, false, m.fluid_density, false);
+
+   m.flowsolver->AddWindkesselBC(attr,R_val,Rd_val,C_val,p0_val,pd_val,Q0);
 }
 
 double MFEMSolver::FluidDensity() const
@@ -181,7 +271,7 @@ bool MFEMSolver::Init()
 	m.mesh->PrintCharacteristics();
 
    // get fluid material
-   FEMaterial* mat = fem.GetMaterial(0);
+   FEMaterial* mat = fem.GetMaterial(0); // assumes one material
    // TO DO: More general fluid material interface, for now just Newtonian fluid
    MFEMNewtonianFluid* fluid_mat = dynamic_cast<MFEMNewtonianFluid*>(mat);
    m.fluid_density = fluid_mat->Density();
@@ -189,7 +279,20 @@ bool MFEMSolver::Init()
    m.kinvis = fluid_mat->KinematicViscosity();
 
 	// create the mfem solver class
-	m.flowsolver = new INS_Solver(m.mesh, (int) m.orderv, (int) m.orderp, fluid_mat->kinvis, fluid_mat->rho);
+   if (!m.stabilized_VMS)
+   {
+      if (m.orderv <= 1.0) 
+      {
+         feLogError("Mixed order method requires velocity order greater than or equal to 2");
+         return false;
+      }
+      if (m.orderp != m.orderv - 1.0)
+      {
+         feLogError("Mixed order method requires pressure order to be one less than velocity order");
+         return false;
+      }
+   }
+	m.flowsolver = new INS_Solver(m.mesh, (int) m.orderv, (int) m.orderp, fluid_mat->m_kinvis, fluid_mat->m_rho);
 
 	// set rho_inf for time stepping method
 	m.flowsolver->SetRhoInf(m.rhoinf);
@@ -223,7 +326,7 @@ bool MFEMSolver::Init()
 		 case ins_solver::StabilizationType::SUPG:
             if (m.orderv != m.orderp - 1) 
             {
-                  feLogError("Error: using SUPG only requires mixed order elements");
+                  feLogError("using SUPG only requires mixed order elements");
                   return false;
             }
             m.flowsolver->UseSUPG();
@@ -232,7 +335,7 @@ bool MFEMSolver::Init()
 		 case ins_solver::StabilizationType::SUPG_PSPG:
             if (m.orderv != m.orderp) 
             {
-                  feLogError("Error: SUPG/PSPG requires equal order elements");
+                  feLogError("SUPG/PSPG requires equal order elements");
                   return false;
             }
             m.flowsolver->UseSUPG();
@@ -243,16 +346,16 @@ bool MFEMSolver::Init()
          default:
             if (m.orderv != m.orderp) 
             {
-                  feLogError("Error: VMS requires equal order elements");
+                  feLogError("VMS requires equal order elements");
                   return false;
             }
             m.flowsolver->UseVMS();
             break;
       }
    }
-
 	if (m.stabilized_LSIC) 
    {
+      // turned on by default with VMS
       m.flowsolver->UseMassStabilization();
    }
 

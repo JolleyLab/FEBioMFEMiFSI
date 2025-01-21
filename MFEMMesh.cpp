@@ -40,7 +40,20 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 
 			switch (el.Shape())
 			{
-			case ET_HEX8: newMesh->AddHex(indices, n + 1); break;
+         case ET_TET4: 
+         case ET_TET10:
+            newMesh->AddTet(indices, n + 1); break;
+         case ET_HEX8: 
+         case ET_HEX27:
+            newMesh->AddHex(indices, n + 1); break;
+         case ET_PENTA6: 
+         // case ET_PENTA15: // 2nd order wedge TODO
+            newMesh->AddWedge(indices, n + 1); break;
+         case ET_PYRA5: 
+         // case ET_PYRA13: // 2nd order pyramid TODO
+            newMesh->AddPyramid(indices, n + 1);
+            assert(false);
+            break;
 			default:
 				assert(false);
 			}
@@ -59,15 +72,21 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 				indices[j] = face.node[j];
 			}
 
-			if (face.ntype == FEFacetSet::FACET::QUAD4)
-			{
-				newMesh->AddBdrQuad(indices, n + 1);
-			}
+         switch (face.ntype)
+         {
+         case FEFacetSet::FACET::TRI3: 
+         case FEFacetSet::FACET::TRI6:
+            newMesh->AddBdrTriangle(indices, n + 1); break;
+         case FEFacetSet::FACET::QUAD4:
+         case FEFacetSet::FACET::QUAD9:
+            newMesh->AddBdrQuad(indices, n + 1); break;
+         default:
+            assert(false);
+         }
 		}
 	}
 
-	// newMesh->FinalizeTopology(false);
-   newMesh->FinalizeTopology();
+   newMesh->FinalizeTopology(false);
 	newMesh->Finalize(false, true);
 
 	return newMesh;

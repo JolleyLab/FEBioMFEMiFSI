@@ -4,7 +4,7 @@
 #include "MFEMAnalysis.h"
 #include "MFEMDomain.h"
 #include "MFEMSolver.h"
-#include "MFEMNewtonianFluid.h"
+#include "MFEMMaterial.h"
 #include "MFEMPlotVariables.h"
 #include "MFEMInitialCondition.h"
 #include "MFEMBoundaryCondition.h"
@@ -68,8 +68,23 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 	REGISTER_FECORE_CLASS(MFEMInitialPressure, "initial pressure");
 	REGISTER_FECORE_CLASS(MFEMInitialVelocity, "initial velocity");
 
+   // velocity bcs
 	REGISTER_FECORE_CLASS(MFEMVelDirichletBC, "prescribed velocity");
+   REGISTER_FECORE_CLASS(MFEMNoSlipBC, "no slip");
+   REGISTER_FECORE_CLASS(MFEMNormalVelocityBC, "prescribed normal velocity");
+
+   // traction bcs
 	REGISTER_FECORE_CLASS(MFEMNeumannBC, "traction");
+   REGISTER_FECORE_CLASS(MFEMTractionFreeBC, "traction free");
+   REGISTER_FECORE_CLASS(MFEMPressureBC, "pressure");
+
+   // periodic bcs
+   REGISTER_FECORE_CLASS(MFEMPeriodicBC, "periodic");
+   
+   // cardiovascular bcs
+   REGISTER_FECORE_CLASS(MFEMBackflowStabilizationBC, "backflow stabilization");
+   REGISTER_FECORE_CLASS(MFEMResistanceBC, "resistance (R)");
+   REGISTER_FECORE_CLASS(MFEMWindkesselBC, "windkessel (RCR)");
 
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");
 	REGISTER_FECORE_CLASS(FEPltMFemVelocity, "mfem velocity");
