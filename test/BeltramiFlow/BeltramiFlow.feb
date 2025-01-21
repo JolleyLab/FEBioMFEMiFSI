@@ -19,8 +19,22 @@
 			<equation_scheme>staggered</equation_scheme>
 			<equation_order>default</equation_order>
 			<optimize_bw>0</optimize_bw>
-			<atol>1e-12</atol>
-			<rtol>1e-08</rtol>
+			<velocity_order>1</velocity_order>
+			<pressure_order>1</pressure_order>
+			<VMS>1</VMS>
+			<Laplace_form>0</Laplace_form>
+			<rho_inf>0.5</rho_inf>
+			<atol>1e-06</atol>
+			<rtol>0.001</rtol>
+			<minIt>3</minIt>
+			<maxIt>10</maxIt>
+			<lin_atol>1e-06</lin_atol>
+			<lin_rtol>0.001</lin_rtol>
+			<lin_maxIt>200</lin_maxIt>
+			<Ainv_atol>1e-06</Ainv_atol>
+			<Ainv_rtol>0.001</Ainv_rtol>
+			<Sinv_atol>1e-06</Sinv_atol>
+			<Sinv_rtol>0.001</Sinv_rtol>
 		</solver>
 	</Control>
 	<Globals>
@@ -32,7 +46,10 @@
 		</Constants>
 	</Globals>
 	<Material>
-		<material id="1" name="Material1" type="mfem"/>
+		<material id="1" name="Material1" type="mfem newtonian fluid">
+			<rho>1.0</rho>
+			<mu>10.0</mu>
+		</material>
 	</Material>
 	<Mesh>
 		<Nodes name="Object1">

@@ -66,7 +66,8 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 		}
 	}
 
-	newMesh->FinalizeTopology(false);
+	// newMesh->FinalizeTopology(false);
+   newMesh->FinalizeTopology();
 	newMesh->Finalize(false, true);
 
 	return newMesh;

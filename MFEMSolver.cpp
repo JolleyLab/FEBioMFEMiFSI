@@ -5,6 +5,7 @@
 #include "ins_solver.hpp"
 #else
 #include <Navier-Stokes-Serial/ins_solver.hpp>
+#include <Navier-Stokes/ins_solver_enum.hpp>
 #include "mfem.hpp"
 #endif
 #include "MFEMMesh.h"
@@ -12,6 +13,7 @@
 #include "MFEMBoundaryCondition.h"
 #include "MFEMLoad.h"
 #include <FECore/log.h>
+#include "MFEMNewtonianFluid.h"
 
 using namespace ins_solver_serial;
 using namespace std;
@@ -25,59 +27,101 @@ public:
 	Imp() { This = this; }
 
 public:
-	MFEMMesh* mesh = nullptr;
-	INS_Solver* flowsolver = nullptr;
-	GridFunction* p_gf = nullptr;
-	GridFunction* u_gf = nullptr;
-	ParaViewDataCollection* pvdc = nullptr;
+	MFEMMesh* mesh = nullptr; // MFEM mesh
+	INS_Solver* flowsolver = nullptr; // MFEM flow solver
+	GridFunction* p_gf = nullptr; // velocity grid function
+	GridFunction* u_gf = nullptr; // pressure grid function
+	ParaViewDataCollection* pvdc = nullptr; // paraview data collection
 
 public:
-	int nonlinear_form = INS_Solver::NonlinearFormType::Convective;
-	bool div_stress = true;
-	
-	bool total_integ = false; // This was true for the 2D case
-	bool equal_order = true;
-	bool supg_flag = true;
-	bool pspg_flag = true; // equal order must be true too!
-	bool vms_flag = true;
-	bool mass_stab = true;
+   // Material properties
+   double fluid_density;
+   double kinvis;
+   double dyn_viscosity;
 
-	bool scr_flag = false;
-	bool simple_flag = true;
-	bool ascr_flag = false;
+	// Discretization options
+   double orderv = 1.0;
+   double orderp = 1.0;
+   bool stabilized_LSIC = false; // turned on automatically using VMS
+   bool stabilized_VMS = true;
+   int stab_type = ins_solver::StabilizationType::VMS;
 
-	// material parameters?
-	double fluid_density = 1.0;
-	double dyn_viscosity = 10.0;
-	double kinvis = dyn_viscosity / fluid_density; // = 0.025 for 2d Case
-	double reynolds = 1.0 / kinvis;
-	double rhoinf = 0.5;
+   int nonlinear_form = ins_solver::NonlinearFormType::Convective;
+   int viscous_term_type = ins_solver::ViscousTermType::StressForm;
+   bool LaplaceForm = false;
+   bool total_integ = true;
 
-	// solver tolerances
-	double atol = 1e-12;
-	double rtol = 1e-8;
+   // Time Stepping Options
+   double rhoinf = 0.5;
 
-	// prec tolerances
-	double atol_prec = 1e-12;
-	double rtol_prec = 1e-8;
+   // Nonlinear Solver Options
+   int minIt = 3;
+   int maxIt = 10;
+   double atol = 1.0e-6;
+   double rtol = 1.0e-3;
 
-	// equal order
-	int order = 1;
+   // Linear Solver Options
+   // int lin_minIt;
+   int lin_maxIt = 200;
+   double lin_atol = 1.0e-6;
+   double lin_rtol = 1.0e-3;
 
-	int ts_method = INS_Solver::TS_Method::GeneralizedAlpha;
+   // Preconditioner Options
+   int prec_type = ins_solver::PreconditionerType::SIMPLE;
+   double prec_Ainv_atol = 1.0e-6;
+   double prec_Ainv_rtol = 1.0e-3;
+   double prec_Sinv_atol = 1.0e-6;
+   double prec_Sinv_rtol = 1.0e-3;
 };
 
 MFEMSolver::Imp* MFEMSolver::Imp::This = nullptr;
 
 // TODO: Add solver parameters
 BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
-	ADD_PARAMETER(m.atol, "atol");
-	ADD_PARAMETER(m.rtol, "rtol");
+   // Discretization Options
+   BEGIN_PARAM_GROUP("Discretization");
+      ADD_PARAMETER(m.orderv, FE_RANGE_GREATER_OR_EQUAL(1), "velocity_order");
+      ADD_PARAMETER(m.orderp, FE_RANGE_GREATER_OR_EQUAL(1), "pressure_order");
+      ADD_PARAMETER(m.stabilized_VMS, "VMS");
+      // drop down menu for stabilization type, for now either VMS or unstabilized
+      // ADD_PARAMETER(m.stabilized_LSIC, "LSIC");
+      ADD_PARAMETER(m.LaplaceForm, "Laplace_form");
+   END_PARAM_GROUP();
+
+   // Time Stepping Options
+   BEGIN_PARAM_GROUP("Time Stepping");
+      ADD_PARAMETER(m.rhoinf, FE_RANGE_CLOSED(0.0,1.0), "rho_inf");
+   END_PARAM_GROUP();
+
+   // // Nonlinear Solver Options
+   BEGIN_PARAM_GROUP("Nonlinear Solver");
+      ADD_PARAMETER(m.atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "atol");
+      ADD_PARAMETER(m.rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "rtol");
+      ADD_PARAMETER(m.minIt, FE_RANGE_GREATER_OR_EQUAL(1), "minIt");
+      ADD_PARAMETER(m.maxIt, FE_RANGE_GREATER_OR_EQUAL(1), "maxIt");
+   END_PARAM_GROUP();
+
+   // Linear Solver Options
+   BEGIN_PARAM_GROUP("Linear Solver");
+      ADD_PARAMETER(m.lin_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "lin_atol");
+      ADD_PARAMETER(m.lin_rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "lin_rtol");
+      // ADD_PARAMETER(m.lin_minIt, FE_RANGE_GREATER_OR_EQUAL(1), "lin_minIt");
+      ADD_PARAMETER(m.lin_maxIt, FE_RANGE_GREATER_OR_EQUAL(1), "lin_maxIt");
+   END_PARAM_GROUP();
+
+   // Preconditioner Options
+   BEGIN_PARAM_GROUP("Preconditioner");
+      // set preconditioner drop down menu, for now SIMPLE
+      ADD_PARAMETER(m.prec_Ainv_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_atol");
+      ADD_PARAMETER(m.prec_Ainv_rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_rtol");
+      ADD_PARAMETER(m.prec_Sinv_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Sinv_atol");
+      ADD_PARAMETER(m.prec_Sinv_rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Sinv_rtol");
+   END_PARAM_GROUP();
 END_FECORE_CLASS();
 
 MFEMSolver::MFEMSolver(FEModel* fem) : FESolver(fem), m(*(new MFEMSolver::Imp))
 {
-
+   // default values created in Imp class
 }
 
 MFEMSolver::~MFEMSolver()
@@ -136,63 +180,86 @@ bool MFEMSolver::Init()
 	if (m.mesh == nullptr) return false;
 	m.mesh->PrintCharacteristics();
 
-	// create the mfem solver class
-	if (m.equal_order)
-	{
-		m.flowsolver = new INS_Solver(m.mesh, m.order, m.order, m.kinvis);
-	}
-	else
-	{
-		m.flowsolver = new INS_Solver(m.mesh, m.order, m.order - 1, m.kinvis);
-	}
+   // get fluid material
+   FEMaterial* mat = fem.GetMaterial(0);
+   // TO DO: More general fluid material interface, for now just Newtonian fluid
+   MFEMNewtonianFluid* fluid_mat = dynamic_cast<MFEMNewtonianFluid*>(mat);
+   m.fluid_density = fluid_mat->Density();
+   m.dyn_viscosity = fluid_mat->DynamicViscosity();
+   m.kinvis = fluid_mat->KinematicViscosity();
 
-	// set time stepping method
-	if (m.ts_method == INS_Solver::TS_Method::GeneralizedAlpha)
-	{
-		m.flowsolver->UseGenAlpha(m.rhoinf);
-	}
-	else
-	{
-		feLogError("Just Gen Alpha for serial solver");
-		return false;
-	}
+	// create the mfem solver class
+	m.flowsolver = new INS_Solver(m.mesh, (int) m.orderv, (int) m.orderp, fluid_mat->kinvis, fluid_mat->rho);
+
+	// set rho_inf for time stepping method
+	m.flowsolver->SetRhoInf(m.rhoinf);
 
 	// set tolerances
-	m.flowsolver->SetLinearSolveAbsTol(m.atol);
-	m.flowsolver->SetLinearSolveRelTol(m.rtol);
-	m.flowsolver->SetLinearSolveMaxIt(200);
+	m.flowsolver->SetLinearSolveAbsTol(m.lin_atol);
+	m.flowsolver->SetLinearSolveRelTol(m.lin_rtol);
+	m.flowsolver->SetLinearSolveMaxIt(m.lin_maxIt);
 
 	m.flowsolver->SetNewtonSolveAbsTol(m.atol);
 	m.flowsolver->SetNewtonSolveRelTol(m.rtol);
-	m.flowsolver->SetNewtonSolveMinIt(3);
-	m.flowsolver->SetNewtonSolveMaxIt(20);
+	m.flowsolver->SetNewtonSolveMinIt(m.minIt);
+	m.flowsolver->SetNewtonSolveMaxIt(m.maxIt);
 
-	// NOTE: This was not used in 2d example. Add solver parameter for this.
-	m.flowsolver->UseSIMPLEPreconditioner();
+	// set preconditioner
+	m.flowsolver->SetPreconditioner(m.prec_type);
 
 	// set nonlinear form type
 	m.flowsolver->SetNonlinearFormType(m.nonlinear_form);
 
+   // use total integrator
 	if (m.total_integ) m.flowsolver->UseTotalIntegrator();
 
 	// stabilizations
-	if (m.supg_flag) m.flowsolver->UseSUPG();
-	if (m.pspg_flag)
-	{
-		if (!m.equal_order)
-		{
-			feLogError("Error: pspg needs equal order elements!");
-			return false;
-		}
-		m.flowsolver->UsePSPG();
-	}
-	if (m.vms_flag) m.flowsolver->UseVMS();
-	if (m.mass_stab) m.flowsolver->UseMassStabilization();
+   // TODO: setup options for each, for now just VMS
+   if (m.stabilized_VMS)
+   {
+      switch (m.stab_type) {
+       case ins_solver::StabilizationType::NONE:
+            break;
+		 case ins_solver::StabilizationType::SUPG:
+            if (m.orderv != m.orderp - 1) 
+            {
+                  feLogError("Error: using SUPG only requires mixed order elements");
+                  return false;
+            }
+            m.flowsolver->UseSUPG();
+            break;
 
-	// set viscous term type
-	if (m.div_stress)
+		 case ins_solver::StabilizationType::SUPG_PSPG:
+            if (m.orderv != m.orderp) 
+            {
+                  feLogError("Error: SUPG/PSPG requires equal order elements");
+                  return false;
+            }
+            m.flowsolver->UseSUPG();
+            m.flowsolver->UsePSPG();
+            break;
+
+		 case ins_solver::StabilizationType::VMS:
+         default:
+            if (m.orderv != m.orderp) 
+            {
+                  feLogError("Error: VMS requires equal order elements");
+                  return false;
+            }
+            m.flowsolver->UseVMS();
+            break;
+      }
+   }
+
+	if (m.stabilized_LSIC) 
+   {
+      m.flowsolver->UseMassStabilization();
+   }
+
+	// set viscous term type, default is StressForm
+	if (m.LaplaceForm)
 	{
-		m.flowsolver->SetViscousTermType(INS_Solver::ViscousTermType::SymGradientForm);
+		m.flowsolver->SetViscousTermType(ins_solver::ViscousTermType::LaplaceForm);
 	}
 
 	// Set the initial conditions.
@@ -232,53 +299,17 @@ bool MFEMSolver::Init()
 	m.u_gf = m.flowsolver->GetCurrentVelocity();
 	m.p_gf = m.flowsolver->GetCurrentPressure();
 
-	std::string fname;
-	if (m.equal_order)
-	{
-		fname = "EO_results";
-	}
-	else
-	{
-		fname = "Mixed_results";
-	}
-	if (m.ts_method == INS_Solver::TS_Method::GeneralizedAlpha)
-	{
-		std::stringstream ss;
-		ss << std::fixed << std::setprecision(1) << m.rhoinf;
-		fname += "_GenAlpha_" + ss.str();
-		std::setprecision(8);
-	}
-	else
-	{
-		fname += "_BDF2";
-	}
-
-	if (m.simple_flag)
-	{
-		fname += "_SIMPLE";
-	}
-	else if (m.scr_flag)
-	{
-		fname += "_SCR";
-	}
-	else if (m.ascr_flag)
-	{
-		fname += "_aSCR";
-	}
-	else
-	{
-		MFEM_ABORT("Error: unknown preconditioner specificed");
-	}
-
 	// setup output in paraview format
+   std::string fname = "results_mfem_solver";
 	m.pvdc = new ParaViewDataCollection(fname, m.mesh);
 	m.pvdc->SetDataFormat(VTKFormat::BINARY32);
 	m.pvdc->SetHighOrderOutput(true);
-	m.pvdc->SetLevelsOfDetail(m.order);
+	m.pvdc->SetLevelsOfDetail(m.orderv);
 	m.pvdc->SetCycle(0);
 	m.pvdc->SetTime(0);
 	m.pvdc->RegisterField("Velocity", m.u_gf);
 	m.pvdc->RegisterField("Pressure", m.p_gf);
+   // TODO: add more outputs (curlv, wss, others)
 	m.pvdc->Save();
 
 	double dt = fem.GetTime().timeIncrement;

@@ -4,7 +4,7 @@
 #include "MFEMAnalysis.h"
 #include "MFEMDomain.h"
 #include "MFEMSolver.h"
-#include "MFEMMaterial.h"
+#include "MFEMNewtonianFluid.h"
 #include "MFEMPlotVariables.h"
 #include "MFEMInitialCondition.h"
 #include "MFEMBoundaryCondition.h"
@@ -63,7 +63,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 
 	// feature classes
 	REGISTER_FECORE_CLASS(MFEMSolver, "mfem");
-	REGISTER_FECORE_CLASS(MFEMMaterial, "mfem");
+   REGISTER_FECORE_CLASS(MFEMNewtonianFluid, "mfem newtonian fluid");
 
 	REGISTER_FECORE_CLASS(MFEMInitialPressure, "initial pressure");
 	REGISTER_FECORE_CLASS(MFEMInitialVelocity, "initial velocity");

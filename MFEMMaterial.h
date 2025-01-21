@@ -6,5 +6,6 @@ class MFEMMaterial : public FEMaterial
 public:
 	MFEMMaterial(FEModel* fem);
 
-	DECLARE_FECORE_CLASS();
+   // return material properties
+   virtual double Density() = 0;
 };
