@@ -32,6 +32,9 @@ public:
    void AddNormalVelocityBC(mfem::Coefficient* coeff, mfem::Array<int>& attr);
    // to do - add mapped velocity bc
 
+   // Pressure conditions
+   void SetNodalPressure(FEParamDouble pval, mfem::Vector &node_pos);
+
    // traction bcs
 	void AddTractionBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);
    void AddTractionFreeBC(mfem::Array<int>& attr);
@@ -44,6 +47,9 @@ public:
    void AddBackflowStabilizationBC(FEParamDouble beta, mfem::Array<int>& attr);
    void AddResistanceBC(FEParamDouble R, FEParamDouble p0, mfem::Array<int>& attr);
    void AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDouble C, FEParamDouble p0, FEParamDouble pd, mfem::Array<int>& attr);
+
+   // body forces
+   void AddBodyForce(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);
 
    // material properties
 	double FluidDensity() const;

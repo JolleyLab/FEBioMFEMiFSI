@@ -4,6 +4,7 @@
 
 class FEMesh;
 class FEFacetSet;
+class FEDomain;
 
 class MFEMMesh : public mfem::Mesh 
 {
@@ -21,8 +22,20 @@ public:
 		return m_surfMap[set];
 	}
 
+   void AssignDomainAttribute(FEDomain* dom, int attr)
+   {
+      m_domMap[dom] = attr;
+   }
+
+   int GetDomainAttribute(FEDomain* dom)
+   {
+      if (m_domMap.find(dom) == m_domMap.end()) return -1;
+      return m_domMap[dom];
+   }
+
 private:
 	std::map<FEFacetSet*, int> m_surfMap;
+   std::map<FEDomain*, int> m_domMap;
 };
 
 MFEMMesh* CreateMFEMMesh3D(FEMesh& mesh);

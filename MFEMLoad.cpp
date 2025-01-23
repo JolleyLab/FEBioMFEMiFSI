@@ -1,6 +1,7 @@
 #include "MFEMLoad.h"
 #include "MFEMSolver.h"
 #include "MFEMTools.h"
+#include <FECore/FEMesh.h>
 
 BEGIN_FECORE_CLASS(MFEMNeumannBC, MFEMLoad)
 	ADD_PARAMETER(m_tx, "tx");
@@ -89,4 +90,42 @@ void MFEMWindkesselBC::Apply(MFEMSolver* solver, int attr)
 	load_attr = 0;
 	load_attr[attr] = 1;
 	solver->AddWindkesselBC(m_R, m_Rd, m_C, m_p0, m_pd, load_attr);
+}
+
+BEGIN_FECORE_CLASS(MFEMBodyForce, MFEMBodyLoad)
+	ADD_PARAMETER(m_bx, "bx");
+	ADD_PARAMETER(m_by, "by");
+   ADD_PARAMETER(m_bz, "bz");
+END_FECORE_CLASS();
+
+void MFEMBodyForce::Apply(MFEMSolver* solver, int attr)
+{
+	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Array<int> load_attr(mesh->attributes.Max());
+	load_attr = 0;
+	load_attr[attr] = 1;
+	solver->AddBodyForce(new FEVectorCoefficient(GetFEModel(), m_bx, m_by, m_bz), load_attr);
+}
+
+BEGIN_FECORE_CLASS(MFEMSetNodalPressure, MFEMNodalLoad)
+	ADD_PARAMETER(m_p, "p");
+END_FECORE_CLASS();
+
+void MFEMSetNodalPressure::Apply(MFEMSolver* solver)
+{
+   FEMesh& m = GetMesh();
+
+	// check to ensure only one node is set
+   FENodeSet& nset = *m_nodeSet;
+   int N = nset.Size();
+   assert(N == 1);
+   
+   // get the nodal position in the reference state
+	vec3d r = m.Node(nset[0]).m_r0;
+   mfem::Vector node_pos(3);
+   node_pos(0) = r.x;
+   node_pos(1) = r.y;
+   node_pos(2) = r.z;
+
+   solver->SetNodalPressure(m_p, node_pos);
 }

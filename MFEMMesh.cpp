@@ -32,6 +32,7 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 	{
 		FEDomain& dom = febioMesh.Domain(n);
 		int elemsInDomain = dom.Elements();
+      newMesh->AssignDomainAttribute(&dom, n + 1);
 		for (int i = 0; i < elemsInDomain; i++) {
 			FEElement& el = dom.ElementRef(i);
 			for (int j = 0; j < el.Nodes(); j++) {
@@ -52,7 +53,7 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
          case ET_PYRA5: 
          // case ET_PYRA13: // 2nd order pyramid TODO
             newMesh->AddPyramid(indices, n + 1);
-            assert(false);
+            assert(false); // no routines for computing d2Ndxx in MFEM yet
             break;
 			default:
 				assert(false);

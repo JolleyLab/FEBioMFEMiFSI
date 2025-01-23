@@ -1,8 +1,12 @@
 #pragma once
 #include <FECore/FESurfaceLoad.h>
+#include <FECore/FEBodyLoad.h>
 #include <FECore/FEModelParam.h>
+#include <FECore/FENodalLoad.h>
 
 class MFEMSolver;
+
+/////// Base classes ///////
 
 class MFEMLoad : public FESurfaceLoad
 {
@@ -11,6 +15,28 @@ public:
 
 	virtual void Apply(MFEMSolver* solver, int attr) = 0;
 };
+
+class MFEMBodyLoad : public FEBodyLoad
+{
+public:
+	MFEMBodyLoad(FEModel* fem) : FEBodyLoad(fem) {}
+
+	virtual void Apply(MFEMSolver* solver, int attr) = 0;
+};
+
+class MFEMNodalLoad : public FENodalLoad
+{
+public:
+	MFEMNodalLoad(FEModel* fem) : FENodalLoad(fem) {}
+
+   // override pure virtual functions
+   void GetNodalValues(int inode, std::vector<double>& vals) override {};
+   bool SetDofList(FEDofList& doflist) override { return true; };
+
+	virtual void Apply(MFEMSolver* solver) = 0;
+};
+
+/////// Derived classes for each bc ///////
 
 class MFEMNeumannBC : public MFEMLoad
 {
@@ -101,3 +127,28 @@ private:
 	DECLARE_FECORE_CLASS();
 };
 
+class MFEMBodyForce : public MFEMBodyLoad
+{
+public:
+	MFEMBodyForce(FEModel* fem) : MFEMBodyLoad(fem) {}
+
+	void Apply(MFEMSolver* solver, int attr) override;
+private:
+   FEParamDouble m_bx;
+	FEParamDouble m_by;
+	FEParamDouble m_bz;
+
+	DECLARE_FECORE_CLASS();
+};
+
+class MFEMSetNodalPressure : public MFEMNodalLoad
+{
+public:
+	MFEMSetNodalPressure(FEModel* fem) : MFEMNodalLoad(fem) {}
+
+	void Apply(MFEMSolver* solver) override;
+private:
+   FEParamDouble m_p;
+
+	DECLARE_FECORE_CLASS();
+};

@@ -27,7 +27,6 @@ void MFEMNoSlipBC::Apply(MFEMSolver* solver, int attr)
 {
 	mfem::Mesh* mesh = solver->GetMFEMMesh();
 	mfem::Array<int> vel_bc_attr(mesh->bdr_attributes.Max());
-   mfem::out << "attr array size = " << vel_bc_attr.Size() << std::endl;
 	vel_bc_attr = 0;
 	vel_bc_attr[attr] = 1;
    m_val = 0.0;

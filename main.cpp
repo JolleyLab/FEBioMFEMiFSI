@@ -9,6 +9,7 @@
 #include "MFEMInitialCondition.h"
 #include "MFEMBoundaryCondition.h"
 #include "MFEMLoad.h"
+// #include "MFEMConstraint.h"
 
 class FEMFEMiFSI : public FEModule
 {
@@ -85,6 +86,12 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    REGISTER_FECORE_CLASS(MFEMBackflowStabilizationBC, "backflow stabilization");
    REGISTER_FECORE_CLASS(MFEMResistanceBC, "resistance (R)");
    REGISTER_FECORE_CLASS(MFEMWindkesselBC, "windkessel (RCR)");
+
+   // body force
+   REGISTER_FECORE_CLASS(MFEMBodyForce, "body force");
+
+   // Set pressure nodal value
+   REGISTER_FECORE_CLASS(MFEMSetNodalPressure, "set nodal pressure");
 
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");
 	REGISTER_FECORE_CLASS(FEPltMFemVelocity, "mfem velocity");

@@ -50,6 +50,7 @@ public:
    int viscous_term_type = ins_solver::ViscousTermType::StressForm;
    bool LaplaceForm = false;
    bool total_integ = true;
+   bool zero_mean_pressure = false;
 
    // Time Stepping Options
    double rhoinf = 0.5;
@@ -86,6 +87,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       // drop down menu for stabilization type, for now either VMS or unstabilized
       // ADD_PARAMETER(m.stabilized_LSIC, "LSIC");
       ADD_PARAMETER(m.LaplaceForm, "Laplace_form");
+      ADD_PARAMETER(m.zero_mean_pressure, "Zero_mean_pressure");
    END_PARAM_GROUP();
 
    // Time Stepping Options
@@ -159,6 +161,16 @@ void MFEMSolver::AddVelDirichletBC(mfem::Coefficient* coeff, mfem::Array<int>& a
 void MFEMSolver::AddNoSlipBC(mfem::Array<int>& attr)
 {
    m.flowsolver->AddNoSlipBC(attr);
+}
+
+void MFEMSolver::SetNodalPressure(FEParamDouble pval, mfem::Vector &node_pos)
+{
+   if (pval.isConst() == false)
+   {
+      feLogError("Pressure value must be constant");
+   }
+   double pressure_value = pval.constValue();
+   m.flowsolver->AddPressureNodeCondition(pressure_value, node_pos);
 }
 
 void MFEMSolver::AddNormalVelocityBC(mfem::Coefficient* coeff, mfem::Array<int>& attr)
@@ -244,6 +256,11 @@ void MFEMSolver::AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDoubl
    double Q0 = m.flowsolver->ComputeMassFlowThruSurf(*u_ic, attr, false, m.fluid_density, false);
 
    m.flowsolver->AddWindkesselBC(attr,R_val,Rd_val,C_val,p0_val,pd_val,Q0);
+}
+
+void MFEMSolver::AddBodyForce(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr)
+{
+   m.flowsolver->AddBodyForce(coeff, attr);
 }
 
 double MFEMSolver::FluidDensity() const
@@ -389,15 +406,38 @@ bool MFEMSolver::Init()
 	}
 	for (int i = 0; i < fem.ModelLoads(); ++i)
 	{
+      // nodal loads
+      MFEMNodalLoad* nl = dynamic_cast<MFEMNodalLoad*>(fem.ModelLoad(i));
+      if (nl && nl->IsActive())
+      {
+         nl->Apply(this);
+      }
+
+      // surface loads
 		MFEMLoad* ml = dynamic_cast<MFEMLoad*>(fem.ModelLoad(i));
 		if (ml && ml->IsActive())
 		{
-			FESurface& surf = ml->GetSurface();
-			FEFacetSet* set = surf.GetFacetSet();
-			int id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
-			ml->Apply(this, id - 1);
+         FESurface& surf = ml->GetSurface();
+         FEFacetSet* set = surf.GetFacetSet();
+         int id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
+         ml->Apply(this, id - 1);
 		}
+
+      // body loads
+      MFEMBodyLoad* bl = dynamic_cast<MFEMBodyLoad*>(fem.ModelLoad(i));
+      if (bl && bl->IsActive())
+      {
+         for (int j=0; j<bl->Domains(); ++j)
+         {
+            FEDomain* dom = bl->Domain(j);
+            int id = m.mesh->GetDomainAttribute(dom); assert(id > 0);
+            bl->Apply(this, id - 1);
+         }         
+      }
 	}
+
+   // Zero mean pressure if active
+   if (m.zero_mean_pressure) m.flowsolver->AddZeroMeanPressureCondition();
 
 	m.u_gf = m.flowsolver->GetCurrentVelocity();
 	m.p_gf = m.flowsolver->GetCurrentPressure();
