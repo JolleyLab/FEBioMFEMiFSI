@@ -223,9 +223,6 @@
 			<vz type="math">-1.0*(Y*Y - Y)/(2.0*0.04)</vz>
 		</bc>
 		<bc name="NoSlip2" surface="NoSlip2" type="no slip">
-			<vx>1</vx>
-			<vy>1</vy>
-			<vz>1</vz>
 		</bc>
 	</Boundary>
 	<Loads>

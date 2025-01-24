@@ -72,7 +72,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    // velocity bcs
 	REGISTER_FECORE_CLASS(MFEMVelDirichletBC, "prescribed velocity");
    REGISTER_FECORE_CLASS(MFEMNoSlipBC, "no slip");
-   REGISTER_FECORE_CLASS(MFEMNormalVelocityBC, "prescribed normal velocity");
+   REGISTER_FECORE_CLASS(MFEMPrescribedVelocityComponentBC, "prescribed velocity component");
 
    // traction bcs
 	REGISTER_FECORE_CLASS(MFEMNeumannBC, "traction");

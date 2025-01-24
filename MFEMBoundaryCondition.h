@@ -43,25 +43,20 @@ public:
 	void Apply(MFEMSolver* solver, int attr) override;
 
 private:
-   bool m_vx = false;
-   bool m_vy = false;
-   bool m_vz = false;
-
-   FEParamDouble m_val;
 
 	DECLARE_FECORE_CLASS();
 };
 
-// Set v = v * nor
-class MFEMNormalVelocityBC : public MFEMBoundaryCondition
+class MFEMPrescribedVelocityComponentBC : public MFEMBoundaryCondition
 {
 public:
-	MFEMNormalVelocityBC(FEModel* fem) : MFEMBoundaryCondition(fem) {}
+	MFEMPrescribedVelocityComponentBC(FEModel* fem) : MFEMBoundaryCondition(fem) {}
 
 	void Apply(MFEMSolver* solver, int attr) override;
 
 private:
-   FEParamDouble m_vn;
+   FEParamDouble m_vval;
+   int m_dof;
 
 	DECLARE_FECORE_CLASS();
 };

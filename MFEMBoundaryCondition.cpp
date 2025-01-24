@@ -18,9 +18,6 @@ void MFEMVelDirichletBC::Apply(MFEMSolver* solver, int attr)
 }
 
 BEGIN_FECORE_CLASS(MFEMNoSlipBC, MFEMBoundaryCondition)
-	ADD_PARAMETER(m_vx, "vx");
-	ADD_PARAMETER(m_vy, "vy");
-	ADD_PARAMETER(m_vz, "vz");
 END_FECORE_CLASS();
 
 void MFEMNoSlipBC::Apply(MFEMSolver* solver, int attr)
@@ -29,39 +26,21 @@ void MFEMNoSlipBC::Apply(MFEMSolver* solver, int attr)
 	mfem::Array<int> vel_bc_attr(mesh->bdr_attributes.Max());
 	vel_bc_attr = 0;
 	vel_bc_attr[attr] = 1;
-   m_val = 0.0;
-   if (m_vx && m_vy && m_vz)
-   {
-      solver->AddNoSlipBC(vel_bc_attr);
-   }
-   else
-   {
-      if (m_vx)
-      {
-         solver->AddVelDirichletBC(new FEScalarCoefficient(GetFEModel(),m_val), vel_bc_attr, 1);
-      }
-      if (m_vy)
-      {
-         solver->AddVelDirichletBC(new FEScalarCoefficient(GetFEModel(),m_val), vel_bc_attr, 2);
-      }
-      if(m_vz)
-      {
-         solver->AddVelDirichletBC(new FEScalarCoefficient(GetFEModel(),m_val), vel_bc_attr, 3);
-      }
-   }
+   solver->AddNoSlipBC(vel_bc_attr);
 }
 
-BEGIN_FECORE_CLASS(MFEMNormalVelocityBC, MFEMBoundaryCondition)
-	ADD_PARAMETER(m_vn, "vn");
+BEGIN_FECORE_CLASS(MFEMPrescribedVelocityComponentBC, MFEMBoundaryCondition)
+	ADD_PARAMETER(m_dof, "dof", 0, "$(dof_list:velocity)");
+   ADD_PARAMETER(m_vval, "value");
 END_FECORE_CLASS();
 
-void MFEMNormalVelocityBC::Apply(MFEMSolver* solver, int attr)
+void MFEMPrescribedVelocityComponentBC::Apply(MFEMSolver* solver, int attr)
 {
 	mfem::Mesh* mesh = solver->GetMFEMMesh();
 	mfem::Array<int> vel_bc_attr(mesh->bdr_attributes.Max());
 	vel_bc_attr = 0;
 	vel_bc_attr[attr] = 1;
-   solver->AddNormalVelocityBC(new FEScalarCoefficient(GetFEModel(),m_vn), vel_bc_attr);
+   solver->AddVelDirichletBC(new FEScalarCoefficient(GetFEModel(),m_vval), vel_bc_attr, m_dof);
 }
 
 BEGIN_FECORE_CLASS(MFEMPeriodicBC, MFEMBoundaryCondition)

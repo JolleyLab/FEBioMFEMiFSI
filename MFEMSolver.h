@@ -29,7 +29,7 @@ public:
 	void AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);
    void AddVelDirichletBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int component);
    void AddNoSlipBC(mfem::Array<int>& attr);
-   void AddNormalVelocityBC(mfem::Coefficient* coeff, mfem::Array<int>& attr);
+   void AddPrescribedVelocityComponentBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int dof);
    // to do - add mapped velocity bc
 
    // Pressure conditions

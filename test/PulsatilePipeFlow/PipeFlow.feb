@@ -16996,9 +16996,6 @@
 	</MeshDomains>
 	<Boundary>
 		<bc name="NoSlip1" surface="NoSlip1" type="no slip">
-			<vx>1</vx>
-			<vy>1</vy>
-			<vz>1</vz>
 		</bc>
 		<bc name="PrescribedVelocity2" surface="PrescribedVelocity2" type="prescribed velocity">
 			<vx>0</vx>

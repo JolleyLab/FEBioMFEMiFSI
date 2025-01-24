@@ -168,14 +168,15 @@ void MFEMSolver::SetNodalPressure(FEParamDouble pval, mfem::Vector &node_pos)
    if (pval.isConst() == false)
    {
       feLogError("Pressure value must be constant");
+      assert(false);
    }
    double pressure_value = pval.constValue();
    m.flowsolver->AddPressureNodeCondition(pressure_value, node_pos);
 }
 
-void MFEMSolver::AddNormalVelocityBC(mfem::Coefficient* coeff, mfem::Array<int>& attr)
+void MFEMSolver::AddPrescribedVelocityComponentBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int dof)
 {
-   m.flowsolver->AddLocalNormalVelDirichletBC(coeff, attr);
+   m.flowsolver->AddVelDirichletBC(coeff, attr, dof);
 }
 
 void MFEMSolver::AddTractionBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr)
@@ -203,6 +204,7 @@ void MFEMSolver::AddBackflowStabilizationBC(FEParamDouble beta, mfem::Array<int>
    if (beta.isConst() == false)
    {
       feLogError("Backflow stabilization coefficient must be constant");
+      assert(false);
    }
    double beta_val = beta.constValue();
    m.flowsolver->UseBackflowStabilization(attr,beta_val);
@@ -213,10 +215,12 @@ void MFEMSolver::AddResistanceBC(FEParamDouble R, FEParamDouble p0, mfem::Array<
    if (R.isConst() == false)
    {
       feLogError("Resistance coefficient must be constant");
+      assert(false);
    }
    if (p0.isConst() == false)
    {
       feLogError("Initial pressure must be constant");
+      assert(false);
    }
    double R_val = R.constValue();
    double p0_val = p0.constValue();
@@ -228,22 +232,27 @@ void MFEMSolver::AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDoubl
    if (R.isConst() == false)
    {
       feLogError("Proximal resistance coefficient must be constant");
+      assert(false);
    }
    if (Rd.isConst() == false)
    {
       feLogError("Distal resistance coefficient must be constant");
+      assert(false);
    }
    if (C.isConst() == false)
    {
       feLogError("Compliance coefficient must be constant");
+      assert(false);
    }
    if (p0.isConst() == false)
    {
       feLogError("Initial pressure must be constant");
+      assert(false);
    }
    if (pd.isConst() == false)
    {
       feLogError("Distal pressure must be constant");
+      assert(false);
    }
    double R_val = R.constValue();
    double Rd_val = Rd.constValue();

@@ -2,6 +2,7 @@
 #include "MFEMSolver.h"
 #include "MFEMTools.h"
 #include <FECore/FEMesh.h>
+#include <FECore/log.h>
 
 BEGIN_FECORE_CLASS(MFEMNeumannBC, MFEMLoad)
 	ADD_PARAMETER(m_tx, "tx");
@@ -109,11 +110,19 @@ void MFEMBodyForce::Apply(MFEMSolver* solver, int attr)
 
 BEGIN_FECORE_CLASS(MFEMSetNodalPressure, MFEMNodalLoad)
 	ADD_PARAMETER(m_p, "p");
+   ADD_PARAMETER(m_dof, "dof", 0, "$(dof_list:pressure)");
 END_FECORE_CLASS();
 
 void MFEMSetNodalPressure::Apply(MFEMSolver* solver)
 {
    FEMesh& m = GetMesh();
+
+   // check to ensure pressure dof is set
+   if (m_dof != 0)
+   {
+      feLogError("dof must be set to pressure for the SetNodalPressure condition!");
+      assert(false);
+   }   
 
 	// check to ensure only one node is set
    FENodeSet& nset = *m_nodeSet;

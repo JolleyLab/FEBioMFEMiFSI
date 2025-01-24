@@ -31,9 +31,15 @@ public:
 
    // override pure virtual functions
    void GetNodalValues(int inode, std::vector<double>& vals) override {};
-   bool SetDofList(FEDofList& doflist) override { return true; };
+   bool SetDofList(FEDofList& doflist) override 
+   { 
+     return doflist.AddDof(m_dof);
+   };
 
 	virtual void Apply(MFEMSolver* solver) = 0;
+
+protected:
+   int m_dof;
 };
 
 /////// Derived classes for each bc ///////
