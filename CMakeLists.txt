@@ -54,8 +54,11 @@ endif()
 # Set include directory
 include_directories(C:/Users/Steve/source/repos/FEBio/)
 
+file(GLOB HeaderFiles "*.h")
+file(GLOB SourceFiles "*.cpp")
+
 # Add library
-add_library(FEBioMFEMiFSI SHARED FEBioMFEMiFSITask.h FEBioMFEMiFSITask.cpp main.cpp)
+add_library(FEBioMFEMiFSI SHARED ${HeaderFiles} ${SourceFiles})
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT FEBioMFEMiFSI)
 
 # Link FEBio Libraries
