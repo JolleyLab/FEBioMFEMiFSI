@@ -1,5 +1,6 @@
 #pragma once
 #include <FECore/FESolver.h>
+#include "CustomStreamBuffer.h"
 
 #ifdef WIN32
 #include "ins_solver.hpp"
@@ -58,6 +59,9 @@ public:
 
 private:
 	Imp& m;
+
+   // Custom stream buffer for writing to the log file
+   CustomStreamBuffer customBuffer;
 
 	DECLARE_FECORE_CLASS();
 };

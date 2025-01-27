@@ -14,6 +14,7 @@
 #include "MFEMLoad.h"
 #include <FECore/log.h>
 #include "MFEMMaterial.h"
+#include "CustomStreamBuffer.h"
 
 using namespace ins_solver_serial;
 using namespace std;
@@ -128,6 +129,9 @@ MFEMSolver::MFEMSolver(FEModel* fem) : FESolver(fem), m(*(new MFEMSolver::Imp))
 
 MFEMSolver::~MFEMSolver()
 {
+   // Restore the original buffer
+   mfem::out.rdbuf(customBuffer.originalBuffer);
+
 	delete m.mesh;
 	delete m.flowsolver;
 	delete m.pvdc;
@@ -291,6 +295,14 @@ bool MFEMSolver::Init()
 {
 	// create the mfem mesh from the FEBio mesh
 	FEModel& fem = *GetFEModel();
+
+   // Redirect mfem::out to the custom stream buffer that writes to the log file
+   // TODO: Cleanup the output to the log file
+   customBuffer.originalBuffer = mfem::out.rdbuf();
+   customBuffer.fe_model = &fem;
+   std::ostream customStream(&customBuffer);
+   mfem::out.rdbuf(customStream.rdbuf());
+
 	FEMesh& femesh = fem.GetMesh();
 	m.mesh = CreateMFEMMesh3D(femesh);
 	if (m.mesh == nullptr) return false;
@@ -466,7 +478,7 @@ bool MFEMSolver::Init()
 
 	double dt = fem.GetTime().timeIncrement;
 	m.flowsolver->Setup(dt);
-
+   
 	return true;
 }
 
@@ -486,7 +498,7 @@ bool MFEMSolver::SolveStep()
 	// note that this function needs the previous time point and will update t0.
 	// After this call it should be that t0 == t
 	m.flowsolver->Step(t0, dt, timeStep);
-
+   
 	// save data
 	m.pvdc->SetCycle(timeStep + 1);
 	m.pvdc->SetTime(t0);
