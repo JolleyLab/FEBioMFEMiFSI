@@ -13,11 +13,19 @@ MFEMMesh::MFEMMesh(int nodes, int elems, int bndrelems) : mfem::Mesh(3, nodes, e
 
 MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 {
-	FESurface* boundaryMesh = febioMesh.ElementBoundarySurface();
+	// We count the nr of boundary elements, by adding up all faces from the facet sets. 
+	// Note that this may not count all the elements on the mesh boundary, but it doesn't look like that is a problem.
+	// This also assumes that none of the facet sets overlap.
+	int nbndrElems = 0;
+	for (int n = 0; n < febioMesh.FacetSets(); ++n)
+	{
+		FEFacetSet& surf = febioMesh.FacetSet(n);
+		int faces = surf.Faces();
+		nbndrElems += faces;
+	}
 
 	int nodes = febioMesh.Nodes();
 	int elems = febioMesh.Elements();
-	int nbndrElems = boundaryMesh->Elements();
 	MFEMMesh* newMesh = new MFEMMesh(nodes, elems, nbndrElems);
 	for (int i = 0; i < nodes; ++i)
 	{
