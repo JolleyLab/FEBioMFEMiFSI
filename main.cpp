@@ -111,4 +111,6 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    // plot variables
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");
 	REGISTER_FECORE_CLASS(FEPltMFemVelocity, "mfem velocity");
+   REGISTER_FECORE_CLASS(FEPltMFemImmersedDisplacement, "mfem immersed displacement");
+	REGISTER_FECORE_CLASS(FEPltMFemImmersedVelocity, "mfem immersed velocity");
 }

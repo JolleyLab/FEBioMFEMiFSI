@@ -44388,6 +44388,8 @@
 		<plotfile type="febio">
 			<var type="mfem pressure"/>
 			<var type="mfem velocity"/>
+			<var type="mfem immersed displacement"/>
+			<var type="mfem immersed velocity"/>
 		</plotfile>
 	</Output>
 </febio_spec>

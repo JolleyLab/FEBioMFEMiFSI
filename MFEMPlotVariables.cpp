@@ -24,3 +24,29 @@ bool FEPltMFemVelocity::Save(FEMesh& m, FEDataStream& a)
 	}
 	return true;
 };
+
+bool FEPltMFemImmersedDisplacement::Save(FEMesh& m, FEDataStream& a)
+{
+	int dofUX = GetFEModel()->GetDOFIndex("im_ux");
+	int dofUY = GetFEModel()->GetDOFIndex("im_uy");
+	int dofUZ = GetFEModel()->GetDOFIndex("im_uz");
+	for (int i = 0; i < m.Nodes(); ++i)
+	{
+		FENode& node = m.Node(i);
+		a << node.get(dofUX) << node.get(dofUY) << node.get(dofUZ);
+	}
+	return true;
+};
+
+bool FEPltMFemImmersedVelocity::Save(FEMesh& m, FEDataStream& a)
+{
+	int dofVX = GetFEModel()->GetDOFIndex("im_vx");
+	int dofVY = GetFEModel()->GetDOFIndex("im_vy");
+	int dofVZ = GetFEModel()->GetDOFIndex("im_vz");
+	for (int i = 0; i < m.Nodes(); ++i)
+	{
+		FENode& node = m.Node(i);
+		a << node.get(dofVX) << node.get(dofVY) << node.get(dofVZ);
+	}
+	return true;
+};

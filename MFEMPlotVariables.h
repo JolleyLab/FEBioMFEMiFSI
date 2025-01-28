@@ -15,3 +15,17 @@ public:
 	bool Save(FEMesh& m, FEDataStream& a) override;
 };
 
+class FEPltMFemImmersedDisplacement : public FEPlotNodeData
+{
+public:
+	FEPltMFemImmersedDisplacement(FEModel* fem) : FEPlotNodeData(fem, PLT_VEC3F, FMT_NODE) {}
+	bool Save(FEMesh& m, FEDataStream& a) override;
+};
+
+class FEPltMFemImmersedVelocity : public FEPlotNodeData
+{
+public:
+	FEPltMFemImmersedVelocity(FEModel* fem) : FEPlotNodeData(fem, PLT_VEC3F, FMT_NODE) {}
+	bool Save(FEMesh& m, FEDataStream& a) override;
+};
+
