@@ -93,6 +93,12 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    // Set pressure nodal value
    REGISTER_FECORE_CLASS(MFEMSetNodalPressure, "set nodal pressure");
 
+   // Immersed solid
+   REGISTER_FECORE_CLASS(MFEMCompressibleNeoHookeanMaterial, "mfem compressible neo-hookean");
+   REGISTER_FECORE_CLASS(MFEMNearlyIncompressibleNeoHookeanMaterial, "mfem nearly-incompressible neo-hookean");
+   REGISTER_FECORE_CLASS(MFEMNearlyIncompressibleAnnularDisk, "mfem nearly-incompressible annular disk");
+
+   // plot variables
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");
 	REGISTER_FECORE_CLASS(FEPltMFemVelocity, "mfem velocity");
 }

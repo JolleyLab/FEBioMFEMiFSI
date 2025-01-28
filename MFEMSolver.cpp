@@ -3,9 +3,14 @@
 #include <FECore/FEAnalysis.h>
 #ifdef WIN32
 #include "ins_solver.hpp"
+#include "ins_solver_enum.hpp"
+#include "immersed_solid.hpp" // file in ImmersedFSI-Serial/
+#include "materials.hpp" // file in Elasticity/Materials/
 #else
 #include <Navier-Stokes-Serial/ins_solver.hpp>
 #include <Navier-Stokes/ins_solver_enum.hpp>
+#include <ImmersedFSI-Serial/immersed_solid.hpp>
+#include <Elasticity/Materials/materials.hpp>
 #include "mfem.hpp"
 #endif
 #include "MFEMMesh.h"
@@ -15,11 +20,14 @@
 #include <FECore/log.h>
 #include "MFEMMaterial.h"
 #include "CustomStreamBuffer.h"
+#include <typeinfo>
 
 using namespace ins_solver_serial;
 using namespace std;
 using namespace std::placeholders;
 using namespace mfem;
+using namespace immersed_solid_serial;
+using namespace mat;
 
 class MFEMSolver::Imp
 {
@@ -33,6 +41,11 @@ public:
 	GridFunction* p_gf = nullptr; // velocity grid function
 	GridFunction* u_gf = nullptr; // pressure grid function
 	ParaViewDataCollection* pvdc = nullptr; // paraview data collection
+
+   MFEMMesh* solid_mesh = nullptr; // immersed solid mesh
+   GridFunction *d_gf = nullptr; // immersed solid displacement grid function
+   GridFunction *vib_gf = nullptr; // immersed solid velocity grid function
+   ParaViewDataCollection *sdc = nullptr; // immersed solid paraview data collection
 
 public:
    // Material properties
@@ -67,13 +80,24 @@ public:
    int lin_maxIt = 200;
    double lin_atol = 1.0e-6;
    double lin_rtol = 1.0e-3;
+   bool direct_solver = false;
 
    // Preconditioner Options
    int prec_type = ins_solver::PreconditionerType::SIMPLE;
+   bool direct_solver_prec = false;
    double prec_Ainv_atol = 1.0e-6;
    double prec_Ainv_rtol = 1.0e-3;
    double prec_Sinv_atol = 1.0e-6;
    double prec_Sinv_rtol = 1.0e-3;
+
+   // immersed solid
+   int orderd = orderv;
+   MaterialType *mat_type = nullptr;
+   int form_type = ImmersedSolid::form_type::TotalLagrangian;
+   bool subtract_viscous_stress = true;
+   bool immersed_solid = false;
+   int vol_type = NearlyIncompressibleMaterial::volumetric_energy::ST91;
+   // TO DO make vol_type a drop down option with nearly incompressible materials
 };
 
 MFEMSolver::Imp* MFEMSolver::Imp::This = nullptr;
@@ -91,6 +115,12 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.zero_mean_pressure, "Zero_mean_pressure");
    END_PARAM_GROUP();
 
+   // Immersed Solid Options
+   BEGIN_PARAM_GROUP("Immersed Solid Options");
+      ADD_PARAMETER(m.immersed_solid, "Immersed_solid");
+      ADD_PARAMETER(m.subtract_viscous_stress, "Subtract_viscous_stress");
+   END_PARAM_GROUP();
+
    // Time Stepping Options
    BEGIN_PARAM_GROUP("Time Stepping");
       ADD_PARAMETER(m.rhoinf, FE_RANGE_CLOSED(0.0,1.0), "rho_inf");
@@ -106,6 +136,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
 
    // Linear Solver Options
    BEGIN_PARAM_GROUP("Linear Solver");
+      ADD_PARAMETER(m.direct_solver, "direct_solver");
       ADD_PARAMETER(m.lin_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "lin_atol");
       ADD_PARAMETER(m.lin_rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "lin_rtol");
       // ADD_PARAMETER(m.lin_minIt, FE_RANGE_GREATER_OR_EQUAL(1), "lin_minIt");
@@ -115,6 +146,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
    // Preconditioner Options
    BEGIN_PARAM_GROUP("Preconditioner");
       // set preconditioner drop down menu, for now SIMPLE
+      ADD_PARAMETER(m.direct_solver_prec, "inner_solves_using_direct_solver");
       ADD_PARAMETER(m.prec_Ainv_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_atol");
       ADD_PARAMETER(m.prec_Ainv_rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_rtol");
       ADD_PARAMETER(m.prec_Sinv_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Sinv_atol");
@@ -135,6 +167,10 @@ MFEMSolver::~MFEMSolver()
 	delete m.mesh;
 	delete m.flowsolver;
 	delete m.pvdc;
+
+   delete m.solid_mesh;
+   delete m.mat_type;
+   delete m.sdc;
 }
 
 mfem::GridFunction* MFEMSolver::GetCurrentPressure()
@@ -303,18 +339,37 @@ bool MFEMSolver::Init()
    std::ostream customStream(&customBuffer);
    mfem::out.rdbuf(customStream.rdbuf());
 
+   // create fluid mesh
 	FEMesh& femesh = fem.GetMesh();
 	m.mesh = CreateMFEMMesh3D(femesh);
 	if (m.mesh == nullptr) return false;
+   if (m.immersed_solid)
+   {
+      // extract fluid and immersed solid meshes
+   }
+   feLog("-------------------------------\nFluid Mesh\n");
 	m.mesh->PrintCharacteristics();
+   feLog("-------------------------------\n");
+
+   // check to ensure at most two materials have been specified!
+   if (fem.Materials() > 2)
+   {
+      feLogError("More than two materials have been specified. At most two materials can be set for the MFEMiFSI solver.");
+      return false;
+   }
 
    // get fluid material
-   FEMaterial* mat = fem.GetMaterial(0); // assumes one material
-   // TO DO: More general fluid material interface, for now just Newtonian fluid
-   MFEMNewtonianFluid* fluid_mat = dynamic_cast<MFEMNewtonianFluid*>(mat);
-   m.fluid_density = fluid_mat->Density();
-   m.dyn_viscosity = fluid_mat->DynamicViscosity();
-   m.kinvis = fluid_mat->KinematicViscosity();
+   for (int i=0; i<fem.Materials(); ++i)
+   {
+      FEMaterial* mat = fem.GetMaterial(i);
+      if (dynamic_cast<MFEMNewtonianFluid*>(mat))
+      {
+         m.fluid_density = dynamic_cast<MFEMNewtonianFluid*>(mat)->Density();
+         m.dyn_viscosity = dynamic_cast<MFEMNewtonianFluid*>(mat)->DynamicViscosity();
+         m.kinvis = dynamic_cast<MFEMNewtonianFluid*>(mat)->KinematicViscosity();
+         break;
+      }
+   } 
 
 	// create the mfem solver class
    if (!m.stabilized_VMS)
@@ -330,7 +385,7 @@ bool MFEMSolver::Init()
          return false;
       }
    }
-	m.flowsolver = new INS_Solver(m.mesh, (int) m.orderv, (int) m.orderp, fluid_mat->m_kinvis, fluid_mat->m_rho);
+	m.flowsolver = new INS_Solver(m.mesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density);
 
 	// set rho_inf for time stepping method
 	m.flowsolver->SetRhoInf(m.rhoinf);
@@ -345,8 +400,9 @@ bool MFEMSolver::Init()
 	m.flowsolver->SetNewtonSolveMinIt(m.minIt);
 	m.flowsolver->SetNewtonSolveMaxIt(m.maxIt);
 
-	// set preconditioner
-	m.flowsolver->SetPreconditioner(m.prec_type);
+	// set linear solver and preconditioner
+   if (m.direct_solver) m.flowsolver->UseDirectSolver();
+   m.flowsolver->SetPreconditioner(m.prec_type, m.direct_solver_prec);
 
 	// set nonlinear form type
 	m.flowsolver->SetNonlinearFormType(m.nonlinear_form);
@@ -460,12 +516,76 @@ bool MFEMSolver::Init()
    // Zero mean pressure if active
    if (m.zero_mean_pressure) m.flowsolver->AddZeroMeanPressureCondition();
 
+   // Fluid grid functions
 	m.u_gf = m.flowsolver->GetCurrentVelocity();
 	m.p_gf = m.flowsolver->GetCurrentPressure();
 
+   // Add immersed solid
+   if (m.immersed_solid)
+   {
+      // create solid mesh
+      // TODO
+
+      // create solid material
+      MFEMSolidMaterial* solid_mat = nullptr;
+      for (int i=0; i<fem.Materials(); ++i)
+      {
+         FEMaterial* fe_mat = fem.GetMaterial(i);
+         solid_mat = dynamic_cast<MFEMSolidMaterial*>(fe_mat);
+         if (solid_mat)
+         {
+            break;
+         }
+      }
+      if (!solid_mat)
+      {
+         feLogError("No immersed solid material found");
+         return false;
+      }
+
+      // determine which material
+      if (typeid(*solid_mat) == typeid(MFEMCompressibleNeoHookeanMaterial))
+      {
+         MFEMCompressibleNeoHookeanMaterial* cnh_mat = static_cast<MFEMCompressibleNeoHookeanMaterial*>(solid_mat);
+         m.mat_type = new CompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),*cnh_mat->GetC1Coeff(),*cnh_mat->GetC0Coeff());
+      }
+      else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleNeoHookeanMaterial))
+      {
+         MFEMNearlyIncompressibleNeoHookeanMaterial* nih_mat = static_cast<MFEMNearlyIncompressibleNeoHookeanMaterial*>(solid_mat);
+         m.mat_type = new NearlyIncompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*nih_mat->GetBulkModulus(),*nih_mat->GetC0Coeff());
+      }
+      else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleAnnularDisk))
+      {
+         MFEMNearlyIncompressibleAnnularDisk* niad_mat = static_cast<MFEMNearlyIncompressibleAnnularDisk*>(solid_mat);
+         double disk_w = niad_mat->GetRadialThickness(); // constant thickness
+         m.mat_type = new NearlyIncompressibleAnnularDisk(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*niad_mat->GetBulkModulus(),*niad_mat->GetC0Coeff(),disk_w,true);
+      }
+      else
+      {
+         feLogError("Unsupported solid material type");
+         return false;
+      }
+
+      // add immersed solid to the flow solver
+      FEScalarCoefficient *init_rho_coeff = solid_mat->GetDensityCoeff();
+      m.flowsolver->AddImmersedSolid(m.solid_mesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress);
+   
+      // immersed solid grid functions
+      m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
+      m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
+   }   
+
 	// setup output in paraview format
    std::string fname = "results_mfem_solver";
-	m.pvdc = new ParaViewDataCollection(fname, m.mesh);
+   if (m.immersed_solid)
+   {
+      std::string fluid_filename = fname + "/fluid";
+      m.pvdc = new ParaViewDataCollection(fluid_filename, m.mesh);
+   }
+   else
+   {
+      m.pvdc = new ParaViewDataCollection(fname, m.mesh);
+   }	
 	m.pvdc->SetDataFormat(VTKFormat::BINARY32);
 	m.pvdc->SetHighOrderOutput(true);
 	m.pvdc->SetLevelsOfDetail(m.orderv);
@@ -475,6 +595,20 @@ bool MFEMSolver::Init()
 	m.pvdc->RegisterField("Pressure", m.p_gf);
    // TODO: add more outputs (curlv, wss, others)
 	m.pvdc->Save();
+
+   if (m.immersed_solid)
+   {
+      std::string solid_filename = fname + "/solid";
+      m.sdc = new ParaViewDataCollection(solid_filename, m.solid_mesh);  
+      m.sdc->SetDataFormat(VTKFormat::BINARY);
+      m.sdc->SetHighOrderOutput(true);
+      m.sdc->SetLevelsOfDetail(m.orderd);
+      m.sdc->RegisterField("Displacement", m.d_gf);
+      m.sdc->RegisterField("Velocity", m.vib_gf);
+      m.sdc->SetCycle(0);
+      m.sdc->SetTime(0);
+      m.sdc->Save();
+   }
 
 	double dt = fem.GetTime().timeIncrement;
 	m.flowsolver->Setup(dt);
@@ -503,6 +637,12 @@ bool MFEMSolver::SolveStep()
 	m.pvdc->SetCycle(timeStep + 1);
 	m.pvdc->SetTime(t0);
 	m.pvdc->Save();
+   if (m.immersed_solid)
+   {
+      m.sdc->SetCycle(timeStep + 1);
+      m.sdc->SetTime(t0);
+      m.sdc->Save();
+   }
 
 	// copy data to FEBio mesh
 	Vector& p = *m.p_gf;
