@@ -24,6 +24,16 @@ public:
 		dofs.SetDOFName(velocity, 0, "vx");
 		dofs.SetDOFName(velocity, 1, "vy");
 		dofs.SetDOFName(velocity, 2, "vz");
+
+      // immersed solid
+      int immersed_displacement = dofs.AddVariable("immersed_displacement", VAR_VEC3);
+      dofs.SetDOFName(immersed_displacement, 0, "im_ux");
+      dofs.SetDOFName(immersed_displacement, 1, "im_uy");
+      dofs.SetDOFName(immersed_displacement, 2, "im_uz");
+      int immersed_velocity = dofs.AddVariable("immersed_velocity", VAR_VEC3);
+      dofs.SetDOFName(immersed_velocity, 0, "im_vx");
+      dofs.SetDOFName(immersed_velocity, 1, "im_vy");
+      dofs.SetDOFName(immersed_velocity, 2, "im_vz");
 	}
 };
 

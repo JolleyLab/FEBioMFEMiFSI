@@ -341,7 +341,7 @@ bool MFEMSolver::Init()
 
    // create fluid mesh
 	FEMesh& femesh = fem.GetMesh();
-	m.mesh = CreateMFEMMesh3D(femesh);
+	m.mesh = CreateMFEMMesh3D(femesh);   
 	if (m.mesh == nullptr) return false;
    if (m.immersed_solid)
    {
@@ -651,6 +651,23 @@ bool MFEMSolver::SolveStep()
 	int dofVX = fem.GetDOFIndex("vx");
 	int dofVY = fem.GetDOFIndex("vy");
 	int dofVZ = fem.GetDOFIndex("vz");
+   int dofUX;
+   int dofUY;
+   int dofUZ;
+   int dofVIMX;
+   int dofVIMY;
+   int dofVIMZ;
+   Vector& d = *m.d_gf;
+   Vector& vib = *m.vib_gf;
+   if(m.immersed_solid)
+   {
+      dofUX = fem.GetDOFIndex("im_ux");
+      dofUY = fem.GetDOFIndex("im_uy");
+      dofUZ = fem.GetDOFIndex("im_uz");
+      dofVIMX = fem.GetDOFIndex("im_vx");
+      dofVIMY = fem.GetDOFIndex("im_vy");
+      dofVIMZ = fem.GetDOFIndex("im_vz");
+   }
 	int NN = femesh.Nodes();
 	for (int i = 0; i < NN; ++i)
 	{
@@ -659,6 +676,15 @@ bool MFEMSolver::SolveStep()
 		node.set(dofVX, v[i]);
 		node.set(dofVY, v[i + NN]);
 		node.set(dofVZ, v[i + 2*NN]);
+      if (m.immersed_solid)
+      {
+         node.set(dofUX, d[i]);
+         node.set(dofUY, d[i + NN]);
+         node.set(dofUZ, d[i + 2 * NN]);
+         node.set(dofVIMX, v[i]);
+         node.set(dofVIMY, v[i + NN]);
+         node.set(dofVIMZ, v[i + 2 * NN]);
+      }
 	}
 	fem.Update();
 
