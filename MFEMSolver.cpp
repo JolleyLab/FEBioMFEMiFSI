@@ -93,7 +93,10 @@ public:
    // immersed solid
    int orderd = orderv;
    MaterialType *mat_type = nullptr;
+   
    int form_type = ImmersedSolid::form_type::TotalLagrangian;
+   // int form_type = ImmersedSolid::form_type::UpdatedLagrangian; // either work
+
    bool subtract_viscous_stress = true;
    bool immersed_solid = false;
    int vol_type = NearlyIncompressibleMaterial::volumetric_energy::ST91;
@@ -119,6 +122,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
    BEGIN_PARAM_GROUP("Immersed Solid Options");
       ADD_PARAMETER(m.immersed_solid, "Immersed_solid");
       ADD_PARAMETER(m.subtract_viscous_stress, "Subtract_viscous_stress");
+      // drop down menu to select Total vs Updated Lagrangian TODO
    END_PARAM_GROUP();
 
    // Time Stepping Options
@@ -558,7 +562,7 @@ bool MFEMSolver::Init()
       {
          MFEMNearlyIncompressibleAnnularDisk* niad_mat = static_cast<MFEMNearlyIncompressibleAnnularDisk*>(solid_mat);
          double disk_w = niad_mat->GetRadialThickness(); // constant thickness
-         m.mat_type = new NearlyIncompressibleAnnularDisk(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*niad_mat->GetBulkModulus(),*niad_mat->GetC0Coeff(),disk_w,true);
+         m.mat_type = new NearlyIncompressibleAnnularDisk(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*niad_mat->GetBulkModulus(),*niad_mat->GetC0Coeff(),disk_w);
       }
       else
       {
