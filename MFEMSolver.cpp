@@ -37,12 +37,24 @@ public:
 
 public:
 	MFEMMesh* mesh = nullptr; // MFEM mesh
+   // transfer maps from submesh to global mfem mesh
+   TransferMap* submeshfluid_to_global_v = nullptr; 
+   TransferMap* submeshfluid_to_global_p = nullptr; 
+   TransferMap* submeshsolid_to_global_d = nullptr;
+   // global spaces and gridfunctions
+   FiniteElementSpace* vfespace_global = nullptr;
+   FiniteElementSpace* pfespace_global = nullptr;
+   GridFunction u_gf_global, p_gf_global, d_gf_global, vib_gf_global;
+
+   // fluid
+   SubMesh* fluid_mesh = nullptr; // fluid mesh
 	INS_Solver* flowsolver = nullptr; // MFEM flow solver
 	GridFunction* p_gf = nullptr; // velocity grid function
 	GridFunction* u_gf = nullptr; // pressure grid function
 	ParaViewDataCollection* pvdc = nullptr; // paraview data collection
 
-   MFEMMesh* solid_mesh = nullptr; // immersed solid mesh
+   // immersed solid
+   SubMesh* solid_mesh = nullptr; // immersed solid mesh
    GridFunction *d_gf = nullptr; // immersed solid displacement grid function
    GridFunction *vib_gf = nullptr; // immersed solid velocity grid function
    ParaViewDataCollection *sdc = nullptr; // immersed solid paraview data collection
@@ -59,6 +71,7 @@ public:
    bool stabilized_LSIC = false; // turned on automatically using VMS
    bool stabilized_VMS = true;
    int stab_type = ins_solver::StabilizationType::VMS;
+   int orderingtype= Ordering::byVDIM;
 
    int nonlinear_form = ins_solver::NonlinearFormType::Convective;
    int viscous_term_type = ins_solver::ViscousTermType::StressForm;
@@ -168,7 +181,14 @@ MFEMSolver::~MFEMSolver()
    // Restore the original buffer
    mfem::out.rdbuf(customBuffer.originalBuffer);
 
+   delete m.submeshfluid_to_global_v;
+   delete m.submeshfluid_to_global_p;
+   delete m.submeshsolid_to_global_d;
+   delete m.vfespace_global;
+   delete m.pfespace_global;
+
 	delete m.mesh;
+   delete m.fluid_mesh;
 	delete m.flowsolver;
 	delete m.pvdc;
 
@@ -190,6 +210,16 @@ mfem::GridFunction* MFEMSolver::GetCurrentVelocity()
 mfem::Mesh* MFEMSolver::GetMFEMMesh()
 {
 	return m.mesh;
+}
+
+mfem::Mesh* MFEMSolver::GetMFEMfluidmesh()
+{
+	return m.fluid_mesh;
+}
+
+mfem::Mesh* MFEMSolver::GetMFEMsolidmesh()
+{
+	return m.solid_mesh;
 }
 
 void MFEMSolver::AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr)
@@ -343,17 +373,51 @@ bool MFEMSolver::Init()
    std::ostream customStream(&customBuffer);
    mfem::out.rdbuf(customStream.rdbuf());
 
-   // create fluid mesh
+   // create the mesh
 	FEMesh& femesh = fem.GetMesh();
 	m.mesh = CreateMFEMMesh3D(femesh);   
 	if (m.mesh == nullptr) return false;
    if (m.immersed_solid)
    {
-      // extract fluid and immersed solid meshes
+      // create fluid and solid submeshes from mfem version of FEBio mesh
+      for (int i = 0; i < femesh.Domains(); ++i)
+      {
+         FEDomain& dom = femesh.Domain(i);
+         if (dom.IsActive() && dynamic_cast<MFEMSolidMaterial*>(dom.GetMaterial()))
+         {
+            Array<int> domain_attr(m.mesh->attributes.Max());
+            domain_attr = 0;
+            domain_attr[i] = i+1;
+            m.solid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,domain_attr));
+            if (m.solid_mesh == nullptr) return false;
+         }
+         if(dom.IsActive() && dynamic_cast<MFEMNewtonianFluid*>(dom.GetMaterial()))
+         {
+            Array<int> domain_attr(m.mesh->attributes.Max());
+            domain_attr = 0;
+            domain_attr[i] = i+1;
+            m.fluid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,domain_attr));
+            if (m.fluid_mesh == nullptr) return false;
+         }
+      }
    }
-   feLog("-------------------------------\nFluid Mesh\n");
-	m.mesh->PrintCharacteristics();
-   feLog("-------------------------------\n");
+
+   // print mesh details
+   if (m.immersed_solid)
+   {
+      feLog("-------------------------------\nFluid Mesh\n");
+      m.fluid_mesh->PrintCharacteristics();
+      feLog("-------------------------------\n");
+      feLog("-------------------------------\nSolid Mesh\n");
+      m.solid_mesh->PrintCharacteristics();
+      feLog("-------------------------------\n");
+   }
+   else
+   {
+      feLog("-------------------------------\nFluid Mesh\n");
+      m.mesh->PrintCharacteristics();
+      feLog("-------------------------------\n");
+   }
 
    // check to ensure at most two materials have been specified!
    if (fem.Materials() > 2)
@@ -389,8 +453,8 @@ bool MFEMSolver::Init()
          return false;
       }
    }
-	m.flowsolver = new INS_Solver(m.mesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density);
-
+   m.flowsolver = new INS_Solver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
+   
 	// set rho_inf for time stepping method
 	m.flowsolver->SetRhoInf(m.rhoinf);
 
@@ -463,7 +527,8 @@ bool MFEMSolver::Init()
 		m.flowsolver->SetViscousTermType(ins_solver::ViscousTermType::LaplaceForm);
 	}
 
-	// Set the initial conditions.
+   // Here we assume the immersed solid has no initial or boundary conditions set
+   // Set the initial conditions.
 	for (int i = 0; i < fem.InitialConditions(); ++i)
 	{
 		MFEMInitialCondition* ic = dynamic_cast<MFEMInitialCondition*>(fem.InitialCondition(i));
@@ -481,7 +546,7 @@ bool MFEMSolver::Init()
 		{
 			FESurface& surf = *bc->GetSurface();
 			FEFacetSet* set = surf.GetFacetSet();
-			int id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
+         int id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
 			bc->Apply(this, id - 1);
 		}
 	}
@@ -527,9 +592,6 @@ bool MFEMSolver::Init()
    // Add immersed solid
    if (m.immersed_solid)
    {
-      // create solid mesh
-      // TODO
-
       // create solid material
       MFEMSolidMaterial* solid_mat = nullptr;
       for (int i=0; i<fem.Materials(); ++i)
@@ -579,12 +641,36 @@ bool MFEMSolver::Init()
       m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
    }   
 
+   // create transfer maps and global functions
+   if(m.immersed_solid)
+   {
+      int vdim = m.flowsolver->GetCurrentVelocity()->FESpace()->GetVDim();
+      int ordering = m.flowsolver->GetCurrentVelocity()->FESpace()->GetOrdering();
+      auto vfec = m.flowsolver->GetCurrentVelocity()->FESpace()->FEColl();
+      auto pfec = m.flowsolver->GetCurrentPressure()->FESpace()->FEColl();
+      m.vfespace_global = new FiniteElementSpace(static_cast<Mesh*>(m.mesh),vfec,vdim,ordering);
+      m.pfespace_global = new FiniteElementSpace(static_cast<Mesh*>(m.mesh),pfec,1,ordering);
+   
+      m.u_gf_global.SetSpace(m.vfespace_global);
+      m.u_gf_global = 0.0;
+      m.p_gf_global.SetSpace(m.pfespace_global);
+      m.p_gf_global = 0.0;
+      m.d_gf_global.SetSpace(m.vfespace_global);
+      m.d_gf_global = 0.0;
+      m.vib_gf_global.SetSpace(m.vfespace_global);
+      m.vib_gf_global = 0.0;
+
+      m.submeshfluid_to_global_v = new TransferMap(*m.u_gf,m.u_gf_global);
+      m.submeshfluid_to_global_p = new TransferMap(*m.p_gf,m.p_gf_global);
+      m.submeshsolid_to_global_d = new TransferMap(*m.d_gf,m.d_gf_global);
+   }
+
 	// setup output in paraview format
    std::string fname = "results_mfem_solver";
    if (m.immersed_solid)
    {
       std::string fluid_filename = fname + "/fluid";
-      m.pvdc = new ParaViewDataCollection(fluid_filename, m.mesh);
+      m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_mesh);
    }
    else
    {
@@ -638,59 +724,91 @@ bool MFEMSolver::SolveStep()
 	m.flowsolver->Step(t0, dt, timeStep);
    
 	// save data
-	m.pvdc->SetCycle(timeStep + 1);
+	m.pvdc->SetCycle(timeStep);
 	m.pvdc->SetTime(t0);
 	m.pvdc->Save();
    if (m.immersed_solid)
    {
-      m.sdc->SetCycle(timeStep + 1);
+      m.sdc->SetCycle(timeStep);
       m.sdc->SetTime(t0);
       m.sdc->Save();
    }
 
 	// copy data to FEBio mesh
-	Vector& p = *m.p_gf;
-	Vector& v = *m.u_gf;
-	int dofP = fem.GetDOFIndex("p");
-	int dofVX = fem.GetDOFIndex("vx");
-	int dofVY = fem.GetDOFIndex("vy");
-	int dofVZ = fem.GetDOFIndex("vz");
-   int dofUX;
-   int dofUY;
-   int dofUZ;
-   int dofVIMX;
-   int dofVIMY;
-   int dofVIMZ;
-   Vector& d = *m.d_gf;
-   Vector& vib = *m.vib_gf;
    if(m.immersed_solid)
    {
-      dofUX = fem.GetDOFIndex("im_ux");
-      dofUY = fem.GetDOFIndex("im_uy");
-      dofUZ = fem.GetDOFIndex("im_uz");
-      dofVIMX = fem.GetDOFIndex("im_vx");
-      dofVIMY = fem.GetDOFIndex("im_vy");
-      dofVIMZ = fem.GetDOFIndex("im_vz");
-   }
-	int NN = femesh.Nodes();
-	for (int i = 0; i < NN; ++i)
-	{
-		FENode& node = femesh.Node(i);
-		node.set(dofP, p[i]);
-		node.set(dofVX, v[i]);
-		node.set(dofVY, v[i + NN]);
-		node.set(dofVZ, v[i + 2*NN]);
-      if (m.immersed_solid)
+      // transfer grid functions from submesh to parent febio mesh
+      m.u_gf_global = 0.0;
+      m.p_gf_global = 0.0;
+      m.d_gf_global = 0.0;
+      m.vib_gf_global = 0.0;
+      m.submeshfluid_to_global_v->Transfer(*m.u_gf, m.u_gf_global);
+      m.submeshfluid_to_global_p->Transfer(*m.p_gf, m.p_gf_global);
+      m.submeshsolid_to_global_d->Transfer(*m.d_gf, m.d_gf_global);
+      m.submeshsolid_to_global_d->Transfer(*m.vib_gf, m.vib_gf_global);
+
+      Vector& p = m.p_gf_global;
+      Vector& v = m.u_gf_global;
+      int dofP = fem.GetDOFIndex("p");
+      int dofVX = fem.GetDOFIndex("vx");
+      int dofVY = fem.GetDOFIndex("vy");
+      int dofVZ = fem.GetDOFIndex("vz");
+
+      Vector& d = m.d_gf_global;
+      Vector& vib = m.vib_gf_global;
+      int dofUX = fem.GetDOFIndex("im_ux");
+      int dofUY = fem.GetDOFIndex("im_uy");
+      int dofUZ = fem.GetDOFIndex("im_uz");
+      int dofVIMX = fem.GetDOFIndex("im_vx");
+      int dofVIMY = fem.GetDOFIndex("im_vy");
+      int dofVIMZ = fem.GetDOFIndex("im_vz");
+
+      int NN = femesh.Nodes();
+      for (int i = 0; i < NN; ++i)
       {
-         node.set(dofUX, d[i]);
-         node.set(dofUY, d[i + NN]);
-         node.set(dofUZ, d[i + 2 * NN]);
-         node.set(dofVIMX, v[i]);
-         node.set(dofVIMY, v[i + NN]);
-         node.set(dofVIMZ, v[i + 2 * NN]);
+         FENode& node = femesh.Node(i);
+         node.set(dofP, p[i]);
+
+         // for vector unknowns, check dof ordering type
+         int idx = m.orderingtype == Ordering::byNODES ? i + 0*NN : i*3 + 0;
+         int idy = m.orderingtype == Ordering::byNODES ? i + 1*NN : i*3 + 1;
+         int idz = m.orderingtype == Ordering::byNODES ? i + 2*NN : i*3 + 2;
+         node.set(dofVX, v[idx]);
+         node.set(dofVY, v[idy]);
+         node.set(dofVZ, v[idz]);
+         node.set(dofUX, d[idx]);
+         node.set(dofUY, d[idy]);
+         node.set(dofUZ, d[idz]);
+         node.set(dofVIMX, vib[idx]);
+         node.set(dofVIMY, vib[idy]);
+         node.set(dofVIMZ, vib[idz]);
       }
-	}
-	fem.Update();
+      fem.Update();
+   }
+   else
+   {
+      Vector& p = *m.p_gf;
+      Vector& v = *m.u_gf;
+      int dofP = fem.GetDOFIndex("p");
+      int dofVX = fem.GetDOFIndex("vx");
+      int dofVY = fem.GetDOFIndex("vy");
+      int dofVZ = fem.GetDOFIndex("vz");
+      int NN = femesh.Nodes();
+      for (int i = 0; i < NN; ++i)
+      {
+         FENode& node = femesh.Node(i);
+         node.set(dofP, p[i]);
+         
+         // for vector unknowns, check dof ordering type
+         int idx = m.orderingtype == Ordering::byNODES ? i + 0*NN : i*3 + 0;
+         int idy = m.orderingtype == Ordering::byNODES ? i + 1*NN : i*3 + 1;
+         int idz = m.orderingtype == Ordering::byNODES ? i + 2*NN : i*3 + 2;
+         node.set(dofVX, v[idx]);
+         node.set(dofVY, v[idy]);
+         node.set(dofVZ, v[idz]);
+      }
+      fem.Update();
+   }
 
 	feLog("%11s %11s\n", "Time", "dt");
 	feLog("%.5E %.5E\n", t, dt);

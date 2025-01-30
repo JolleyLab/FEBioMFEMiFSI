@@ -40,6 +40,7 @@ endif()
 
 # Find FEBio Libs (from FEBioHeat plugin CMakeLists.txt)
 set(FEBio_SDK "/Applications/FEBioStudio/sdk")
+# set(FEBio_SDK "/Users/blackr1/Documents/Software/FEBio/")
 
 # Only update the include and lib directories if the FEBio_SDK path has been changed. 
 if(NOT OLD_SDK)

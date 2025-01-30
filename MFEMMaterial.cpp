@@ -41,6 +41,11 @@ double MFEMNewtonianFluid::KinematicViscosity()
 /////////////////////////////////////////////////////////////////////////
 // solid materials
 
+MFEMSolidMaterial::MFEMSolidMaterial(FEModel* fem) : MFEMMaterial(fem)
+{
+
+}
+
 BEGIN_FECORE_CLASS(MFEMCompressibleNeoHookeanMaterial, MFEMSolidMaterial)
    ADD_PARAMETER(m_rho, FE_RANGE_GREATER(0.0), "rho")->setUnits(UNIT_DENSITY)->setLongName("density");
    ADD_PARAMETER(m_mu, FE_RANGE_GREATER_OR_EQUAL(0.0), "mu");
@@ -57,6 +62,11 @@ MFEMCompressibleNeoHookeanMaterial::MFEMCompressibleNeoHookeanMaterial(FEModel* 
    m_rho_coeff = new FEScalarCoefficient(fem, m_rho);
    m_mu_coeff = new FEScalarCoefficient(fem, m_mu);
    m_lambda_coeff = new FEScalarCoefficient(fem, m_lambda);
+}
+
+MFEMNearlyIncompressibleMaterial::MFEMNearlyIncompressibleMaterial(FEModel* fem) : MFEMSolidMaterial(fem)
+{
+
 }
 
 BEGIN_FECORE_CLASS(MFEMNearlyIncompressibleNeoHookeanMaterial, MFEMNearlyIncompressibleMaterial)

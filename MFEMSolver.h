@@ -25,6 +25,8 @@ public:
 	mfem::GridFunction* GetCurrentVelocity();
 
 	mfem::Mesh* GetMFEMMesh();
+   mfem::Mesh* GetMFEMfluidmesh();
+   mfem::Mesh* GetMFEMsolidmesh();
 
    // velocity bcs
 	void AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);

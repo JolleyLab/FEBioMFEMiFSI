@@ -117,6 +117,8 @@ void MFEMSetNodalPressure::Apply(MFEMSolver* solver)
 {
    FEMesh& m = GetMesh();
 
+   feLogWarning("SetNodalPressure condition may cause issues for iFSI if node is within overlapping solid region!");
+
    // check to ensure pressure dof is set
    if (m_dof != 0)
    {

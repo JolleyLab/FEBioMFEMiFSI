@@ -7,9 +7,6 @@ class MFEMMaterial : public FEMaterial
 {
 public:
 	MFEMMaterial(FEModel* fem);
-
-   // return material properties
-   virtual double Density() = 0;
 };
 
 class MFEMNewtonianFluid : public MFEMMaterial
@@ -18,7 +15,7 @@ public:
 	MFEMNewtonianFluid(FEModel* fem);
 
    // return material properties
-   double Density() override;
+   double Density();
    double DynamicViscosity();
    double KinematicViscosity();
 
@@ -32,10 +29,10 @@ private:
 };
 
 // solid materials
-class MFEMSolidMaterial : public FEMaterial
+class MFEMSolidMaterial : public MFEMMaterial
 {
 public:
-   MFEMSolidMaterial(FEModel* fem) : FEMaterial(fem) {};
+   MFEMSolidMaterial(FEModel* fem);
 
    virtual FEScalarCoefficient *GetDensityCoeff() = 0;
    virtual FEScalarCoefficient *GetC0Coeff() = 0;
@@ -65,7 +62,7 @@ private:
 class MFEMNearlyIncompressibleMaterial : public MFEMSolidMaterial
 {
 public:
-   MFEMNearlyIncompressibleMaterial(FEModel* fem) : MFEMSolidMaterial(fem) {};
+   MFEMNearlyIncompressibleMaterial(FEModel* fem);
 
    virtual FEScalarCoefficient *GetBulkModulus() = 0;
 };
