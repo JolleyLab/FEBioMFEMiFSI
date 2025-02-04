@@ -62,6 +62,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 		"}";
 
 	fecore.CreateModule(new FEMFEMiFSI, "mfemifsi", info);
+   // fecore.AddModuleDependency("solid");
 
 	// analyis classes (default type must match module name!)
 	REGISTER_FECORE_CLASS(MFEMAnalysis, "mfemifsi");
@@ -106,6 +107,10 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    REGISTER_FECORE_CLASS(MFEMCompressibleNeoHookeanMaterial, "mfem compressible neo-hookean");
    REGISTER_FECORE_CLASS(MFEMNearlyIncompressibleNeoHookeanMaterial, "mfem nearly-incompressible neo-hookean");
    REGISTER_FECORE_CLASS(MFEMNearlyIncompressibleAnnularDisk, "mfem nearly-incompressible annular disk");
+
+   // FEBio uncoupled materials
+   REGISTER_FECORE_CLASS(FEBioMooneyRivlin, "febio mooney rivlin");
+   REGISTER_FECORE_CLASS(FEBioIncompNeoHookean, "febio incompressible neo-hookean");
 
    // plot variables
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");

@@ -106,9 +106,10 @@ public:
    // immersed solid
    int orderd = orderv;
    MaterialType *mat_type = nullptr;
+   bool febio_material = false;
    
-   int form_type = ImmersedSolid::form_type::TotalLagrangian;
-   // int form_type = ImmersedSolid::form_type::UpdatedLagrangian; // either work
+   // int form_type = ImmersedSolid::form_type::TotalLagrangian; // either work
+   int form_type = ImmersedSolid::form_type::UpdatedLagrangian; // either work, but FEBio computes integrals in spatial frame
 
    bool subtract_viscous_stress = true;
    bool immersed_solid = false;
@@ -193,7 +194,7 @@ MFEMSolver::~MFEMSolver()
 	delete m.pvdc;
 
    delete m.solid_mesh;
-   delete m.mat_type;
+   if(m.febio_material == false) delete m.mat_type;
    delete m.sdc;
 }
 
@@ -375,21 +376,23 @@ bool MFEMSolver::Init()
 
    // create the mesh
 	FEMesh& femesh = fem.GetMesh();
-	m.mesh = CreateMFEMMesh3D(femesh);   
+	m.mesh = CreateMFEMMesh3D(femesh);
 	if (m.mesh == nullptr) return false;
    if (m.immersed_solid)
    {
       // create fluid and solid submeshes from mfem version of FEBio mesh
+      Array<int> solid_domain_attr(m.mesh->attributes.Max());
+      solid_domain_attr = 0;
       for (int i = 0; i < femesh.Domains(); ++i)
       {
          FEDomain& dom = femesh.Domain(i);
          if (dom.IsActive() && dynamic_cast<MFEMSolidMaterial*>(dom.GetMaterial()))
          {
-            Array<int> domain_attr(m.mesh->attributes.Max());
-            domain_attr = 0;
-            domain_attr[i] = i+1;
-            m.solid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,domain_attr));
-            if (m.solid_mesh == nullptr) return false;
+            solid_domain_attr[i] = i+1;
+         }
+         if (dom.IsActive() && dynamic_cast<MFEMUncoupledFEBioMaterial*>(dom.GetMaterial()))
+         {
+            solid_domain_attr[i] = i+1;
          }
          if(dom.IsActive() && dynamic_cast<MFEMNewtonianFluid*>(dom.GetMaterial()))
          {
@@ -400,6 +403,10 @@ bool MFEMSolver::Init()
             if (m.fluid_mesh == nullptr) return false;
          }
       }
+
+      // create solid mesh as sum of all solid domains, this will preserve solid domain numbering
+      m.solid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,solid_domain_attr));
+      if (m.solid_mesh == nullptr) return false;
    }
 
    // print mesh details
@@ -407,7 +414,6 @@ bool MFEMSolver::Init()
    {
       feLog("-------------------------------\nFluid Mesh\n");
       m.fluid_mesh->PrintCharacteristics();
-      feLog("-------------------------------\n");
       feLog("-------------------------------\nSolid Mesh\n");
       m.solid_mesh->PrintCharacteristics();
       feLog("-------------------------------\n");
@@ -470,7 +476,7 @@ bool MFEMSolver::Init()
 
 	// set linear solver and preconditioner
    if (m.direct_solver) m.flowsolver->UseDirectSolver();
-   m.flowsolver->SetPreconditioner(m.prec_type, m.direct_solver_prec);
+   else m.flowsolver->SetPreconditioner(m.prec_type, m.direct_solver_prec);
 
 	// set nonlinear form type
 	m.flowsolver->SetNonlinearFormType(m.nonlinear_form);
@@ -594,46 +600,84 @@ bool MFEMSolver::Init()
    {
       // create solid material
       MFEMSolidMaterial* solid_mat = nullptr;
+      MFEMUncoupledFEBioMaterial* uncoupled_mat = nullptr;
       for (int i=0; i<fem.Materials(); ++i)
       {
          FEMaterial* fe_mat = fem.GetMaterial(i);
+         
+         // MFEM material
          solid_mat = dynamic_cast<MFEMSolidMaterial*>(fe_mat);
          if (solid_mat)
          {
             break;
          }
+
+         // FEBio material
+         uncoupled_mat = dynamic_cast<MFEMUncoupledFEBioMaterial*>(fe_mat);
+         if (uncoupled_mat)
+         {
+            MFEM_ASSERT(m.form_type == ImmersedSolid::form_type::UpdatedLagrangian, "FEBio materials only work with Updated Lagrangian");
+            break;
+         }
       }
-      if (!solid_mat)
+      if (!solid_mat && !uncoupled_mat)
       {
          feLogError("No immersed solid material found");
          return false;
       }
 
       // determine which material
-      if (typeid(*solid_mat) == typeid(MFEMCompressibleNeoHookeanMaterial))
+      FEScalarCoefficient *init_rho_coeff = nullptr;
+      if (solid_mat)
       {
-         MFEMCompressibleNeoHookeanMaterial* cnh_mat = static_cast<MFEMCompressibleNeoHookeanMaterial*>(solid_mat);
-         m.mat_type = new CompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),*cnh_mat->GetC1Coeff(),*cnh_mat->GetC0Coeff());
+         init_rho_coeff = solid_mat->GetDensityCoeff();
+         if (typeid(*solid_mat) == typeid(MFEMCompressibleNeoHookeanMaterial))
+         {
+            MFEMCompressibleNeoHookeanMaterial* cnh_mat = static_cast<MFEMCompressibleNeoHookeanMaterial*>(solid_mat);
+            m.mat_type = new CompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),*cnh_mat->GetC1Coeff(),*cnh_mat->GetC0Coeff());
+         }
+         else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleNeoHookeanMaterial))
+         {
+            MFEMNearlyIncompressibleNeoHookeanMaterial* nih_mat = static_cast<MFEMNearlyIncompressibleNeoHookeanMaterial*>(solid_mat);
+            m.mat_type = new NearlyIncompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*nih_mat->GetBulkModulus(),*nih_mat->GetC0Coeff());
+         }
+         else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleAnnularDisk))
+         {
+            MFEMNearlyIncompressibleAnnularDisk* niad_mat = static_cast<MFEMNearlyIncompressibleAnnularDisk*>(solid_mat);
+            double disk_w = niad_mat->GetRadialThickness(); // constant thickness
+            m.mat_type = new NearlyIncompressibleAnnularDisk(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*niad_mat->GetBulkModulus(),*niad_mat->GetC0Coeff(),disk_w);
+         }
+         else
+         {
+            feLogError("Unsupported solid material type");
+            return false;
+         }
       }
-      else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleNeoHookeanMaterial))
+      else if (uncoupled_mat)
       {
-         MFEMNearlyIncompressibleNeoHookeanMaterial* nih_mat = static_cast<MFEMNearlyIncompressibleNeoHookeanMaterial*>(solid_mat);
-         m.mat_type = new NearlyIncompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*nih_mat->GetBulkModulus(),*nih_mat->GetC0Coeff());
-      }
-      else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleAnnularDisk))
-      {
-         MFEMNearlyIncompressibleAnnularDisk* niad_mat = static_cast<MFEMNearlyIncompressibleAnnularDisk*>(solid_mat);
-         double disk_w = niad_mat->GetRadialThickness(); // constant thickness
-         m.mat_type = new NearlyIncompressibleAnnularDisk(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*niad_mat->GetBulkModulus(),*niad_mat->GetC0Coeff(),disk_w);
+         m.febio_material = true;
+         init_rho_coeff = uncoupled_mat->GetDensityCoeff();
+         if (typeid(*uncoupled_mat) == typeid(FEBioMooneyRivlin))
+         {
+            m.mat_type = uncoupled_mat;
+         }
+         else if (typeid(*uncoupled_mat) == typeid(FEBioIncompNeoHookean))
+         {
+            m.mat_type = uncoupled_mat;
+         }
+         else
+         {
+            feLogError("Unsupported solid material type");
+            return false;
+         }
       }
       else
       {
-         feLogError("Unsupported solid material type");
+         feLogError("No immersed solid material found");
          return false;
-      }
+      }      
 
       // add immersed solid to the flow solver
-      FEScalarCoefficient *init_rho_coeff = solid_mat->GetDensityCoeff();
       m.flowsolver->AddImmersedSolid(m.solid_mesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress);
    
       // immersed solid grid functions

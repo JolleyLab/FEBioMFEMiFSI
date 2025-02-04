@@ -7,7 +7,7 @@ FEDomain* MFEMDomainFactory::CreateDomain(const FE_Element_Spec& spec, FEMesh* p
 	FEModel& fem = *pmat->GetFEModel();
 	FE_Element_Class eclass = spec.eclass;
 	FEDomain* dom = nullptr;
-	if (dynamic_cast<MFEMMaterial*>(pmat))
+	if (dynamic_cast<MFEMMaterial*>(pmat) || dynamic_cast<MFEMUncoupledFEBioMaterial*>(pmat))
 	{
 		if (eclass == FE_ELEM_SHELL)
 		{
