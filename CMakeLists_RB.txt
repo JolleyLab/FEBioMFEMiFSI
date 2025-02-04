@@ -196,3 +196,6 @@ target_link_libraries(FEBioMFEMiFSI mfem)
 
 # Link FSI Solver
 target_link_libraries(FEBioMFEMiFSI fsi_solver)
+
+# Output the build type
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
