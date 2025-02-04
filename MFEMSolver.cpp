@@ -19,7 +19,6 @@
 #include "MFEMLoad.h"
 #include <FECore/log.h>
 #include "MFEMMaterial.h"
-#include "CustomStreamBuffer.h"
 #include <typeinfo>
 
 using namespace ins_solver_serial;
@@ -115,6 +114,10 @@ public:
    bool immersed_solid = false;
    int vol_type = NearlyIncompressibleMaterial::volumetric_energy::ST91;
    // TO DO make vol_type a drop down option with nearly incompressible materials
+
+public:
+   // Custom stream buffer for writing to the log file
+   CustomStreamBuffer customBuffer;
 };
 
 MFEMSolver::Imp* MFEMSolver::Imp::This = nullptr;
@@ -180,7 +183,7 @@ MFEMSolver::MFEMSolver(FEModel* fem) : FESolver(fem), m(*(new MFEMSolver::Imp))
 MFEMSolver::~MFEMSolver()
 {
    // Restore the original buffer
-   mfem::out.rdbuf(customBuffer.originalBuffer);
+   mfem::out.rdbuf(m.customBuffer.originalBuffer);
 
    delete m.submeshfluid_to_global_v;
    delete m.submeshfluid_to_global_p;
@@ -369,9 +372,9 @@ bool MFEMSolver::Init()
 
    // Redirect mfem::out to the custom stream buffer that writes to the log file
    // TODO: Cleanup the output to the log file
-   customBuffer.originalBuffer = mfem::out.rdbuf();
-   customBuffer.fe_model = &fem;
-   std::ostream customStream(&customBuffer);
+   m.customBuffer.originalBuffer = mfem::out.rdbuf();
+   m.customBuffer.fe_model = &fem;
+   std::ostream customStream(&m.customBuffer);
    mfem::out.rdbuf(customStream.rdbuf());
 
    // create the mesh
