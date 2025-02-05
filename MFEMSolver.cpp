@@ -760,24 +760,22 @@ bool MFEMSolver::SolveStep()
 	FEMesh& femesh = fem.GetMesh();
 
 	FEAnalysis* analysis = fem.GetCurrentStep();
-	int timeStep = analysis->m_ntimesteps;
+	int timeStep = analysis->m_ntimesteps + 1; // current time step number
 
-	double t = fem.GetTime().currentTime;
+	double t = fem.GetTime().currentTime; // t = t_n+1
 	double dt = fem.GetTime().timeIncrement;
-	double t0 = t - dt;
 
-	// note that this function needs the previous time point and will update t0.
-	// After this call it should be that t0 == t
-	m.flowsolver->Step(t0, dt, timeStep);
+   // solve a time step
+	m.flowsolver->Step(t, dt, timeStep);
    
 	// save data
 	m.pvdc->SetCycle(timeStep);
-	m.pvdc->SetTime(t0);
+	m.pvdc->SetTime(t);
 	m.pvdc->Save();
    if (m.immersed_solid)
    {
       m.sdc->SetCycle(timeStep);
-      m.sdc->SetTime(t0);
+      m.sdc->SetTime(t);
       m.sdc->Save();
    }
 
@@ -857,11 +855,8 @@ bool MFEMSolver::SolveStep()
       fem.Update();
    }
 
-	feLog("%11s %11s\n", "Time", "dt");
-	feLog("%.5E %.5E\n", t, dt);
-
 	// print out relative L2 error at final time step
-	if (timeStep == analysis->m_ntime - 1)
+	if (timeStep == analysis->m_ntime)
 	{
 		m.flowsolver->PrintTimingData();
 	}

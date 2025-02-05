@@ -186,17 +186,8 @@ void MFEMUncoupledFEBioMaterial::EvalCauchyStress(DenseMatrix &stress)
 {
    stress.SetSize(vdim);
 
-   // the current time in mfem may not always match the current time in FEBio
-	// so we have to do this little trick to make sure parameters are evaluated
-   FETimeInfo& ti = GetFEModel()->GetTime();
-	double oldTime = ti.currentTime;
-	ti.currentTime = m_rho_coeff->GetTime();
-
    // Compute sigma = sigma_iso + sigma_vol
    mat3ds m_s = (*this).Stress(*m_materialpoint);
-
-   // reset the FEBio time
-	ti.currentTime = oldTime;
 
    // copy data to mfem stress matrix
    stress(0,0) = m_s(0,0);
@@ -212,13 +203,6 @@ void MFEMUncoupledFEBioMaterial::EvalCauchyStress(DenseMatrix &stress)
 
 double MFEMUncoupledFEBioMaterial::EvalElasticityTensor(int i, int j, int k, int l)
 {
-   // the current time in mfem may not always match the current time in FEBio
-	// so we have to do this little trick to make sure parameters are evaluated
-	// at the correct time
-	FETimeInfo& ti = GetFEModel()->GetTime();
-	double oldTime = ti.currentTime;
-	ti.currentTime = m_rho_coeff->GetTime();
-
    double val = 0.0;
    if (formulation_type == form_type::UpdatedLagrangian)
    {
@@ -233,9 +217,6 @@ double MFEMUncoupledFEBioMaterial::EvalElasticityTensor(int i, int j, int k, int
    {
       MFEM_ABORT("Error: TotalLagrangian formulation not implemented");
    }
-
-   // reset the FEBio time
-	ti.currentTime = oldTime;
    
    return val;
 }
