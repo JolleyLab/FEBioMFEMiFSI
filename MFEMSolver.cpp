@@ -111,6 +111,7 @@ public:
    int form_type = ImmersedSolid::form_type::UpdatedLagrangian; // either work, but FEBio computes integrals in spatial frame
 
    bool subtract_viscous_stress = true;
+   double stabs_scale = 1.0;
    bool immersed_solid = false;
    int vol_type = NearlyIncompressibleMaterial::volumetric_energy::ST91;
    // TO DO make vol_type a drop down option with nearly incompressible materials
@@ -139,7 +140,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
    BEGIN_PARAM_GROUP("Immersed Solid Options");
       ADD_PARAMETER(m.immersed_solid, "Immersed_solid");
       ADD_PARAMETER(m.subtract_viscous_stress, "Subtract_viscous_stress");
-      // drop down menu to select Total vs Updated Lagrangian TODO
+      ADD_PARAMETER(m.stabs_scale, FE_RANGE_NOT_EQUAL(0.0), "VMS_stabilization_scaling");
    END_PARAM_GROUP();
 
    // Time Stepping Options
@@ -681,7 +682,7 @@ bool MFEMSolver::Init()
       }      
 
       // add immersed solid to the flow solver
-      m.flowsolver->AddImmersedSolid(m.solid_mesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress);
+      m.flowsolver->AddImmersedSolid(m.solid_mesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
    
       // immersed solid grid functions
       m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
@@ -730,6 +731,11 @@ bool MFEMSolver::Init()
 	m.pvdc->SetTime(0);
 	m.pvdc->RegisterField("Velocity", m.u_gf);
 	m.pvdc->RegisterField("Pressure", m.p_gf);
+   if(m.immersed_solid && m.flowsolver->GetImmersedSolidIndicator()->FESpace() != nullptr)
+   {
+      GridFunction *s_gf = m.flowsolver->GetImmersedSolidIndicator();
+      m.pvdc->RegisterField("Indicator", s_gf);
+   }
    // TODO: add more outputs (curlv, wss, others)
 	m.pvdc->Save();
 
