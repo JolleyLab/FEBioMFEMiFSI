@@ -1,18 +1,10 @@
 #include "MFEMSolver.h"
 #include <FECore/FEModel.h>
 #include <FECore/FEAnalysis.h>
-#ifdef WIN32
-#include "ins_solver.hpp"
-#include "ins_solver_enum.hpp"
-#include "immersed_solid.hpp" // file in ImmersedFSI-Serial/
-#include "materials.hpp" // file in Elasticity/Materials/
-#else
 #include <Navier-Stokes-Serial/ins_solver.hpp>
 #include <Navier-Stokes/ins_solver_enum.hpp>
 #include <ImmersedFSI-Serial/immersed_solid.hpp>
 #include <Elasticity/Materials/materials.hpp>
-#include "mfem.hpp"
-#endif
 #include "MFEMMesh.h"
 #include "MFEMInitialCondition.h"
 #include "MFEMBoundaryCondition.h"
