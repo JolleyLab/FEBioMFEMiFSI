@@ -12,13 +12,40 @@
 #include <FECore/log.h>
 #include "MFEMMaterial.h"
 #include <typeinfo>
+#include "FEBioLinearSolver.h"
 
 using namespace ins_solver_serial;
 using namespace std;
 using namespace std::placeholders;
-using namespace mfem;
 using namespace immersed_solid_serial;
 using namespace mat;
+using namespace mfem;
+
+// we override this so we can use the FEBio linear solvers
+class FEBio_INS_Solver : public INS_Solver
+{
+public:
+	FEBio_INS_Solver(
+		FEModel* fem,
+		mfem::Mesh* mesh,
+		int orderv,
+		int orderp,
+		double kin_vis,
+		double fluid_density_,
+		int ordering_type_ = mfem::Ordering::byNODES,
+		bool immersed_flag = false) : INS_Solver(mesh, orderv, orderp, kin_vis, fluid_density_, ordering_type_, immersed_flag) 
+	{
+		m_fem = fem;
+	}
+
+	void AllocDirectSolver() override
+	{
+		solver = new FEBioLinearSolver(m_fem);
+	}
+
+private:
+	FEModel* m_fem;
+};
 
 class MFEMSolver::Imp
 {
@@ -455,7 +482,7 @@ bool MFEMSolver::Init()
          return false;
       }
    }
-   m.flowsolver = new INS_Solver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
+   m.flowsolver = new FEBio_INS_Solver(&fem, m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
    
 	// set rho_inf for time stepping method
 	m.flowsolver->SetRhoInf(m.rhoinf);
