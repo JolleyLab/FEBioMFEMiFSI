@@ -28,9 +28,11 @@
 			<rtol>0.001</rtol>
 			<minIt>3</minIt>
 			<maxIt>10</maxIt>
+			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-06</lin_atol>
 			<lin_rtol>0.001</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
+			<inner_solver_type>Iterative</inner_solver_type>
 			<Ainv_atol>1e-06</Ainv_atol>
 			<Ainv_rtol>0.001</Ainv_rtol>
 			<Sinv_atol>1e-06</Sinv_atol>

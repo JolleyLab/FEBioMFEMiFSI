@@ -129,6 +129,7 @@ if(FEBio_LIB_DIR)
     findLib(FECore FEBio_LIB_DIR FECORE)
     findLib(FEBioMech FEBio_LIB_DIR FEBIOMECH)
 endif()
+message(STATUS "Found FEBio Include in: ${FEBio_INC}")
 
 ##### Find FSI and MFEM Libraries
 

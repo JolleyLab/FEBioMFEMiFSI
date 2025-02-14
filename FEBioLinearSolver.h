@@ -1,7 +1,11 @@
 #pragma once
 
+#ifdef WIN32
 #include <mfem/linalg/operator.hpp>
 #include <mfem/linalg/sparsemat.hpp>
+#else
+#include <mfem.hpp>
+#endif
 #include <FECore/LinearSolver.h>
 #include <FECore/CompactUnSymmMatrix.h>
 
