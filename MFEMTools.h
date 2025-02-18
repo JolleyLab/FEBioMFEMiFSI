@@ -52,7 +52,14 @@ protected:
          char ch = static_cast<char>(c);
          buffer << ch;
          if (ch == '\n') {
-               feLog("%s", buffer.str().c_str());
+               std::string str = buffer.str();
+               // Escape percent symbols
+               size_t pos = 0;
+               while ((pos = str.find('%', pos)) != std::string::npos) {
+                  str.insert(pos, "%");
+                  pos += 2; // Move past the escaped percent symbol
+               }
+               feLog("%s", str.c_str());
                buffer.str("");
                buffer.clear();
          }
