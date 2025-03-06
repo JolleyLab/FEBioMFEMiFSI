@@ -27,6 +27,9 @@ public:
    mfem::Mesh* GetMFEMfluidmesh();
    mfem::Mesh* GetMFEMsolidmesh();
 
+   // flag for immersed solid
+   bool ImmersedSolid();
+
    // velocity bcs
 	void AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);
    void AddVelDirichletBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int component);

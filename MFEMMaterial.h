@@ -6,6 +6,7 @@
 #include <FEBioMech/FEUncoupledMaterial.h>
 #include <FEBioMech/FEElasticMaterialPoint.h>
 #include <FECore/tens4d.h>
+#include <FEBioMech/FEIncompNeoHookean.h>
 
 class MFEMMaterial : public FEMaterial
 {
@@ -15,6 +16,8 @@ public:
    FECORE_BASE_CLASS(MFEMMaterial)
 };
 
+//-------------------------------------------------------------------------
+/// MFEM Fluid Materials
 class MFEMNewtonianFluid : public MFEMMaterial
 {
 public:
@@ -34,7 +37,8 @@ private:
 	DECLARE_FECORE_CLASS();
 };
 
-// solid materials
+//-------------------------------------------------------------------------
+/// MFEM Solid Materials
 class MFEMSolidMaterial : public MFEMMaterial
 {
 public:
@@ -197,6 +201,36 @@ public:
 
 	//! calculate deviatoric tangent stiffness at material point
 	tens4ds DevTangent(FEMaterialPoint& pt) override;
+    
+	// declare the parameter list
+	DECLARE_FECORE_CLASS();
+};
+
+//-----------------------------------------------------------------------------
+// FEBio Materials
+
+// FEBio version of MFEMNearlyIncompressibleAnnularDisk // special material for Annular Disk test problem
+class FEAnnularDisk : public FEElasticMaterial
+{
+public:
+   FEAnnularDisk(FEModel* pfem);
+
+public:
+   FEParamDouble m_mu; // shear modulus (c0) // zero for annular disk
+   FEParamDouble m_kappa; // bulk modulus
+   FEParamDouble m_w; // radial thickness
+
+public:
+	//! calculate stress at material point
+	mat3ds Stress(FEMaterialPoint& pt) override;
+
+	//! calculate tangent stiffness at material point
+	tens4ds Tangent(FEMaterialPoint& pt) override;
+
+	//! calculate strain energy density at material point
+	double StrainEnergyDensity(FEMaterialPoint& pt) override;
+
+   tens4ds prod_ikjl(const mat3ds&a, const mat3ds& b);
     
 	// declare the parameter list
 	DECLARE_FECORE_CLASS();

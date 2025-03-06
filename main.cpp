@@ -9,6 +9,9 @@
 #include "MFEMInitialCondition.h"
 #include "MFEMBoundaryCondition.h"
 #include "MFEMLoad.h"
+#include "mfem.hpp"
+#include "MFEMImmersedElasticDomain.h"
+#include "MFEMImmersed3FieldElasticDomain.h"
 
 class FEMFEMiFSI : public FEModule
 {
@@ -71,6 +74,8 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 	fecore.RegisterDomain(new MFEMDomainFactory);
 	REGISTER_FECORE_CLASS(MFEMDomain2D, "mfem domain 2d");
 	REGISTER_FECORE_CLASS(MFEMSolidDomain, "mfem domain 3d");
+   REGISTER_FECORE_CLASS(MFEMImmersedElasticDomain, "mfem immersed febio domain");
+   REGISTER_FECORE_CLASS(MFEMImmersed3FieldElasticDomain, "mfem immersed 3field febio domain");
 
 	// feature classes
 	REGISTER_FECORE_CLASS(MFEMSolver, "mfem");
@@ -103,14 +108,18 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    // Set pressure nodal value
    REGISTER_FECORE_CLASS(MFEMSetNodalPressure, "set nodal pressure");
 
-   // Immersed solid
+   // Immersed solid MFEM materials and MFEM Solver
    REGISTER_FECORE_CLASS(MFEMCompressibleNeoHookeanMaterial, "mfem compressible neo-hookean");
    REGISTER_FECORE_CLASS(MFEMNearlyIncompressibleNeoHookeanMaterial, "mfem nearly-incompressible neo-hookean");
    REGISTER_FECORE_CLASS(MFEMNearlyIncompressibleAnnularDisk, "mfem nearly-incompressible annular disk");
 
-   // FEBio uncoupled materials
+   // Immersed solid FEBio uncoupled materials with MFEM Solver
    REGISTER_FECORE_CLASS(FEBioMooneyRivlin, "febio mooney rivlin");
    REGISTER_FECORE_CLASS(FEBioIncompNeoHookean, "febio incompressible neo-hookean");
+
+   // Immersed solid FEBio materials with FEBio Solver
+   REGISTER_FECORE_CLASS(FEAnnularDisk, "annular disk");
+   REGISTER_FECORE_CLASS(FEIncompNeoHookean, "incompressible neo-hookean");
 
    // plot variables
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");

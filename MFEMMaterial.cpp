@@ -391,3 +391,113 @@ tens4ds FEBioIncompNeoHookean::DevTangent(FEMaterialPoint& mp)
 
 	return (I4*Ib -BxI + IxI*(Ib/3))*(2.0*muJ/3.0);
 }
+
+//-----------------------------------------------------------------------------
+
+BEGIN_FECORE_CLASS(FEAnnularDisk, FEElasticMaterial)
+   ADD_PARAMETER(m_mu, FE_RANGE_GREATER_OR_EQUAL(0.0), "mu");
+   ADD_PARAMETER(m_w, "thickness")->setUnits(UNIT_LENGTH)->setLongName("disk radial thickness");
+END_FECORE_CLASS();
+
+FEAnnularDisk::FEAnnularDisk(FEModel* pfem) : FEElasticMaterial(pfem) 
+{
+	m_mu = 0.0;
+   m_w = 0.0;
+   m_kappa = 0.0;
+}
+
+//-----------------------------------------------------------------------------
+mat3ds FEAnnularDisk::Stress(FEMaterialPoint& mp)
+{
+	FEElasticMaterialPoint& pt = *mp.ExtractData<FEElasticMaterialPoint>();
+
+   // compute ehat_theta
+   vec3d curr_pos = mp.m_rt;
+   // shift to center of disk
+   curr_pos(0) -= 0.5;
+   curr_pos(1) -= 0.5;
+   double mag = curr_pos.unit();
+   vec3d ehat_theta(-1.0*curr_pos(1),curr_pos(0),0.0);   
+
+   // shear modulus
+   double mu_val = m_mu(mp);
+
+   mat3d F = pt.m_F;
+   vec3d Ftheta = F*ehat_theta;
+   mat3d FtFt_temp = Ftheta & Ftheta; // this is sym
+   mat3ds FtFt = FtFt_temp.sym(); // to change type
+
+   return FtFt*(mu_val/pt.m_J);
+}
+
+//-----------------------------------------------------------------------------
+tens4ds FEAnnularDisk::Tangent(FEMaterialPoint& mp)
+{
+	FEElasticMaterialPoint& pt = *mp.ExtractData<FEElasticMaterialPoint>();
+
+   // compute ehat_theta
+   vec3d curr_pos = mp.m_rt;
+   // shift to center of disk
+   curr_pos(0) -= 0.5;
+   curr_pos(1) -= 0.5;
+   double mag = curr_pos.unit();
+   vec3d ehat_theta(-1.0*curr_pos(1),curr_pos(0),0.0);   
+
+   // shear modulus
+   double mu_val = m_mu(mp);
+
+   mat3d F = pt.m_F;
+   vec3d Ftheta = F*ehat_theta;
+   mat3d FtFt_temp = Ftheta & Ftheta; // this is sym
+   mat3ds FtFt = FtFt_temp.sym(); // to change type
+
+   // left cauchy-green matrix (i.e. the 'b' matrix)
+	mat3ds b = pt.LeftCauchyGreen();
+
+   // c_ijkl = mu/J * (b_ik FtFt_jl)
+   tens4ds c = prod_ikjl(b, FtFt);
+	return c*(mu_val/pt.m_J);
+}
+
+//()_ijkl = a_ik * b_jl
+tens4ds FEAnnularDisk::prod_ikjl(const mat3ds&a, const mat3ds& b)
+{
+	tens4ds c;
+
+    c.d[ 0] = a.xx() * b.xx(); // 0000
+    
+    c.d[ 1] = a.xy() * b.xy(); // 0011
+    c.d[ 2] = a.yy() * b.yy(); // 1111
+
+    c.d[ 3] = a.xz() * b.xz(); // 0022
+    c.d[ 4] = a.yz() * b.yz(); // 1122
+    c.d[ 5] = a.zz() * b.zz(); // 2222
+    
+    c.d[ 6] = a.xx() * b.xy(); // 0001
+    c.d[ 7] = a.xy() * b.yy(); // 1101
+    c.d[ 8] = a.xz() * b.yz(); // 2201
+    c.d[ 9] = a.xx() * b.yy(); // 0101
+
+    c.d[10] = a.xy() * b.xz(); // 0012
+    c.d[11] = a.yy() * b.yz(); // 1112
+    c.d[12] = a.yz() * b.zz(); // 2212
+    c.d[13] = a.xy() * b.yz(); // 0112
+    c.d[14] = a.yy() * b.zz(); // 1212
+
+    c.d[15] = a.xx() * b.xz(); // 0002
+    c.d[16] = a.xy() * b.yz(); // 1102
+    c.d[17] = a.xz() * b.zz(); // 2202
+    c.d[18] = a.xx() * b.yz(); // 0102
+    c.d[19] = a.xy() * b.zz(); // 1202
+    c.d[20] = a.xx() * b.zz(); // 0202
+
+	return c;
+}
+
+
+//-----------------------------------------------------------------------------
+double FEAnnularDisk::StrainEnergyDensity(FEMaterialPoint& mp)
+{
+   MFEM_ABORT("Error: StrainEnergyDensity not implemented");
+	return 0.0;
+}

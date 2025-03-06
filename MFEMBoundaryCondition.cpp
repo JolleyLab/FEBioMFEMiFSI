@@ -10,7 +10,15 @@ END_FECORE_CLASS();
 
 void MFEMVelDirichletBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> vel_bc_attr(mesh->bdr_attributes.Max());
 	vel_bc_attr = 0;
 	vel_bc_attr[attr] = 1;
@@ -22,7 +30,15 @@ END_FECORE_CLASS();
 
 void MFEMNoSlipBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+   mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> vel_bc_attr(mesh->bdr_attributes.Max());
 	vel_bc_attr = 0;
 	vel_bc_attr[attr] = 1;
@@ -36,7 +52,15 @@ END_FECORE_CLASS();
 
 void MFEMPrescribedVelocityComponentBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> vel_bc_attr(mesh->bdr_attributes.Max());
 	vel_bc_attr = 0;
 	vel_bc_attr[attr] = 1;
@@ -48,7 +72,15 @@ END_FECORE_CLASS();
 
 void MFEMPeriodicBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> p_bc_attr(mesh->bdr_attributes.Max());
 	p_bc_attr = 0;
 	p_bc_attr[attr] = 1;

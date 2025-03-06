@@ -139,7 +139,7 @@ public:
 	MFEMBodyForce(FEModel* fem) : MFEMBodyLoad(fem) {}
 
 	void Apply(MFEMSolver* solver, int attr) override;
-private:
+public:
    FEParamDouble m_bx;
 	FEParamDouble m_by;
 	FEParamDouble m_bz;

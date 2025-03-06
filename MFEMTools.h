@@ -7,6 +7,11 @@
 #include <sstream>
 #include <FECore/log.h>
 #include <FECore/FEModel.h>
+#include <FECore/FEGlobalVector.h>
+#include <FECore/FELinearSystem.h>
+#include <FECore/CompactUnSymmMatrix.h>
+
+class MFEMImmersedElasticDomain;
 
 class FEScalarCoefficient : public mfem::Coefficient
 {
@@ -69,4 +74,45 @@ protected:
 
 private:
    std::ostringstream buffer;
+};
+
+class MFEMGlobalVector : public FEGlobalVector
+{
+public:
+   // constructor
+   MFEMGlobalVector(FEModel* fem, int size, std::vector<double>& R, std::vector<double>& Fr);
+   // destructor
+   ~MFEMGlobalVector() noexcept override;
+
+   //! Assemble the element vector into this global vector
+	void Assemble(std::vector<int>& en, std::vector<int>& elm, std::vector<double>& fe, bool bdom = false) override;
+
+	//! Assemble into this global vector
+	void Assemble(std::vector<int>& lm, std::vector<double>& fe) override;
+
+	//! assemble a nodel value
+	void Assemble(int node, int dof, double f) override;
+
+   // Assemble into global mfem vector
+   void Assemble(mfem::Array<int> &vdofs, std::vector<double>& fe);
+   void Assemble(mfem::Array<int> &vdofs, mfem::Vector& fe);
+
+   mfem::Vector &GetMfemVector() { return mfem_R; }
+
+public:
+   mfem::Vector mfem_R;
+};
+
+class MFEMGlobalMatrix : public FEGlobalMatrix
+{
+public:
+   MFEMGlobalMatrix(CRSSparseMatrix* pK, bool del = true);
+
+   void CreateProfile(FEModel* pfem, int neq, bool reshape);
+   void BuildMatrixProfile(FEModel* pfem, bool breset);
+
+   mfem::SparseMatrix *GetMfemMatrix() { return mfem_K; }
+
+private:
+   mfem::SparseMatrix *mfem_K = nullptr;
 };

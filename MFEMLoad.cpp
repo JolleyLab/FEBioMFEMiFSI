@@ -12,7 +12,15 @@ END_FECORE_CLASS();
 
 void MFEMNeumannBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
 	load_attr = 0;
 	load_attr[attr] = 1;
@@ -24,7 +32,15 @@ END_FECORE_CLASS();
 
 void MFEMTractionFreeBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
 	load_attr = 0;
 	load_attr[attr] = 1;
@@ -37,7 +53,15 @@ END_FECORE_CLASS();
 
 void MFEMPressureBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
 	load_attr = 0;
 	load_attr[attr] = 1;
@@ -55,7 +79,15 @@ MFEMBackflowStabilizationBC::MFEMBackflowStabilizationBC(FEModel* fem) : MFEMLoa
 
 void MFEMBackflowStabilizationBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
 	load_attr = 0;
 	load_attr[attr] = 1;
@@ -69,7 +101,15 @@ END_FECORE_CLASS();
 
 void MFEMResistanceBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
 	load_attr = 0;
 	load_attr[attr] = 1;
@@ -86,7 +126,15 @@ END_FECORE_CLASS();
 
 void MFEMWindkesselBC::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
 	load_attr = 0;
 	load_attr[attr] = 1;
@@ -101,7 +149,15 @@ END_FECORE_CLASS();
 
 void MFEMBodyForce::Apply(MFEMSolver* solver, int attr)
 {
-	mfem::Mesh* mesh = solver->GetMFEMMesh();
+	mfem::Mesh* mesh = nullptr;
+   if(solver->ImmersedSolid())
+   {
+      mesh = solver->GetMFEMfluidmesh();
+   }
+   else
+   {
+      mesh = solver->GetMFEMMesh();
+   }
 	mfem::Array<int> load_attr(mesh->attributes.Max());
 	load_attr = 0;
 	load_attr[attr] = 1;

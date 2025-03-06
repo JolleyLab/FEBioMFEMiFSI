@@ -26,6 +26,11 @@ public:
          mat = dynamic_cast<MFEMUncoupledFEBioMaterial*>(pmat);
          FEShellDomainOld::SetMaterial(pmat);
       }
+      else if (dynamic_cast<FEElasticMaterial*>(pmat)) 
+      {
+         mat = dynamic_cast<FEElasticMaterial*>(pmat);
+         FEShellDomainOld::SetMaterial(pmat);
+      }
       else assert(false);
 	}
 
@@ -57,6 +62,11 @@ public:
       else if (dynamic_cast<MFEMUncoupledFEBioMaterial*>(pmat)) 
       {
          mat = dynamic_cast<MFEMUncoupledFEBioMaterial*>(pmat);
+         FESolidDomain::SetMaterial(pmat);
+      }
+      else if (dynamic_cast<FEElasticMaterial*>(pmat)) 
+      {
+         mat = dynamic_cast<FEElasticMaterial*>(pmat);
          FESolidDomain::SetMaterial(pmat);
       }
       else assert(false);
