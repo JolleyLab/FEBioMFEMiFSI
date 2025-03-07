@@ -108,16 +108,12 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    // Set pressure nodal value
    REGISTER_FECORE_CLASS(MFEMSetNodalPressure, "set nodal pressure");
 
-   // Immersed solid MFEM materials and MFEM Solver
+   // Immersed solid MFEM materials
    REGISTER_FECORE_CLASS(MFEMCompressibleNeoHookeanMaterial, "mfem compressible neo-hookean");
    REGISTER_FECORE_CLASS(MFEMNearlyIncompressibleNeoHookeanMaterial, "mfem nearly-incompressible neo-hookean");
    REGISTER_FECORE_CLASS(MFEMNearlyIncompressibleAnnularDisk, "mfem nearly-incompressible annular disk");
 
-   // Immersed solid FEBio uncoupled materials with MFEM Solver
-   REGISTER_FECORE_CLASS(FEBioMooneyRivlin, "febio mooney rivlin");
-   REGISTER_FECORE_CLASS(FEBioIncompNeoHookean, "febio incompressible neo-hookean");
-
-   // Immersed solid FEBio materials with FEBio Solver
+   // Immersed solid FEBio materials
    REGISTER_FECORE_CLASS(FEAnnularDisk, "annular disk");
    REGISTER_FECORE_CLASS(FEIncompNeoHookean, "incompressible neo-hookean");
 

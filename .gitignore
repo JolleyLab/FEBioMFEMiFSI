@@ -407,3 +407,5 @@ generate_cmake_path.sh
 after_git_pull.sh
 before_git_push.sh
 *.DS_Store
+*.log
+results_mfem_solver/

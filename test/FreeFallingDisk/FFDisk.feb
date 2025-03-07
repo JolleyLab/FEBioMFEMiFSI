@@ -10380,7 +10380,8 @@
 	</Mesh>
 	<MeshDomains>
 		<SolidDomain name="Part1" mat="Material1"/>
-		<SolidDomain name="Part2" mat="Material2" type="mfem domain 3d"/>
+		<!-- <SolidDomain name="Part2" mat="Material2" type="mfem domain 3d"/> -->
+      <SolidDomain name="Part2" mat="Material2"/>
 	</MeshDomains>
 	<Boundary>
 		<bc name="NoSlip1" surface="NoSlip1" type="no slip"/>

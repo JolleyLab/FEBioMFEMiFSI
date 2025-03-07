@@ -75,7 +75,6 @@ void MFEMImmersedElasticDomain::PreSolveUpdate(const FETimeInfo& timeInfo)
 			for (int j = 0; j < n; ++j)
 			{
 				FEMaterialPoint& mp = *el.GetMaterialPoint(j);
-            // dynamic cast going bad here??
 				FEElasticMaterialPoint& pt = *mp.ExtractData<FEElasticMaterialPoint>();
 				pt.m_Wp = pt.m_Wt;
 

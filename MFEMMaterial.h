@@ -45,7 +45,6 @@ public:
    MFEMSolidMaterial(FEModel* fem);
 
    virtual FEScalarCoefficient *GetDensityCoeff() = 0;
-   virtual FEScalarCoefficient *GetC0Coeff() = 0;
 };
 
 class MFEMCompressibleNeoHookeanMaterial : public MFEMSolidMaterial
@@ -55,7 +54,7 @@ public:
    ~MFEMCompressibleNeoHookeanMaterial();
 
    FEScalarCoefficient *GetDensityCoeff() override { return m_rho_coeff; }
-   FEScalarCoefficient *GetC0Coeff() override{ return m_mu_coeff; }
+   FEScalarCoefficient *GetC0Coeff() { return m_mu_coeff; }
    FEScalarCoefficient *GetC1Coeff() { return m_lambda_coeff; }
 
 private:
@@ -85,7 +84,7 @@ public:
    ~MFEMNearlyIncompressibleNeoHookeanMaterial();
 
    FEScalarCoefficient *GetDensityCoeff() override { return m_rho_coeff; }
-   FEScalarCoefficient *GetC0Coeff() override{ return m_mu_coeff; }
+   FEScalarCoefficient *GetC0Coeff() { return m_mu_coeff; }
    FEScalarCoefficient *GetBulkModulus() override { return m_kappa_coeff; }
 
 private:
@@ -108,7 +107,7 @@ public:
    ~MFEMNearlyIncompressibleAnnularDisk();
 
    FEScalarCoefficient *GetDensityCoeff() override { return m_rho_coeff; }
-   FEScalarCoefficient *GetC0Coeff() override{ return m_mu_coeff; }
+   FEScalarCoefficient *GetC0Coeff() { return m_mu_coeff; }
    FEScalarCoefficient *GetBulkModulus() override { return m_kappa_coeff; }
    double GetRadialThickness() 
    {
@@ -131,79 +130,6 @@ private:
    FEScalarCoefficient *m_kappa_coeff = nullptr;
 
    DECLARE_FECORE_CLASS();
-};
-
-// Uncoupled materials using FEBio material classes
-class MFEMUncoupledFEBioMaterial : public FEUncoupledMaterial, public NearlyIncompressibleMaterial
-{
-public:
-   MFEMUncoupledFEBioMaterial(FEModel* fem);
-   virtual ~MFEMUncoupledFEBioMaterial() noexcept;
-
-   // set material point data
-   void SetNearlyIncStrainMeasures(const mfem::Vector &u, const mfem::DenseMatrix &gradu) override;
-
-   // Evaluate stress
-   void EvalCauchyStress(mfem::DenseMatrix &stress) override;
-
-   // Evaluate tangent
-   double EvalElasticityTensor(int i, int j, int k, int l) override;
-
-   // Set material constants, here we use it to map current gauss pt to physical space
-   // for evaluating material parameters using FEParamDouble
-   void SetMaterialConstants(const mfem::IntegrationPoint &ip, mfem::ElementTransformation &T) override;
-
-   FEScalarCoefficient *GetDensityCoeff() { return m_rho_coeff; }
-
-private:
-   FEMaterialPoint* m_materialpoint = nullptr;
-   bool compute_tangent = true;
-   tens4ds m_C;
-   mfem::Vector r0;
-
-   FEScalarCoefficient *m_rho_coeff = nullptr;
-
-   FECORE_BASE_CLASS(MFEMUncoupledFEBioMaterial)
-};
-
-class FEBioMooneyRivlin : public MFEMUncoupledFEBioMaterial
-{
-public:
-   FEBioMooneyRivlin(FEModel* pfem);
-   ~FEBioMooneyRivlin() override {};
-
-public:
-	FEParamDouble	m_c1;	//!< Mooney-Rivlin coefficient C1
-	FEParamDouble	m_c2;	//!< Mooney-Rivlin coefficient C2
-
-public:
-	//! calculate deviatoric stress at material point
-	mat3ds DevStress(FEMaterialPoint& pt) override;
-
-	//! calculate deviatoric tangent stiffness at material point
-	tens4ds DevTangent(FEMaterialPoint& pt) override;   
-    
-	// declare the parameter list
-	DECLARE_FECORE_CLASS();
-};
-
-class FEBioIncompNeoHookean : public MFEMUncoupledFEBioMaterial
-{
-public:
-	FEBioIncompNeoHookean(FEModel* pfem);
-
-public:
-	FEParamDouble	m_G;	//!< Shear modulus
-
-public:
-	//! calculate deviatoric stress at material point
-	mat3ds DevStress(FEMaterialPoint& pt) override;
-
-	//! calculate deviatoric tangent stiffness at material point
-	tens4ds DevTangent(FEMaterialPoint& pt) override;
-    
-	// declare the parameter list
-	DECLARE_FECORE_CLASS();
 };
 
 //-----------------------------------------------------------------------------
@@ -244,7 +170,7 @@ public:
 
 	FEScalarCoefficient* GetDensityCoeff() { return m_rho_coeff; }
 
-	void SetMaterialConstants(const mfem::IntegrationPoint& ip, mfem::ElementTransformation& T);
+	void SetMaterialConstants(const mfem::IntegrationPoint& ip, mfem::ElementTransformation& T) override;
 
 	// set material point data
 	void SetNearlyIncStrainMeasures(const mfem::Vector& u, const mfem::DenseMatrix& gradu) override;
@@ -254,6 +180,8 @@ public:
 
 	// Evaluate tangent
 	double EvalElasticityTensor(int i, int j, int k, int l) override;
+
+   virtual ~FEBioUncoupledMaterial() noexcept {};
 
 private:
 	FEScalarCoefficient* m_rho_coeff = nullptr;

@@ -62,7 +62,7 @@
 			<rho>1000</rho>
 			<mu>0.1</mu>
 		</material>
-		<material id="2" name="Material3" type="febio incompressible neo-hookean">
+		<material id="2" name="Material3" type="incompressible neo-hookean">
 			<density>1200</density>
 			<k>38.42857</k>
 			<pressure_model>Abaqus (GOH)</pressure_model>

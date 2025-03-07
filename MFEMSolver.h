@@ -29,6 +29,9 @@ public:
 
    // flag for immersed solid
    bool ImmersedSolid();
+   // solid solver type
+   int SolidSolverType();
+   enum SolidSolverType { MFEM = 0, FEBio = 1 };
 
    // velocity bcs
 	void AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);

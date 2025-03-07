@@ -79,7 +79,6 @@ public:
    GridFunction *vib_gf = nullptr; // immersed solid velocity grid function
    ParaViewDataCollection *sdc = nullptr; // immersed solid paraview data collection
    int solidsolvertype = 0; // 0 = MFEM, 1 = FEBio
-   enum SolidSolverType { MFEM = 0, FEBio = 1 };
    ImmersedFEBioSolid *immersed_febio_solid = nullptr; // not owned
 
 public:
@@ -261,6 +260,11 @@ mfem::Mesh* MFEMSolver::GetMFEMsolidmesh()
 bool MFEMSolver::ImmersedSolid()
 {
    return m.immersed_solid;
+}
+
+int MFEMSolver::SolidSolverType()
+{
+   return m.solidsolvertype;
 }
 
 void MFEMSolver::AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr)
@@ -664,10 +668,8 @@ bool MFEMSolver::Init()
          
          // MFEM material
          solid_mat = dynamic_cast<MFEMSolidMaterial*>(fe_mat);
-         if (solid_mat)
-         {
-            break;
-         }
+         if (solid_mat) { break; }
+         
          // FEBio material
          febio_elast_mat = dynamic_cast<FEElasticMaterial*>(fe_mat);
          if (febio_elast_mat)
@@ -678,7 +680,7 @@ bool MFEMSolver::Init()
       }
       if (!solid_mat && !febio_elast_mat)
       {
-         feLogError("No immersed solid material found");
+         feLogError("No or invalid immersed solid material found");
          return false;
       }
 
@@ -686,6 +688,7 @@ bool MFEMSolver::Init()
       FEScalarCoefficient *init_rho_coeff = nullptr;
       if (solid_mat)
       {
+         // MFEM Material
          init_rho_coeff = solid_mat->GetDensityCoeff();
          if (typeid(*solid_mat) == typeid(MFEMCompressibleNeoHookeanMaterial))
          {
@@ -711,38 +714,15 @@ bool MFEMSolver::Init()
       }
       else if (febio_elast_mat)
       {
+         // FEBio material
          m.febio_material = true;
-		 MFEMUncoupledFEBioMaterial* uncoupled_mat = dynamic_cast<MFEMUncoupledFEBioMaterial*>(febio_elast_mat);
-
-         // febio material with mfem solver
-         if (uncoupled_mat)
+         if (dynamic_cast<FEUncoupledMaterial*>(febio_elast_mat))
          {
-            init_rho_coeff = uncoupled_mat->GetDensityCoeff();
-            if (typeid(*uncoupled_mat) == typeid(FEBioMooneyRivlin))
-            {
-               m.mat_type = uncoupled_mat;
-            }
-            else if (typeid(*uncoupled_mat) == typeid(FEBioIncompNeoHookean))
-            {
-               m.mat_type = uncoupled_mat;
-            }
-            else
-            {
-               feLogError("Unsupported solid material type");
-               return false;
-            }
+            // MFEM Solver with FEBio material
+            FEBioUncoupledMaterial* feb_mat = new FEBioUncoupledMaterial(dynamic_cast<FEUncoupledMaterial*>(febio_elast_mat));
+            init_rho_coeff = feb_mat->GetDensityCoeff();
+            m.mat_type = feb_mat;
          }
-		 else if (dynamic_cast<FEUncoupledMaterial*>(febio_elast_mat))
-		 {
-			 FEBioUncoupledMaterial* feb_mat = new FEBioUncoupledMaterial(dynamic_cast<FEUncoupledMaterial*>(febio_elast_mat));
-			 init_rho_coeff = feb_mat->GetDensityCoeff();
-			 m.mat_type = feb_mat;
-		 }
-		 else
-		 {
-			 feLogError("Unsupported solid material type");
-			 return false;
-		 }
       }
       else
       {
@@ -751,7 +731,7 @@ bool MFEMSolver::Init()
       }      
 
       // add immersed solid to the flow solver
-      if (m.solidsolvertype == m.SolidSolverType::MFEM)
+      if (m.solidsolvertype == SolidSolverType::MFEM)
       {
          m.flowsolver->AddImmersedSolid(m.solid_mesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
          
@@ -759,7 +739,7 @@ bool MFEMSolver::Init()
          m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
          m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
       }
-      else if (m.solidsolvertype == m.SolidSolverType::FEBio)
+      else if (m.solidsolvertype == SolidSolverType::FEBio)
       {
          MFEM_ASSERT(m.febio_material, "Immersed FEBio solids only support FEBio materials");
 
@@ -805,7 +785,7 @@ bool MFEMSolver::Init()
       m.submeshsolid_to_global_d = new TransferMap(*m.d_gf,m.d_gf_global);
       m.global_to_submeshsolid_d = new TransferMap(m.d_gf_global,*m.d_gf);
       
-      if (m.solidsolvertype == m.SolidSolverType::FEBio)
+      if (m.solidsolvertype == SolidSolverType::FEBio)
       {
          // set submesh mapping data
          m.immersed_febio_solid->SetSubMeshMaps(m.submeshsolid_to_global_d,m.global_to_submeshsolid_d,&m.vib_gf_global);
