@@ -501,3 +501,87 @@ double FEAnnularDisk::StrainEnergyDensity(FEMaterialPoint& mp)
    MFEM_ABORT("Error: StrainEnergyDensity not implemented");
 	return 0.0;
 }
+
+FEBioUncoupledMaterial::FEBioUncoupledMaterial(FEUncoupledMaterial* mat) : umat(mat), NearlyIncompressibleMaterial(mat::MaterialType::UpdatedLagrangian, 3)
+{
+	FEParam* p = mat->GetParameter("density"); assert(p);
+	FEParamDouble& pd = p->value<FEParamDouble>();
+	m_rho_coeff = new FEScalarCoefficient(mat->GetFEModel(), pd);
+}
+
+void FEBioUncoupledMaterial::SetMaterialConstants(const mfem::IntegrationPoint& ip, mfem::ElementTransformation& T)
+{
+	// note this function is called prior to SetNearlyIncStrainMeasures() above
+	// here we use it to get the coordinates of the current integration point
+	r0.SetSize(3);
+	T.Transform(ip, r0);
+}
+
+void FEBioUncoupledMaterial::SetNearlyIncStrainMeasures(const mfem::Vector& u, const mfem::DenseMatrix& gradu)
+{
+	// setup material point
+	if (m_materialpoint) delete m_materialpoint;
+	m_materialpoint = new FEMaterialPoint(umat->CreateMaterialPointData()); // this will delete the ElasticMaterialPoint data (m_data) as well
+
+	// set relevant data
+	FEElasticMaterialPoint& pt = *m_materialpoint->ExtractData<FEElasticMaterialPoint>(); // this references m_data (MaterialPointData) in m_materialpoint (MaterialPoint)
+	pt.m_J = J;
+
+	pt.m_F(0, 0) = F(0, 0);
+	pt.m_F(0, 1) = F(0, 1);
+	pt.m_F(0, 2) = F(0, 2);
+	pt.m_F(1, 0) = F(1, 0);
+	pt.m_F(1, 1) = F(1, 1);
+	pt.m_F(1, 2) = F(1, 2);
+	pt.m_F(2, 0) = F(2, 0);
+	pt.m_F(2, 1) = F(2, 1);
+	pt.m_F(2, 2) = F(2, 2);
+
+	pt.m_buncoupled = true;
+
+	m_materialpoint->m_r0 = vec3d(r0(0), r0(1), r0(2));
+
+	// flag to recompute tangent at new gauss pt
+	compute_tangent = true;
+}
+
+// Evaluate stress
+void FEBioUncoupledMaterial::EvalCauchyStress(mfem::DenseMatrix& stress)
+{
+	stress.SetSize(vdim);
+
+	// Compute sigma = sigma_iso + sigma_vol
+	mat3ds m_s = umat->Stress(*m_materialpoint);
+
+	// copy data to mfem stress matrix
+	stress(0, 0) = m_s(0, 0);
+	stress(0, 1) = m_s(0, 1);
+	stress(0, 2) = m_s(0, 2);
+	stress(1, 0) = m_s(1, 0);
+	stress(1, 1) = m_s(1, 1);
+	stress(1, 2) = m_s(1, 2);
+	stress(2, 0) = m_s(2, 0);
+	stress(2, 1) = m_s(2, 1);
+	stress(2, 2) = m_s(2, 2);
+}
+
+// Evaluate tangent
+double FEBioUncoupledMaterial::EvalElasticityTensor(int i, int j, int k, int l)
+{
+	double val = 0.0;
+	if (formulation_type == form_type::UpdatedLagrangian)
+	{
+		if (compute_tangent)
+		{
+			m_C = umat->Tangent(*m_materialpoint);
+			compute_tangent = false;
+		}
+		val = m_C(i, j, k, l);
+	}
+	else
+	{
+		MFEM_ABORT("Error: TotalLagrangian formulation not implemented");
+	}
+
+	return val;
+}

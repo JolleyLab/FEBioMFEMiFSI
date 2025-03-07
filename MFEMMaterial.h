@@ -235,3 +235,31 @@ public:
 	// declare the parameter list
 	DECLARE_FECORE_CLASS();
 };
+
+// Generic wrapper class for FEBio materials
+class FEBioUncoupledMaterial : public NearlyIncompressibleMaterial
+{
+public:
+	FEBioUncoupledMaterial(FEUncoupledMaterial* mat);
+
+	FEScalarCoefficient* GetDensityCoeff() { return m_rho_coeff; }
+
+	void SetMaterialConstants(const mfem::IntegrationPoint& ip, mfem::ElementTransformation& T);
+
+	// set material point data
+	void SetNearlyIncStrainMeasures(const mfem::Vector& u, const mfem::DenseMatrix& gradu) override;
+
+	// Evaluate stress
+	void EvalCauchyStress(mfem::DenseMatrix& stress) override;
+
+	// Evaluate tangent
+	double EvalElasticityTensor(int i, int j, int k, int l) override;
+
+private:
+	FEScalarCoefficient* m_rho_coeff = nullptr;
+	FEMaterialPoint* m_materialpoint = nullptr;
+	FEUncoupledMaterial* umat = nullptr;
+	bool compute_tangent = true;
+	mfem::Vector r0;
+	tens4ds m_C;
+};

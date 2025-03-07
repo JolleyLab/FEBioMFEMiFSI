@@ -62,11 +62,16 @@
 			<rho>1000</rho>
 			<mu>0.1</mu>
 		</material>
-		<material id="2" name="Material2" type="mfem nearly-incompressible neo-hookean">
+		<material id="2" name="Material2" type="incompressible neo-hookean">
+			<density>1200</density>
+			<G>384.2857</G>
+			<k>38.42857</k>
+		</material>
+		<!-- <material id="2" name="Material2" type="mfem nearly-incompressible neo-hookean">
 			<rho>1200</rho>
 			<mu>384.2857</mu>
 			<kappa>38.42857</kappa>
-		</material>
+		</material> -->
 	</Material>
 	<Mesh>
 		<Nodes name="fluid_mesh_mfem">
@@ -10375,7 +10380,7 @@
 	</Mesh>
 	<MeshDomains>
 		<SolidDomain name="Part1" mat="Material1"/>
-		<SolidDomain name="Part2" mat="Material2"/>
+		<SolidDomain name="Part2" mat="Material2" type="mfem domain 3d"/>
 	</MeshDomains>
 	<Boundary>
 		<bc name="NoSlip1" surface="NoSlip1" type="no slip"/>

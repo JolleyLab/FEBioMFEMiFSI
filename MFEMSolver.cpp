@@ -657,7 +657,6 @@ bool MFEMSolver::Init()
    {
       // create solid material
       MFEMSolidMaterial* solid_mat = nullptr;
-      MFEMUncoupledFEBioMaterial* uncoupled_mat = nullptr;
       FEElasticMaterial* febio_elast_mat = nullptr;
       for (int i=0; i<fem.Materials(); ++i)
       {
@@ -673,7 +672,6 @@ bool MFEMSolver::Init()
          febio_elast_mat = dynamic_cast<FEElasticMaterial*>(fe_mat);
          if (febio_elast_mat)
          {
-            uncoupled_mat = dynamic_cast<MFEMUncoupledFEBioMaterial*>(fe_mat);
             MFEM_ASSERT(m.form_type == ImmersedSolid::form_type::UpdatedLagrangian, "FEBio materials only work with Updated Lagrangian");
             break;          
          }
@@ -714,6 +712,8 @@ bool MFEMSolver::Init()
       else if (febio_elast_mat)
       {
          m.febio_material = true;
+		 MFEMUncoupledFEBioMaterial* uncoupled_mat = dynamic_cast<MFEMUncoupledFEBioMaterial*>(febio_elast_mat);
+
          // febio material with mfem solver
          if (uncoupled_mat)
          {
@@ -731,7 +731,18 @@ bool MFEMSolver::Init()
                feLogError("Unsupported solid material type");
                return false;
             }
-         }         
+         }
+		 else if (dynamic_cast<FEUncoupledMaterial*>(febio_elast_mat))
+		 {
+			 FEBioUncoupledMaterial* feb_mat = new FEBioUncoupledMaterial(dynamic_cast<FEUncoupledMaterial*>(febio_elast_mat));
+			 init_rho_coeff = feb_mat->GetDensityCoeff();
+			 m.mat_type = feb_mat;
+		 }
+		 else
+		 {
+			 feLogError("Unsupported solid material type");
+			 return false;
+		 }
       }
       else
       {
