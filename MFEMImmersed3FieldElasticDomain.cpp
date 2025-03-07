@@ -212,7 +212,7 @@ void MFEMImmersed3FieldElasticDomain::ElementMaterialStiffness(int iel, FESolidE
 			Gyi = G[i].y;
 			Gzi = G[i].z;
 
-			for (int j = 0, j3 = i3; j<neln; ++j, j3 += 3)
+			for (int j = 0, j3 = 0; j<neln; ++j, j3 += 3)
 			{
 				Gxj = G[j].x;
 				Gyj = G[j].y;
