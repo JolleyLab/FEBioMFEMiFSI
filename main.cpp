@@ -116,6 +116,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    // Immersed solid FEBio materials
    REGISTER_FECORE_CLASS(FEAnnularDisk, "annular disk");
    REGISTER_FECORE_CLASS(FEIncompNeoHookean, "incompressible neo-hookean");
+   REGISTER_FECORE_CLASS(FENeoHookean, "neo-hookean");
 
    // plot variables
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");

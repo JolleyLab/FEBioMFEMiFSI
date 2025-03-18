@@ -38,7 +38,7 @@
 			<rtol>1e-06</rtol>
 			<minIt>3</minIt>
 			<maxIt>10</maxIt>
-			<solver_type>PARDISO</solver_type>
+			<solver_type>UMFPack</solver_type>
 			<lin_atol>1e-06</lin_atol>
 			<lin_rtol>0.001</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
@@ -62,16 +62,16 @@
 			<rho>1000</rho>
 			<mu>0.1</mu>
 		</material>
-		<material id="2" name="Material2" type="incompressible neo-hookean">
+		<!-- <material id="2" name="Material2" type="incompressible neo-hookean">
 			<density>1200</density>
 			<G>384.2857</G>
 			<k>38.42857</k>
-		</material>
-		<!-- <material id="2" name="Material2" type="mfem nearly-incompressible neo-hookean">
+		</material> -->
+		<material id="2" name="Material2" type="mfem nearly-incompressible neo-hookean">
 			<rho>1200</rho>
 			<mu>384.2857</mu>
 			<kappa>38.42857</kappa>
-		</material> -->
+		</material>
 	</Material>
 	<Mesh>
 		<Nodes name="fluid_mesh_mfem">

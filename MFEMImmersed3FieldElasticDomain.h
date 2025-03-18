@@ -35,10 +35,10 @@ public: // overriden from MFEMImmersedElasticDomain
    void ElementSolidStiffness(int iel, FESolidElement& el, matrix& ke, double scale) override;
 
    //! geometrical stiffness (i.e. initial stress)
-	void ElementGeometricalStiffness(int iel, FESolidElement& el, matrix& ke) override;
+	void ElementGeometricalStiffness(int iel, FESolidElement& el, matrix& ke, double scale) override;
 
 	//! material stiffness component
-	void ElementMaterialStiffness(int iel, FESolidElement& el, matrix& ke) override;
+	void ElementMaterialStiffness(int iel, FESolidElement& el, matrix& ke, double scale) override;
 
    //! update the stress of an element
 	void UpdateElementStress(int iel, const FETimeInfo& tp) override;
@@ -46,7 +46,7 @@ public: // overriden from MFEMImmersedElasticDomain
 protected:
 
    //! Dilatational stiffness component for nearly-incompressible materials
-	void ElementDilatationalStiffness(FEModel& fem, int iel, matrix& ke);
+	void ElementDilatationalStiffness(FEModel& fem, int iel, matrix& ke, double scale);
 
 
 protected:

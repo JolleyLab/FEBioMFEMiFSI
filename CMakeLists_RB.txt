@@ -39,8 +39,8 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # Find FEBio Libs (from FEBioHeat plugin CMakeLists.txt)
-set(FEBio_SDK "/Applications/FEBioStudio/sdk")
-# set(FEBio_SDK "/Users/blackr1/Documents/Software/FEBio/")
+# set(FEBio_SDK "/Applications/FEBioStudio/sdk")
+set(FEBio_SDK "/Users/blackr1/Documents/Software/FEBio/")
 
 # Only update the include and lib directories if the FEBio_SDK path has been changed. 
 if(NOT OLD_SDK)
@@ -172,13 +172,18 @@ elseif(APPLE)
     add_definitions(-D__APPLE__)
    #  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.13)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup")
+   #  add_compile_options(-frtti) # Enable RTTI for macOS
+   # add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+   # add_link_options(-fsanitize=address)
 else()
 	add_definitions(-DLINUX)
-    add_compile_options(-static-libstdc++ -static-libgcc -w -Wall)
+   #  add_compile_options(-static-libstdc++ -static-libgcc -w -Wall -frtti)
+   add_compile_options(-static-libstdc++ -static-libgcc -w -Wall)
     
     set(CMAKE_BUILD_RPATH_USE_LINK_PATH FALSE)
     set(CMAKE_BUILD_RPATH $ORIGIN/../lib/)
 endif()
+
 
 # Set include directory
 include_directories(${FEBio_INC} ${FSI_Source_DIR} ${MFEM_SOURCE_DIR})

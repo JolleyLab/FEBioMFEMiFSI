@@ -67,14 +67,12 @@ void MFEMImmersed3FieldElasticDomain::ElementSolidStiffness(int iel, FESolidElem
 {
    FEModel& fem = *GetFEModel();
 
-   ElementGeometricalStiffness(iel, el, ke);
-   ElementMaterialStiffness(iel, el, ke);
-   ElementDilatationalStiffness(fem, iel, ke);
-
-   ke *= scale;
+   ElementGeometricalStiffness(iel, el, ke, scale);
+   ElementMaterialStiffness(iel, el, ke, scale);
+   ElementDilatationalStiffness(fem, iel, ke, scale);
 }
 
-void MFEMImmersed3FieldElasticDomain::ElementDilatationalStiffness(FEModel& fem, int iel, matrix& ke)
+void MFEMImmersed3FieldElasticDomain::ElementDilatationalStiffness(FEModel& fem, int iel, matrix& ke, double scale)
 {
 	int i, j, n;
 
@@ -110,7 +108,7 @@ void MFEMImmersed3FieldElasticDomain::ElementDilatationalStiffness(FEModel& fem,
 	{
 		// calculate jacobian
 		J0 = detJ0(elem, n);
-		Jt = invjact(elem, Ji, n, m_alphaf);
+		Jt = invjact(elem, Ji, n, m_alphaf)*scale;
 
 		Jt *= gw[n];
 
@@ -152,7 +150,7 @@ void MFEMImmersed3FieldElasticDomain::ElementDilatationalStiffness(FEModel& fem,
 
 //-----------------------------------------------------------------------------
 //! Calculates element material stiffness element matrix
-void MFEMImmersed3FieldElasticDomain::ElementMaterialStiffness(int iel, FESolidElement& el, matrix &ke)
+void MFEMImmersed3FieldElasticDomain::ElementMaterialStiffness(int iel, FESolidElement& el, matrix &ke, double scale)
 {
 	ELEM_DATA& ed = m_Data[iel];
 
@@ -190,7 +188,7 @@ void MFEMImmersed3FieldElasticDomain::ElementMaterialStiffness(int iel, FESolidE
 	for (int n=0; n<nint; ++n)
 	{
 		// calculate jacobian
-		double detJt = ShapeGradient(el, n, G, m_alphaf)*gw[n];
+		double detJt = ShapeGradient(el, n, G, m_alphaf)*gw[n]*scale;
 
 		// setup the material point
 		// NOTE: deformation gradient and determinant have already been evaluated in the stress routine
@@ -261,7 +259,7 @@ void MFEMImmersed3FieldElasticDomain::ElementMaterialStiffness(int iel, FESolidE
 
 //-----------------------------------------------------------------------------
 //! calculates element's geometrical stiffness component for each integration point
-void MFEMImmersed3FieldElasticDomain::ElementGeometricalStiffness(int iel, FESolidElement& el, matrix &ke)
+void MFEMImmersed3FieldElasticDomain::ElementGeometricalStiffness(int iel, FESolidElement& el, matrix &ke, double scale)
 {
 	const int NME = FEElement::MAX_NODES;
 	double Gx[NME], Gy[NME], Gz[NME];
@@ -287,7 +285,7 @@ void MFEMImmersed3FieldElasticDomain::ElementGeometricalStiffness(int iel, FESol
 	for (int n=0; n<nint; ++n)
 	{
 		// calculate jacobian
-		detJt = invjact(el, Ji, n, m_alphaf)*gw[n];
+		detJt = invjact(el, Ji, n, m_alphaf)*gw[n]*scale;
 
 		Grn = el.Gr(n);
 		Gsn = el.Gs(n);

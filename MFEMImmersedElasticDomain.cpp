@@ -582,11 +582,7 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
       // get mfem submesh element id
       int submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
 
-      // if (submesh_id == 342)
-      // {
-      //    int test = 1;
-      // }
-
+      // mfem::out << "\n";
       // mfem::out << "Element id = " << submesh_id << std::endl;
       // auto curr_elem = dfes->GetFE(submesh_id);
       // auto trans = dfes->GetElementTransformation(submesh_id);
@@ -643,6 +639,9 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
 
          // // febio_map.Print();
 
+         // int precision_out = 6;
+         // int width_out = precision_out + 6;
+
          // // Print the matrix ke to the file
          // for (int i = 0; i < ndof; ++i) 
          // {
@@ -650,49 +649,17 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
          //    for (int j = 0; j < ndof; ++j) 
          //    {
          //       const int jj = febio_map[j];
-         //       if (abs(ke(ii,jj)) >= 1e-11)
+         //       if (abs(ke(ii,jj)) >= 1e-12)
          //       {
-         //          outfile << std::setw(10) << std::setprecision(4) << ke(ii,jj);
+         //          outfile << std::setw(width_out) << std::setprecision(precision_out) << ke(ii,jj);
          //       }
          //       else if (isnan(ke(ii,jj)))
          //       {
-         //          outfile << std::setw(10) << std::setprecision(4) << ke(ii,jj);
+         //          outfile << std::setw(width_out) << std::setprecision(precision_out) << ke(ii,jj);
          //       }
          //       else
          //       {  
-         //          outfile << std::setw(10) << std::setprecision(4) << 0.0;
-         //       }                  
-         //       if (j < ndof - 1) outfile << " ";
-         //    }
-         //    outfile << std::endl;
-         // }
-         // outfile << std::endl; // Add an extra line between matrices
-
-         // // Close the file
-         // outfile.close();
-
-         // ElementShapeDerivativeStiffness(el, ke, af, bfs);
-
-         // // Open a file to write the matrix
-         // // Print the matrix ke to the file
-         // outfile.open("matrix_ke.txt", std::ios::out);
-         // for (int i = 0; i < ndof; ++i) 
-         // {
-         //    const int ii = febio_map[i];
-         //    for (int j = 0; j < ndof; ++j) 
-         //    {
-         //       const int jj = febio_map[j];
-         //       if (abs(ke(ii,jj)) >= 1e-11)
-         //       {
-         //          outfile << std::setw(10) << std::setprecision(4) << ke(ii,jj);
-         //       }
-         //       else if (isnan(ke(ii,jj)))
-         //       {
-         //          outfile << std::setw(10) << std::setprecision(4) << ke(ii,jj);
-         //       }
-         //       else
-         //       {  
-         //          outfile << std::setw(10) << std::setprecision(4) << 0.0;
+         //          outfile << std::setw(width_out) << std::setprecision(precision_out) << 0.0;
          //       }                  
          //       if (j < ndof - 1) outfile << " ";
          //    }
@@ -727,7 +694,7 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
          //    mfem::out << "Element stiffness matrix has a NAN!" << std::endl;
          // }
 
-			// assemble element matrix in global stiffness matrix
+			// assemble element matrix into global stiffness matrix
 			K.Assemble(ke);
 		}
 	}
@@ -808,13 +775,12 @@ void MFEMImmersedElasticDomain::ElementArtificialFluidStiffness(FESolidElement& 
 
 void MFEMImmersedElasticDomain::ElementSolidStiffness(int iel, FESolidElement& el, matrix& ke, double scale)
 {
-   ElementGeometricalStiffness(iel, el, ke);
-   ElementMaterialStiffness(iel, el, ke);
-   ke *= scale;
+   ElementGeometricalStiffness(iel, el, ke, scale);
+   ElementMaterialStiffness(iel, el, ke, scale);
 }
 
 //! calculates element's geometrical stiffness component for integration point n
-void MFEMImmersedElasticDomain::ElementGeometricalStiffness(int iel, FESolidElement &el, matrix &ke)
+void MFEMImmersedElasticDomain::ElementGeometricalStiffness(int iel, FESolidElement &el, matrix &ke, double scale)
 {
 	// spatial derivatives of shape functions
 	vec3d G[FEElement::MAX_NODES];
@@ -828,7 +794,7 @@ void MFEMImmersedElasticDomain::ElementGeometricalStiffness(int iel, FESolidElem
 	for (int n = 0; n<nint; ++n)
 	{
 		// calculate shape function gradients and jacobian
-      double w = ShapeGradient(el, n, G, m_alphaf)*gw[n];
+      double w = ShapeGradient(el, n, G, m_alphaf)*gw[n]*scale;
 
 		// get the material point data
 		FEMaterialPoint& mp = *el.GetMaterialPoint(n);
@@ -849,7 +815,7 @@ void MFEMImmersedElasticDomain::ElementGeometricalStiffness(int iel, FESolidElem
 	}
 }
 
-void MFEMImmersedElasticDomain::ElementMaterialStiffness(int iel, FESolidElement &el, matrix &ke)
+void MFEMImmersedElasticDomain::ElementMaterialStiffness(int iel, FESolidElement &el, matrix &ke, double scale)
 {
 	// Get the current element's data
 	const int nint = el.GaussPoints();
@@ -877,7 +843,7 @@ void MFEMImmersedElasticDomain::ElementMaterialStiffness(int iel, FESolidElement
 	for (int n=0; n<nint; ++n)
 	{
 		// calculate jacobian and shape function gradients
-		detJt = ShapeGradient(el, n, G, m_alphaf)*gw[n];
+		detJt = ShapeGradient(el, n, G, m_alphaf)*gw[n]*scale;
 
 		// setup the material point
 		// NOTE: deformation gradient and determinant have already been evaluated in the stress routine
@@ -943,18 +909,6 @@ void MFEMImmersedElasticDomain::ElementMaterialStiffness(int iel, FESolidElement
 
 void MFEMImmersedElasticDomain::ElementShapeDerivativeStiffness(FESolidElement& el, matrix& ke, double scale, std::vector<MFEMBodyForce*>& bfs)
 {
-   // // Open a file to write the matrix
-   // std::ofstream outfile("matrix_shape_ke.txt", std::ios::out);
-
-   // mfem::Array<int> febio_map(3*el.Nodes());
-   // for (int i=0; i<el.Nodes(); ++i)
-   // {
-   //    febio_map[i] = 3*i;
-   //    febio_map[i+el.Nodes()] = 3*i+1;
-   //    febio_map[i+2*el.Nodes()] = 3*i+2;
-   // }
-
-
    // Get the current element's data
 	const int nint = el.GaussPoints();
 	const int neln = el.Nodes();
@@ -967,19 +921,6 @@ void MFEMImmersedElasticDomain::ElementShapeDerivativeStiffness(FESolidElement& 
 
    // shape functions
    double *H;
-
-   // // spatial velocity gradient
-   // // TODO, create immersed material point class that computes gradv and viscous stress directly!
-   // vec3d v[FEElement::MAX_NODES];
-   // int dofVIMX = GetFEModel()->GetDOFIndex("im_vx");
-   // int dofVIMY = GetFEModel()->GetDOFIndex("im_vy");
-   // int dofVIMZ = GetFEModel()->GetDOFIndex("im_vz");
-   // for (int j=0; j<neln; ++j) 
-   // {
-   //    FENode& node = m_pMesh->Node(el.m_node[j]);
-   //    v[j] = node.get_vec3d(dofVIMX, dofVIMY, dofVIMZ) * m_alphaf + node.get_vec3d_prev(dofVIMX, dofVIMY, dofVIMZ) * (1.0-m_alphaf);
-   // }
-   // mat3d gradv;
 
    // strain rate
    mat3ds ev;
@@ -1002,10 +943,6 @@ void MFEMImmersedElasticDomain::ElementShapeDerivativeStiffness(FESolidElement& 
 	// calculate element stiffness matrix
 	for (int n=0; n<nint; ++n)
 	{
-      // if (solid_submesh->GetSubMeshElementFromParent(el.GetID()-1) == 342 && n == 7)
-      // {
-      //    int test_var = 1;
-      // }
       FEMaterialPoint& mp = *el.GetMaterialPoint(n);
 		FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
 
@@ -1013,10 +950,6 @@ void MFEMImmersedElasticDomain::ElementShapeDerivativeStiffness(FESolidElement& 
 		detJt = ShapeGradient(el, n, Gx, m_alphaf)*gw[n]*scale;
       detJ0 = ShapeGradient0(el, n, GX);
       H = el.H(n);
-
-      // // fluid viscous stress
-      // gradv = gradient(el, v, n, m_alphaf);
-      // ev = gradv.sym();
 
       // fluid viscous stress
       ev = pt.m_L.sym();
@@ -1065,56 +998,8 @@ void MFEMImmersedElasticDomain::ElementShapeDerivativeStiffness(FESolidElement& 
             ke[3*na+2][3*nb  ] -= fac1 * rho_if.z * FinvTGX_x + fac2 * ev_Gx_z * FinvTGX_x;
             ke[3*na+2][3*nb+1] -= fac1 * rho_if.z * FinvTGX_y + fac2 * ev_Gx_z * FinvTGX_y;
             ke[3*na+2][3*nb+2] -= fac1 * rho_if.z * FinvTGX_z + fac2 * ev_Gx_z * FinvTGX_z;
-
-            // if (solid_submesh->GetSubMeshElementFromParent(el.GetID()-1) == 342)
-            // {
-            //    // print the values
-            //    mfem::out << "-----------------------------------\n";
-            //    mfem::out << "Node (" << na << ", " << nb << ")" << std::endl;
-            //    for(int ii=0; ii < 3; ++ii)
-            //    {
-            //       for(int jj=0; jj < 3; ++jj)
-            //       {
-            //          if (isnan(ke[3*na+ii][3*nb+jj]))
-            //          {
-            //             mfem::out << "NAN";
-            //          }
-            //          mfem::out << std::setw(10) << std::setprecision(4) << ke[3*na+ii][3*nb+jj];
-            //          if (jj < 2) mfem::out << " ";
-            //       }
-            //       mfem::out << std::endl;
-            //    }
-            // }
          }
 	}
-
-   // // Print the matrix ke to the file
-   // for (int i = 0; i < 3*el.Nodes(); ++i) 
-   // {
-   //    const int ii = febio_map[i];
-   //    for (int j = 0; j < 3*el.Nodes(); ++j) 
-   //    {
-   //       const int jj = febio_map[j];
-   //       if (abs(ke(ii,jj)) >= 1e-11)
-   //       {
-   //          outfile << std::setw(10) << std::setprecision(4) << ke(ii,jj);
-   //       }
-   //       else if (isnan(ke(ii,jj)))
-   //       {
-   //          outfile << std::setw(10) << std::setprecision(4) << ke(ii,jj);
-   //       }
-   //       else
-   //       {  
-   //          outfile << std::setw(10) << std::setprecision(4) << 0.0;
-   //       }                  
-   //       if (j < 3*el.Nodes() - 1) outfile << " ";
-   //    }
-   //    outfile << std::endl;
-   // }
-   // outfile << std::endl; // Add an extra line between matrices
-
-   // // Close the file
-   // outfile.close();
 }
 
 //-----------------------------------------------------------------------------

@@ -242,26 +242,27 @@ double FEAnnularDisk::StrainEnergyDensity(FEMaterialPoint& mp)
 	return 0.0;
 }
 
-FEBioUncoupledMaterial::FEBioUncoupledMaterial(FEUncoupledMaterial* mat) : umat(mat), NearlyIncompressibleMaterial(mat::MaterialType::UpdatedLagrangian, 3)
+//-----------------------------------------------------------------------------
+FEBioElasticMaterial::FEBioElasticMaterial(FEElasticMaterial* mat_) : emat(mat_), MaterialType(mat::MaterialType::UpdatedLagrangian, 3)
 {
-	FEParam* p = mat->GetParameter("density"); assert(p);
+	FEParam* p = emat->GetParameter("density"); assert(p);
 	FEParamDouble& pd = p->value<FEParamDouble>();
-	m_rho_coeff = new FEScalarCoefficient(mat->GetFEModel(), pd);
+	m_rho_coeff = new FEScalarCoefficient(emat->GetFEModel(), pd);
 }
 
-void FEBioUncoupledMaterial::SetMaterialConstants(const mfem::IntegrationPoint& ip, mfem::ElementTransformation& T)
+void FEBioElasticMaterial::SetMaterialConstants(const mfem::IntegrationPoint& ip, mfem::ElementTransformation& T)
 {
-	// note this function is called prior to SetNearlyIncStrainMeasures() above
+	// note this function is called prior to SetAdditionalData()
 	// here we use it to get the coordinates of the current integration point
 	r0.SetSize(3);
 	T.Transform(ip, r0);
 }
 
-void FEBioUncoupledMaterial::SetNearlyIncStrainMeasures(const mfem::Vector& u, const mfem::DenseMatrix& gradu)
+void FEBioElasticMaterial::SetAdditionalData(const mfem::Vector& u, const mfem::DenseMatrix& gradu)
 {
 	// setup material point
 	if (m_materialpoint) delete m_materialpoint;
-	m_materialpoint = new FEMaterialPoint(umat->CreateMaterialPointData()); // this will delete the ElasticMaterialPoint data (m_data) as well
+	m_materialpoint = new FEMaterialPoint(emat->CreateMaterialPointData()); // this will delete the ElasticMaterialPoint data (m_data) as well
 
 	// set relevant data
 	FEElasticMaterialPoint& pt = *m_materialpoint->ExtractData<FEElasticMaterialPoint>(); // this references m_data (MaterialPointData) in m_materialpoint (MaterialPoint)
@@ -277,8 +278,6 @@ void FEBioUncoupledMaterial::SetNearlyIncStrainMeasures(const mfem::Vector& u, c
 	pt.m_F(2, 1) = F(2, 1);
 	pt.m_F(2, 2) = F(2, 2);
 
-	pt.m_buncoupled = true;
-
 	m_materialpoint->m_r0 = vec3d(r0(0), r0(1), r0(2));
 
 	// flag to recompute tangent at new gauss pt
@@ -286,12 +285,12 @@ void FEBioUncoupledMaterial::SetNearlyIncStrainMeasures(const mfem::Vector& u, c
 }
 
 // Evaluate stress
-void FEBioUncoupledMaterial::EvalCauchyStress(mfem::DenseMatrix& stress)
+void FEBioElasticMaterial::EvalCauchyStress(mfem::DenseMatrix& stress)
 {
 	stress.SetSize(vdim);
 
-	// Compute sigma = sigma_iso + sigma_vol
-	mat3ds m_s = umat->Stress(*m_materialpoint);
+	// Compute sigma
+	mat3ds m_s = emat->Stress(*m_materialpoint);
 
 	// copy data to mfem stress matrix
 	stress(0, 0) = m_s(0, 0);
@@ -306,14 +305,14 @@ void FEBioUncoupledMaterial::EvalCauchyStress(mfem::DenseMatrix& stress)
 }
 
 // Evaluate tangent
-double FEBioUncoupledMaterial::EvalElasticityTensor(int i, int j, int k, int l)
+double FEBioElasticMaterial::EvalElasticityTensor(int i, int j, int k, int l)
 {
 	double val = 0.0;
 	if (formulation_type == form_type::UpdatedLagrangian)
 	{
 		if (compute_tangent)
 		{
-			m_C = umat->Tangent(*m_materialpoint);
+			m_C = emat->Tangent(*m_materialpoint);
 			compute_tangent = false;
 		}
 		val = m_C(i, j, k, l);

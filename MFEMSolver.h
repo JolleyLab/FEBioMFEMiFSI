@@ -32,6 +32,8 @@ public:
    // solid solver type
    int SolidSolverType();
    enum SolidSolverType { MFEM = 0, FEBio = 1 };
+   // three field formulation
+   bool ThreeFieldFormulation();
 
    // velocity bcs
 	void AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);

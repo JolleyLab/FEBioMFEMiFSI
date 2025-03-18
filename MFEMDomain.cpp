@@ -18,6 +18,7 @@ FEDomain* MFEMDomainFactory::CreateDomain(const FE_Element_Spec& spec, FEMesh* p
    }
    bool immersed_solid = mfem_solver->ImmersedSolid();
    int solidsolvertype = mfem_solver->SolidSolverType();	
+   bool three_field = mfem_solver->ThreeFieldFormulation();
 
    MFEMMaterial* mfem_mat = dynamic_cast<MFEMMaterial*>(pmat); // MFEM materials
    FEElasticMaterial* febio_elast_mat = dynamic_cast<FEElasticMaterial*>(pmat); // FEBio materials
@@ -38,7 +39,7 @@ FEDomain* MFEMDomainFactory::CreateDomain(const FE_Element_Spec& spec, FEMesh* p
          {
             if (solidsolvertype == MFEMSolver::SolidSolverType::FEBio)
             {
-               if (dynamic_cast<FEUncoupledMaterial*>(pmat))
+               if (three_field)
                {
                   // FEBio 3Field Domain + FEBio Material
                   dom = fecore_new<FESolidDomain>("mfem immersed 3field febio domain", &fem);
@@ -51,6 +52,7 @@ FEDomain* MFEMDomainFactory::CreateDomain(const FE_Element_Spec& spec, FEMesh* p
             }
             else if (solidsolvertype == MFEMSolver::SolidSolverType::MFEM)
             {
+               MFEM_ASSERT(three_field == false, "MFEM solver with FEBio material does not support the three field formulation");
                // MFEM Solver + FEBio Material
                dom = fecore_new<FESolidDomain>("mfem domain 3d", &fem);
             }

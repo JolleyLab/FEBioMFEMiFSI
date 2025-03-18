@@ -78,10 +78,10 @@ public:
    virtual void ElementSolidStiffness(int iel, FESolidElement& el, matrix& ke, double scale);
 
 	//! geometrical stiffness (i.e. initial stress)
-	virtual void ElementGeometricalStiffness(int iel, FESolidElement& el, matrix& ke);
+	virtual void ElementGeometricalStiffness(int iel, FESolidElement& el, matrix& ke, double scale);
 
 	//! material stiffness component
-	virtual void ElementMaterialStiffness(int iel, FESolidElement& el, matrix& ke);
+	virtual void ElementMaterialStiffness(int iel, FESolidElement& el, matrix& ke, double scale);
 
    // shape derivative stiffness
    void ElementShapeDerivativeStiffness(FESolidElement& el, matrix& ke, double scale, std::vector<MFEMBodyForce*>& bfs);

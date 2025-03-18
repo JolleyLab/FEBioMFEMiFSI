@@ -7,6 +7,7 @@
 #include <FEBioMech/FEElasticMaterialPoint.h>
 #include <FECore/tens4d.h>
 #include <FEBioMech/FEIncompNeoHookean.h>
+#include <FEBioMech/FENeoHookean.h>
 
 class MFEMMaterial : public FEMaterial
 {
@@ -162,18 +163,17 @@ public:
 	DECLARE_FECORE_CLASS();
 };
 
-// Generic wrapper class for FEBio materials
-class FEBioUncoupledMaterial : public NearlyIncompressibleMaterial
+// Generic wrapper class for FEBio elastic materials
+class FEBioElasticMaterial : public MaterialType
 {
 public:
-	FEBioUncoupledMaterial(FEUncoupledMaterial* mat);
+   FEBioElasticMaterial(FEElasticMaterial* mat_);
 
 	FEScalarCoefficient* GetDensityCoeff() { return m_rho_coeff; }
 
 	void SetMaterialConstants(const mfem::IntegrationPoint& ip, mfem::ElementTransformation& T) override;
 
-	// set material point data
-	void SetNearlyIncStrainMeasures(const mfem::Vector& u, const mfem::DenseMatrix& gradu) override;
+   void SetAdditionalData(const mfem::Vector& u, const mfem::DenseMatrix& gradu) override;
 
 	// Evaluate stress
 	void EvalCauchyStress(mfem::DenseMatrix& stress) override;
@@ -181,12 +181,12 @@ public:
 	// Evaluate tangent
 	double EvalElasticityTensor(int i, int j, int k, int l) override;
 
-   virtual ~FEBioUncoupledMaterial() noexcept {};
+   virtual ~FEBioElasticMaterial() noexcept {};
 
 private:
 	FEScalarCoefficient* m_rho_coeff = nullptr;
 	FEMaterialPoint* m_materialpoint = nullptr;
-	FEUncoupledMaterial* umat = nullptr;
+	FEElasticMaterial* emat = nullptr;
 	bool compute_tangent = true;
 	mfem::Vector r0;
 	tens4ds m_C;

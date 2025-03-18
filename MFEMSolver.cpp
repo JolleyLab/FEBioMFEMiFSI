@@ -78,8 +78,9 @@ public:
    GridFunction *d_gf = nullptr; // immersed solid displacement grid function
    GridFunction *vib_gf = nullptr; // immersed solid velocity grid function
    ParaViewDataCollection *sdc = nullptr; // immersed solid paraview data collection
-   int solidsolvertype = 0; // 0 = MFEM, 1 = FEBio
+   int solidsolvertype = 0; // 0 = MFEM, 1 = FEBio (default is MFEM)
    ImmersedFEBioSolid *immersed_febio_solid = nullptr; // not owned
+   bool three_field = false; // flag for 3-field formulation
 
 public:
    // Material properties
@@ -135,7 +136,7 @@ public:
    bool febio_material = false;
    
    // int form_type = ImmersedSolid::form_type::TotalLagrangian; // either work
-   int form_type = ImmersedSolid::form_type::UpdatedLagrangian; // either work, but FEBio computes integrals in spatial frame
+   int form_type = ImmersedSolid::form_type::UpdatedLagrangian; // either work, but FEBio computes virtual interal work integrals in spatial frame
 
    bool subtract_viscous_stress = true;
    double stabs_scale = 1.0;
@@ -166,9 +167,9 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
    // Immersed Solid Options
    BEGIN_PARAM_GROUP("Immersed Solid Options");
       ADD_PARAMETER(m.immersed_solid, "Immersed_solid");
-      // ADD_PARAMETER(m.mfemsolidsolver, "mfem_solid_solver");
       ADD_PARAMETER(m.solidsolvertype, "Solid_solver_type")->setEnums("MFEM\0FEBio\0");
       ADD_PARAMETER(m.subtract_viscous_stress, "Subtract_viscous_stress");
+      ADD_PARAMETER(m.three_field, "Three_field_formulation");
       ADD_PARAMETER(m.stabs_scale, FE_RANGE_NOT_EQUAL(0.0), "VMS_stabilization_scaling");
    END_PARAM_GROUP();
 
@@ -255,6 +256,11 @@ mfem::Mesh* MFEMSolver::GetMFEMfluidmesh()
 mfem::Mesh* MFEMSolver::GetMFEMsolidmesh()
 {
 	return m.solid_mesh;
+}
+
+bool MFEMSolver::ThreeFieldFormulation()
+{
+   return m.three_field;
 }
 
 bool MFEMSolver::ImmersedSolid()
@@ -716,13 +722,11 @@ bool MFEMSolver::Init()
       {
          // FEBio material
          m.febio_material = true;
-         if (dynamic_cast<FEUncoupledMaterial*>(febio_elast_mat))
-         {
-            // MFEM Solver with FEBio material
-            FEBioUncoupledMaterial* feb_mat = new FEBioUncoupledMaterial(dynamic_cast<FEUncoupledMaterial*>(febio_elast_mat));
-            init_rho_coeff = feb_mat->GetDensityCoeff();
-            m.mat_type = feb_mat;
-         }
+         
+         // MFEM Solver with FEBio elastic material
+         FEBioElasticMaterial* feb_mat = new FEBioElasticMaterial(febio_elast_mat);
+         init_rho_coeff = feb_mat->GetDensityCoeff();
+         m.mat_type = feb_mat;
       }
       else
       {
@@ -741,7 +745,7 @@ bool MFEMSolver::Init()
       }
       else if (m.solidsolvertype == SolidSolverType::FEBio)
       {
-         MFEM_ASSERT(m.febio_material, "Immersed FEBio solids only support FEBio materials");
+         MFEM_ASSERT(m.febio_material, "Immersed FEBio solid solver only supports FEBio materials");
 
          auto fluid_vfes = m.flowsolver->GetCurrentVelocity()->FESpace();
          auto body_force_terms = m.flowsolver->GetBodyForces();

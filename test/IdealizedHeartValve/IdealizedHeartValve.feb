@@ -32,13 +32,14 @@
 			<Laplace_form>0</Laplace_form>
 			<Zero_mean_pressure>0</Zero_mean_pressure>
 			<Immersed_solid>1</Immersed_solid>
-			<Subtract_viscous_stress>1</Subtract_viscous_stress>
+			<Solid_solver_type>MFEM</Solid_solver_type>
+         <Subtract_viscous_stress>1</Subtract_viscous_stress>
 			<rho_inf>0.5</rho_inf>
 			<atol>1e-10</atol>
 			<rtol>1e-06</rtol>
 			<minIt>3</minIt>
 			<maxIt>10</maxIt>
-			<solver_type>PARDISO</solver_type>
+			<solver_type>UMFPack</solver_type>
 			<lin_atol>1e-10</lin_atol>
 			<lin_rtol>1e-06</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
