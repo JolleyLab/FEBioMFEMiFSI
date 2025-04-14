@@ -1,9 +1,7 @@
 #include "MFEMImmersedElasticDomain.h"
 #include <FEBioMech/FEBodyForce.h>
-#include <FEBioMech/FEElasticMaterial.h>
 #include <FECore/FEModel.h>
-#include "MFEMTools.h"
-#include "mfem.hpp"
+#include "MFEMGlobalTypes.h"
 
 #include <fstream>
 #include <iomanip>

@@ -1,11 +1,11 @@
 #pragma once
-#include <ImmersedFSI-Serial/immersed_solid.hpp>
 #include <FEBioMech/FEElasticSolidDomain.h>
+#include <FEBioMech/FEElasticMaterial.h>
 #include "MFEMLoad.h"
 #include "MFEMTools.h"
-#include <FEBioMech/FEElasticMaterial.h>
+#include <mfem.hpp>
 
-using namespace immersed_solid_serial;
+class MFEMGlobalVector;
 
 class MFEMImmersedElasticDomain : public FESolidDomain
 {
@@ -45,6 +45,8 @@ public:
 	}
 
 	FEMaterial* GetMaterial() override { return m_pMat; }
+
+   mfem::SubMesh* GetSubMesh() { return solid_submesh; }
 
    mfem::Array<int> &TransformVDofs(mfem::Array<int> &vdofs, int nd);
 

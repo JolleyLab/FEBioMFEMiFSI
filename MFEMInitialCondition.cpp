@@ -3,7 +3,7 @@
 #ifdef WIN32
 #include <mfem/fem/gridfunc.hpp>
 #else
-#include <fem/gridfunc.hpp>
+#include "mfem.hpp"
 #endif
 #include "MFEMTools.h"
 

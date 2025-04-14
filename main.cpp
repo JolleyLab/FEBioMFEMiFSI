@@ -9,7 +9,6 @@
 #include "MFEMInitialCondition.h"
 #include "MFEMBoundaryCondition.h"
 #include "MFEMLoad.h"
-#include "mfem.hpp"
 #include "MFEMImmersedElasticDomain.h"
 #include "MFEMImmersed3FieldElasticDomain.h"
 

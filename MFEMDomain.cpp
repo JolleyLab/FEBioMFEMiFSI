@@ -1,7 +1,7 @@
 #include "MFEMDomain.h"
 #include <FECore/FEModel.h>
-#include "MFEMMaterial.h"
 #include <FECore/FEAnalysis.h>
+#include "MFEMMaterial.h"
 #include "MFEMSolver.h"
 
 FEDomain* MFEMDomainFactory::CreateDomain(const FE_Element_Spec& spec, FEMesh* pm, FEMaterial* pmat)

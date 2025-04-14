@@ -1,11 +1,16 @@
 #pragma once
 #include <FECore/FESolver.h>
 
-#ifdef WIN32
-#include "ins_solver.hpp"
-#else
-#include <Navier-Stokes-Serial/ins_solver.hpp>
-#endif
+namespace mfem
+{
+   class GridFunction;
+   class Mesh;
+   class VectorCoefficient;
+   template <typename T> class Array;
+   class Coefficient;
+   class Vector;
+   class VectorCoefficient;
+}
 
 class MFEMSolver : public FESolver
 {

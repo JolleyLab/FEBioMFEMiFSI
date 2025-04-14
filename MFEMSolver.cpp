@@ -1,19 +1,23 @@
 #include "MFEMSolver.h"
+
 #include <FECore/FEModel.h>
 #include <FECore/FEAnalysis.h>
-#include <Navier-Stokes-Serial/ins_solver.hpp>
-#include <Navier-Stokes/ins_solver_enum.hpp>
-#include <ImmersedFSI-Serial/immersed_solid.hpp>
+#include <FECore/log.h>
+
 #include "MFEMImmersedFEBioSolid.h"
-#include <Elasticity/Materials/materials.hpp>
 #include "MFEMMesh.h"
 #include "MFEMInitialCondition.h"
 #include "MFEMBoundaryCondition.h"
 #include "MFEMLoad.h"
-#include <FECore/log.h>
 #include "MFEMMaterial.h"
-#include <typeinfo>
 #include "FEBioLinearSolver.h"
+
+#include <Navier-Stokes-Serial/ins_solver.hpp>
+#include <Navier-Stokes/ins_solver_enum.hpp>
+#include <ImmersedFSI-Serial/immersed_solid.hpp>
+#include <Elasticity/Materials/materials.hpp>
+
+#include <typeinfo>
 
 using namespace ins_solver_serial;
 using namespace std;
@@ -432,6 +436,8 @@ bool MFEMSolver::Init()
    if (m.immersed_solid)
    {
       // create fluid and solid submeshes from mfem version of FEBio mesh
+      bool mfem_solid_material = false;
+      bool febio_solid_material = false;
       Array<int> solid_domain_attr(m.mesh->attributes.Max());
       solid_domain_attr = 0;
       for (int i = 0; i < femesh.Domains(); ++i)
@@ -440,10 +446,12 @@ bool MFEMSolver::Init()
          if (dom.IsActive() && dynamic_cast<MFEMSolidMaterial*>(dom.GetMaterial()))
          {
             solid_domain_attr[i] = i+1;
+            mfem_solid_material = true;
          }
          if (dom.IsActive() && dynamic_cast<FEElasticMaterial*>(dom.GetMaterial()))
          {
             solid_domain_attr[i] = i+1;
+            febio_solid_material = true;
          }
          if(dom.IsActive() && dynamic_cast<MFEMNewtonianFluid*>(dom.GetMaterial()))
          {
@@ -456,8 +464,16 @@ bool MFEMSolver::Init()
       }
 
       // create solid mesh as sum of all solid domains, this will preserve solid domain numbering
-      m.solid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,solid_domain_attr));
-      if (m.solid_mesh == nullptr) return false;
+      if (mfem_solid_material && febio_solid_material)
+      {
+         feLogError("Cannot have both FEBio and MFEM solid materials in the same mesh");
+         return false;
+      }
+      else
+      {
+         m.solid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,solid_domain_attr));
+         if (m.solid_mesh == nullptr) return false;
+      }
    }
 
    // print mesh details
@@ -474,13 +490,6 @@ bool MFEMSolver::Init()
       feLog("-------------------------------\nFluid Mesh\n");
       m.mesh->PrintCharacteristics();
       feLog("-------------------------------\n");
-   }
-
-   // check to ensure at most two materials have been specified!
-   if (fem.Materials() > 2)
-   {
-      feLogError("More than two materials have been specified. At most two materials can be set for the MFEMiFSI solver.");
-      return false;
    }
 
    // get fluid material
@@ -655,7 +664,7 @@ bool MFEMSolver::Init()
       }
 	}
 
-   // Zero mean pressure if active
+   // Zero mean pressure
    if (m.zero_mean_pressure) m.flowsolver->AddZeroMeanPressureCondition();
 
    // Fluid grid functions
@@ -723,10 +732,13 @@ bool MFEMSolver::Init()
          // FEBio material
          m.febio_material = true;
          
-         // MFEM Solver with FEBio elastic material
-         FEBioElasticMaterial* feb_mat = new FEBioElasticMaterial(febio_elast_mat);
-         init_rho_coeff = feb_mat->GetDensityCoeff();
-         m.mat_type = feb_mat;
+         if (m.solidsolvertype == SolidSolverType::MFEM)
+         {
+            // MFEM Solver with FEBio elastic material
+            FEBioElasticMaterial* feb_mat = new FEBioElasticMaterial(febio_elast_mat);
+            init_rho_coeff = feb_mat->GetDensityCoeff();
+            m.mat_type = feb_mat;
+         }
       }
       else
       {
@@ -737,6 +749,8 @@ bool MFEMSolver::Init()
       // add immersed solid to the flow solver
       if (m.solidsolvertype == SolidSolverType::MFEM)
       {
+         MFEM_ASSERT(fem.Materials() < 3, "MFEM solid solver only supports one material");
+
          m.flowsolver->AddImmersedSolid(m.solid_mesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
          
          // immersed solid grid functions

@@ -1,10 +1,10 @@
 #pragma once
 #include <ImmersedFSI-Serial/immersed_solid.hpp>
 #include "MFEMTools.h"
-#include <vector>
-#include "mfem.hpp"
+#include "MFEMGlobalTypes.h"
 #include "MFEMLoad.h"
-#include <FECore/CompactUnSymmMatrix.h>
+#include "mfem.hpp"
+#include <vector>
 
 using namespace immersed_solid_serial;
 
@@ -48,7 +48,6 @@ public:
 
    // Global matrix
    MFEMGlobalMatrix *m_K = nullptr; // owned
-   CRSSparseMatrix *pS = nullptr; // owned by MFEMGlobalMatrix
 
    // Model loads (body forces only!)
    std::vector<MFEMBodyForce*> m_body_forces;

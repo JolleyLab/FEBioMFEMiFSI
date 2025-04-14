@@ -5,8 +5,6 @@
 #include "mfem.hpp"
 #include <math.h>
 
-using namespace mfem;
-
 MFEMMesh::MFEMMesh(int nodes, int elems, int bndrelems) : mfem::Mesh(3, nodes, elems, bndrelems)
 {
 

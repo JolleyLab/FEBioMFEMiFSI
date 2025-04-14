@@ -1,13 +1,13 @@
 #pragma once
 #include <FECore/FEMaterial.h>
-#include "MFEMTools.h"
 #include <FECore/log.h>
-#include <Elasticity/Materials/nearly_incompressible_material.hpp>
 #include <FEBioMech/FEUncoupledMaterial.h>
 #include <FEBioMech/FEElasticMaterialPoint.h>
 #include <FECore/tens4d.h>
 #include <FEBioMech/FEIncompNeoHookean.h>
 #include <FEBioMech/FENeoHookean.h>
+#include "MFEMTools.h"
+#include <Elasticity/Materials/nearly_incompressible_material.hpp>
 
 class MFEMMaterial : public FEMaterial
 {

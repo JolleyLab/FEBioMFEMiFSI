@@ -5,7 +5,7 @@
 #include <Elasticity/Materials/material_type.hpp>
 #include <FECore/FEModel.h>
 
-using namespace mfem;
+// using namespace mfem;
 
 MFEMMaterial::MFEMMaterial(FEModel* fem) : FEMaterial(fem)
 {
