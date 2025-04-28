@@ -32,7 +32,11 @@ public:
    void SetFluidProperties(double rho, double mu);
 
    // set additional time stepping data
+   #ifdef MFEM_USE_MPI
+   void SetAdditionalData(bool subtract_visc_fluid_);
+   #else
    void SetAdditionalData(bool subtract_visc_fluid_, mfem::SubMesh* solid_submesh_, mfem::FiniteElementSpace *gfes_);
+   #endif
 
    void SetMaterial(FEMaterial* pmat) override
 	{

@@ -153,6 +153,24 @@ message(STATUS "Found mfem config in: ${mfem_DIR} (version ${MFEM_VERSION})")
 #   set(CMAKE_CXX_COMPILER "${MFEM_CXX_COMPILER}")
 # endif()
 
+#set options based on mfem config
+if(MFEM_USE_MPI)
+   Option(iFSI_USE_MPI "Use MPI" ON)
+   add_definitions(-DMFEM_USE_MPI)
+   add_definitions(-DMFEM_USE_GSLIB)
+else()
+   Option(iFSI_USE_MPI "Use MPI" OFF)
+endif()
+if (MFEM_USE_GSLIB)
+   Option(iFSI_USE_GSLIB "Use GSLIB" ON)
+else()
+   Option(iFSI_USE_GSLIB "Use GSLIB" OFF)
+endif()
+add_definitions(-DiFSI_USE_MPI)
+add_definitions(-DiFSI_USE_GSLIB)
+
+
+
 # Import FSI_Solver
 message(STATUS "Looking for fsi_solver ...")
 set(FSI_Solver_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../FSI_Solver_v2.0/build/" CACHE PATH "Path to the FSI_Solver build or install prefix.")
@@ -184,6 +202,8 @@ else()
     set(CMAKE_BUILD_RPATH $ORIGIN/../lib/)
 endif()
 
+# Options file
+CONFIGURE_FILE(FEBioMFEMiFSIOptions.cmake.in FEBioMFEMiFSIOptions.cmake @ONLY)
 
 # Set include directory
 include_directories(${FEBio_INC} ${FSI_Source_DIR} ${MFEM_SOURCE_DIR})

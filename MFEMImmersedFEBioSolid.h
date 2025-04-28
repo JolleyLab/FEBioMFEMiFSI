@@ -13,8 +13,13 @@ class ImmersedFEBioSolid : public ImmersedSolid
 public:
    // constructors
    ImmersedFEBioSolid() : ImmersedSolid() {};
+   #ifdef MFEM_USE_MPI
+   ImmersedFEBioSolid(FEModel* fem_, mfem::ParMesh *solid_mesh, int order_, mfem::Coefficient *init_rho_s_, double fluid_density_, double mu_f_, std::vector<AccelTerm_T> *accel_,
+      mfem::ParFiniteElementSpace *vfes_, mfem::ParMesh *fluid_mesh, MaterialType *mat_, int orderingtype_, int form_type_, bool subtract_visc_);
+   #else
    ImmersedFEBioSolid(FEModel* fem_, mfem::Mesh *solid_mesh, int order_, mfem::Coefficient *init_rho_s_, double fluid_density_, double mu_f_, std::vector<AccelTerm_T> *accel_,
       mfem::FiniteElementSpace *vfes_, mfem::Mesh *fluid_mesh, MaterialType *mat_, int orderingtype_, int form_type_, bool subtract_visc_);
+   #endif
 
    // driving functions
    void Setup(double dt, double alpha_m_, double alpha_f_, double gamma_, double beta_) override;
@@ -61,7 +66,15 @@ public:
    mfem::GridFunction delvdot_global_gf;
    
    // Data
+   #ifdef MFEM_USE_MPI
+   mfem::ParGridFunction ddotnp1_gf, d2dotnp1_gf, dnp1_gf;
+   #else
    mfem::GridFunction ddotnp1_gf, d2dotnp1_gf, dnp1_gf;
+   #endif
+
+   #ifdef MFEM_USE_MPI
+   mfem::OperatorHandle pK;
+   #endif
 
 private:
    // flag for recomputing sparse matrix profile

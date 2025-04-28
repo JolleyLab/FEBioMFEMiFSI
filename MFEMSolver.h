@@ -2,7 +2,7 @@
 #include <FECore/FESolver.h>
 
 namespace mfem
-{
+{  
    class GridFunction;
    class Mesh;
    class VectorCoefficient;
@@ -10,6 +10,10 @@ namespace mfem
    class Coefficient;
    class Vector;
    class VectorCoefficient;
+   #ifdef MFEM_USE_MPI
+   class ParGridFunction;
+   class ParMesh;
+   #endif
 }
 
 class MFEMSolver : public FESolver
@@ -25,12 +29,21 @@ public:
 	bool SolveStep() override;
 
 public:
-	mfem::GridFunction* GetCurrentPressure();
+   #ifdef MFEM_USE_MPI
+   mfem::ParGridFunction* GetCurrentPressure();
+	mfem::ParGridFunction* GetCurrentVelocity();
+
+	mfem::ParMesh* GetMFEMMesh();
+   mfem::ParMesh* GetMFEMfluidmesh();
+   mfem::ParMesh* GetMFEMsolidmesh();
+   #else
+   mfem::GridFunction* GetCurrentPressure();
 	mfem::GridFunction* GetCurrentVelocity();
 
 	mfem::Mesh* GetMFEMMesh();
    mfem::Mesh* GetMFEMfluidmesh();
    mfem::Mesh* GetMFEMsolidmesh();
+   #endif
 
    // flag for immersed solid
    bool ImmersedSolid();

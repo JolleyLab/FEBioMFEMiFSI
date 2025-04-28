@@ -5,6 +5,7 @@
 class FEMesh;
 class FEFacetSet;
 class FEDomain;
+class FEModel;
 
 class MFEMMesh : public mfem::Mesh 
 {

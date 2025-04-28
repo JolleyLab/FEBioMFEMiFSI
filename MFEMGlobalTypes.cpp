@@ -80,36 +80,38 @@ MFEMGlobalMatrix::MFEMGlobalMatrix(CRSSparseMatrix* pK, bool del) : FEGlobalMatr
 
 void MFEMGlobalMatrix::CreateProfile(FEModel* pfem, int neq, bool reshape)
 {
-   build_begin(neq);
-   {
-      // setup static profile
-      if(reshape)
-      {
-         m_MPs.Clear();
+   // build_begin(neq);
+   // {
+   //    // setup static profile
+   //    if(reshape)
+   //    {
+   //       m_MPs.Clear();
 
-         // build the profile based on each domain
-         (*this).BuildMatrixProfile(pfem, true);
+   //       // build the profile based on each domain
+   //       (*this).BuildMatrixProfile(pfem, true);
 
-         build_flush();
-			m_MPs = *m_pMP;
-      }
-      else
-      {
-         // copy the old static profile
-			*m_pMP = m_MPs;
-      }
+   //       build_flush();
+	// 		m_MPs = *m_pMP;
+   //    }
+   //    else
+   //    {
+   //       // copy the old static profile
+	// 		*m_pMP = m_MPs;
+   //    }
 
-      // build the dynamic profile
-      (*this).BuildMatrixProfile(pfem, false);      
-   }
-   build_end();
+   //    // build the dynamic profile
+   //    (*this).BuildMatrixProfile(pfem, false);      
+   // }
+   // build_end();
 
-   // wrap FEBio matrix into MFEM SparseMatrix
-   if(mfem_K) delete mfem_K;
-   int *I = m_pA->Pointers();
-   int *J = m_pA->Indices();
-   double *data = m_pA->Values();
-   mfem_K = new mfem::SparseMatrix(I,J,data,neq,neq,false,false,true);
+   // // wrap FEBio matrix into MFEM SparseMatrix
+   // if(mfem_K) delete mfem_K;
+   // int *I = m_pA->Pointers();
+   // int *J = m_pA->Indices();
+   // double *data = m_pA->Values();
+   // mfem_K = new mfem::SparseMatrix(I,J,data,neq,neq,false,false,true);
+
+   mfem_K = new mfem::SparseMatrix(neq);
 }
 
 void MFEMGlobalMatrix::BuildMatrixProfile(FEModel* pfem, bool breset)
@@ -165,3 +167,21 @@ void MFEMGlobalMatrix::BuildMatrixProfile(FEModel* pfem, bool breset)
 		// }
 	}
 }
+
+// void MFEMGlobalMatrix::Assemble(const FEElementMatrix& ke)
+// {
+//    const int skip_zeros = 1;
+//    auto rows = ke.RowIndices();
+//    auto cols = ke.ColumnsIndices();
+//    mfem::Array<int> vdofs_rows(rows.data(), rows.size());
+//    mfem::Array<int> vdofs_cols(cols.data(), cols.size());
+//    mfem::DenseMatrix mfem_elmat(rows.size(),cols.size());
+//    for (int i = 0; i < rows.size(); ++i)
+//    {
+//       for (int j = 0; j < cols.size(); ++j)
+//       {
+//          mfem_elmat(i,j) = ke(i,j);
+//       }
+//    }
+//    mfem_K->AddSubMatrix(vdofs_rows,vdofs_cols,mfem_elmat,skip_zeros);
+// }

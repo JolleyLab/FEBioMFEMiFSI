@@ -11,6 +11,7 @@
 #include "MFEMLoad.h"
 #include "MFEMImmersedElasticDomain.h"
 #include "MFEMImmersed3FieldElasticDomain.h"
+#include "mfem.hpp"
 
 class FEMFEMiFSI : public FEModule
 {
@@ -52,7 +53,21 @@ FECORE_PLUGIN void GetPluginVersion(int& major, int& minor, int& patch)
 
 FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 {
-	FECoreKernel::SetInstance(&fecore);
+   FECoreKernel::SetInstance(&fecore);
+
+   #ifdef MFEM_USE_MPI
+   // initialize MPI and Hypre libraries
+   
+   // int argc;
+   // char** argv;
+   // fecore.GetCommandLineInput(argc,argv);
+   // mfem::Mpi::Init(argc, argv);
+
+   // works for most MPI implementations
+   mfem::Mpi::Init(nullptr, nullptr);   
+   
+   mfem::Hypre::Init();
+   #endif	
 
 	// create the new module
 	const char* info = \

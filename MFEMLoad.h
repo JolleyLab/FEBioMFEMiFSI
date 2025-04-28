@@ -5,15 +5,31 @@
 #include <FECore/FENodalLoad.h>
 
 class MFEMSolver;
+namespace mfem
+{
+   class Mesh;
+}
 
 /////// Base classes ///////
 
-class MFEMLoad : public FESurfaceLoad
+class MFEMSurfaceLoad : public FESurfaceLoad
 {
 public:
-	MFEMLoad(FEModel* fem) : FESurfaceLoad(fem) {}
+   MFEMSurfaceLoad(FEModel* fem) : FESurfaceLoad(fem) {}
+
+   // Get the mesh
+   mfem::Mesh* GetMesh(MFEMSolver* solver);
 
 	virtual void Apply(MFEMSolver* solver, int attr) = 0;
+
+   virtual void CopyFrom(FEModelLoad* pml);
+
+   void SetBoundaryID(int id) { m_bdr_attr = id; };
+
+   double GetBoundaryID() { return m_bdr_attr; };
+
+private:
+   int m_bdr_attr; // bdr attribute ID for the boundary condition
 };
 
 class MFEMBodyLoad : public FEBodyLoad
@@ -21,7 +37,19 @@ class MFEMBodyLoad : public FEBodyLoad
 public:
 	MFEMBodyLoad(FEModel* fem) : FEBodyLoad(fem) {}
 
+   // Get the mesh
+   mfem::Mesh* GetMesh(MFEMSolver* solver);
+
 	virtual void Apply(MFEMSolver* solver, int attr) = 0;
+
+   void SetDomainIDList(std::vector<int> &list) { m_dom_list = list; };
+
+   std::vector<int> &GetDomainIDList() { return m_dom_list; };
+
+   virtual void CopyFrom(FEModelLoad* pml);
+
+private:
+   std::vector<int> m_dom_list; // domain IDs for the body load
 };
 
 class MFEMNodalLoad : public FENodalLoad
@@ -38,18 +66,22 @@ public:
 
 	virtual void Apply(MFEMSolver* solver) = 0;
 
+   // virtual void CopyFrom(FEModelLoad* pml);
+
 protected:
    int m_dof;
 };
 
 /////// Derived classes for each bc ///////
 
-class MFEMNeumannBC : public MFEMLoad
+class MFEMNeumannBC : public MFEMSurfaceLoad
 {
 public:
-	MFEMNeumannBC(FEModel* fem) : MFEMLoad(fem) {}
+	MFEMNeumannBC(FEModel* fem) : MFEMSurfaceLoad(fem) {}
 
 	void Apply(MFEMSolver* solver, int attr) override;
+
+   void CopyFrom(FEModelLoad* pml) override;
 
 private:
 	FEParamDouble m_tx;
@@ -59,24 +91,28 @@ private:
 	DECLARE_FECORE_CLASS();
 };
 
-class MFEMTractionFreeBC : public MFEMLoad
+class MFEMTractionFreeBC : public MFEMSurfaceLoad
 {
 public:
-	MFEMTractionFreeBC(FEModel* fem) : MFEMLoad(fem) {}
+	MFEMTractionFreeBC(FEModel* fem) : MFEMSurfaceLoad(fem) {}
 
 	void Apply(MFEMSolver* solver, int attr) override;
+
+   void CopyFrom(FEModelLoad* pml) override;
 
 private:
 
 	DECLARE_FECORE_CLASS();
 };
 
-class MFEMPressureBC : public MFEMLoad
+class MFEMPressureBC : public MFEMSurfaceLoad
 {
 public:
-	MFEMPressureBC(FEModel* fem) : MFEMLoad(fem) {}
+	MFEMPressureBC(FEModel* fem) : MFEMSurfaceLoad(fem) {}
 
 	void Apply(MFEMSolver* solver, int attr) override;
+
+   void CopyFrom(FEModelLoad* pml) override;
 
 private:
    // applies p*nor to the surface
@@ -85,12 +121,14 @@ private:
 	DECLARE_FECORE_CLASS();
 };
 
-class MFEMBackflowStabilizationBC : public MFEMLoad
+class MFEMBackflowStabilizationBC : public MFEMSurfaceLoad
 {
 public:
 	MFEMBackflowStabilizationBC(FEModel* fem);
 
 	void Apply(MFEMSolver* solver, int attr) override;
+
+   void CopyFrom(FEModelLoad* pml) override;
 
 private:
    // assumes constant beta
@@ -99,12 +137,14 @@ private:
 	DECLARE_FECORE_CLASS();
 };
 
-class MFEMResistanceBC : public MFEMLoad
+class MFEMResistanceBC : public MFEMSurfaceLoad
 {
 public:
-	MFEMResistanceBC(FEModel* fem) : MFEMLoad(fem) {}
+	MFEMResistanceBC(FEModel* fem) : MFEMSurfaceLoad(fem) {}
 
 	void Apply(MFEMSolver* solver, int attr) override;
+
+   void CopyFrom(FEModelLoad* pml) override;
 
 private:
    // assumes constant R and p0
@@ -114,12 +154,14 @@ private:
 	DECLARE_FECORE_CLASS();
 };
 
-class MFEMWindkesselBC : public MFEMLoad
+class MFEMWindkesselBC : public MFEMSurfaceLoad
 {
 public:
-	MFEMWindkesselBC(FEModel* fem) : MFEMLoad(fem) {}
+	MFEMWindkesselBC(FEModel* fem) : MFEMSurfaceLoad(fem) {}
 
 	void Apply(MFEMSolver* solver, int attr) override;
+
+   void CopyFrom(FEModelLoad* pml) override;
 
 private:
    // assumes constant R, Rd, C, p0(spatial), pd
@@ -139,6 +181,9 @@ public:
 	MFEMBodyForce(FEModel* fem) : MFEMBodyLoad(fem) {}
 
 	void Apply(MFEMSolver* solver, int attr) override;
+
+   void CopyFrom(FEModelLoad* pml) override;
+
 public:
    FEParamDouble m_bx;
 	FEParamDouble m_by;
@@ -153,6 +198,9 @@ public:
 	MFEMSetNodalPressure(FEModel* fem) : MFEMNodalLoad(fem) {}
 
 	void Apply(MFEMSolver* solver) override;
+
+   // void CopyFrom(FEModelLoad* pml) override;
+   
 private:
    FEParamDouble m_p;
 

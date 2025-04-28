@@ -3,7 +3,8 @@
 	<Module type="mfemifsi"/>
 	<Control>
 		<analysis>0</analysis>
-		<time_steps>30000</time_steps>
+		<!-- <time_steps>30000</time_steps> -->
+      <time_steps>10</time_steps>
 		<step_size>0.0001</step_size>
 		<plot_zero_state>0</plot_zero_state>
 		<plot_range>0,-1</plot_range>
@@ -39,7 +40,7 @@
 			<rtol>1e-06</rtol>
 			<minIt>3</minIt>
 			<maxIt>10</maxIt>
-			<solver_type>UMFPack</solver_type>
+			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-10</lin_atol>
 			<lin_rtol>1e-06</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>

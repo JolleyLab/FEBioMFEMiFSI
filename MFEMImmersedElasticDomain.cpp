@@ -23,6 +23,19 @@ void MFEMImmersedElasticDomain::SetFluidProperties(double rho, double mu)
    fluid_dyn_viscosity = mu;
 }
 
+#ifdef MFEM_USE_MPI
+void MFEMImmersedElasticDomain::SetAdditionalData(bool subtract_visc_fluid_)
+{
+   auto tp = GetFEModel()->GetTime();
+   dt = tp.timeIncrement;
+   m_gamma = tp.gamma;
+
+   subtract_visc_fluid = subtract_visc_fluid_;
+
+   solid_submesh = nullptr;
+   gfes = nullptr;
+}
+#else
 void MFEMImmersedElasticDomain::SetAdditionalData(bool subtract_visc_fluid_, mfem::SubMesh* solid_submesh_, mfem::FiniteElementSpace *gfes_)
 {
    auto tp = GetFEModel()->GetTime();
@@ -34,6 +47,7 @@ void MFEMImmersedElasticDomain::SetAdditionalData(bool subtract_visc_fluid_, mfe
    solid_submesh = solid_submesh_;
    gfes = gfes_;
 }
+#endif
 
 void MFEMImmersedElasticDomain::Activate()
 {  
@@ -258,7 +272,20 @@ void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std:
       // get submesh element from parent
       // febio element id is 1-based, while mfem element id is 0-based
       // so we need to subtract 1 when getting the mfem element id
-      int submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
+      
+      int submesh_id = -1;
+      if (solid_submesh)
+      {
+         // serial
+         submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
+      }         
+      else
+      {
+         // parallel
+         // submesh_id = el.GetID()-1;
+         submesh_id = el.GetID();
+      }
+
       // const mfem::Array<int>& parent_elem_ids = solid_submesh->GetParentElementIDMap();
       // int global_id = parent_elem_ids[submesh_id];
 
@@ -350,12 +377,12 @@ void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std:
          dfes->GetElementVDofs(submesh_id,vdofs);
          mfem::Array<int> vdofs_febio = TransformVDofs(vdofs,el.Nodes()); // reorder to match febio elem vector [xyz,xyz,xyz,...]
 
-         // mfem::out << "\nVDOFS = ";
-         // for (int ii=0; ii<vdofs_febio.Size(); ++ii)
-         // {
-         //    mfem::out << vdofs_febio[ii] << " ";
-         // }
-         // mfem::out << std::endl;
+         // // mfem::out << "\nVDOFS = ";
+         // // for (int ii=0; ii<vdofs_febio.Size(); ++ii)
+         // // {
+         // //    mfem::out << vdofs_febio[ii] << " ";
+         // // }
+         // // mfem::out << std::endl;
 
          // mfem::out << "Element Vector = " << std::endl;
          // mfem::Vector fe_temp(fe.data(),fe.size());
@@ -366,31 +393,31 @@ void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std:
          //    mfem::out << fe_temp(3*ii + 2) << " ";
          //    mfem::out << std::endl;
          // }
-         // mfem::Vector& fe_mfem = TransformElemVec(fe,ndof);
-         // mfem::out << "Element Vector MFEM = " << std::endl;
-         // for (int ii=0; ii<el.Nodes(); ++ii)
-         // {
-         //    mfem::out << fe_mfem(ii) << " ";
-         //    mfem::out << fe_mfem(ii + ndof) << " ";
-         //    mfem::out << fe_mfem(ii + 2*ndof) << " ";
-         //    mfem::out << std::endl;
-         // }
+         // // mfem::Vector& fe_mfem = TransformElemVec(fe,ndof);
+         // // mfem::out << "Element Vector MFEM = " << std::endl;
+         // // for (int ii=0; ii<el.Nodes(); ++ii)
+         // // {
+         // //    mfem::out << fe_mfem(ii) << " ";
+         // //    mfem::out << fe_mfem(ii + ndof) << " ";
+         // //    mfem::out << fe_mfem(ii + 2*ndof) << " ";
+         // //    mfem::out << std::endl;
+         // // }
 
-         // mfem::Vector& fe_mfem = TransformElemVec(fe,el.Nodes());
+         // // mfem::Vector& fe_mfem = TransformElemVec(fe,el.Nodes());
 
-         // mfem::out << "VDOFS = " << std::endl;
-         // vdofs.Print();
-         // for (int ii=0; ii<el.Nodes(); ++ii)
-         // {
-         //    mfem::out << "Node " << ii << " = (" << vdofs[ii] << ", " << vdofs[ii + el.Nodes()] << ", " << vdofs[ii + 2*el.Nodes()] << ")" << std::endl;
-         // }
+         // // mfem::out << "VDOFS = " << std::endl;
+         // // vdofs.Print();
+         // // for (int ii=0; ii<el.Nodes(); ++ii)
+         // // {
+         // //    mfem::out << "Node " << ii << " = (" << vdofs[ii] << ", " << vdofs[ii + el.Nodes()] << ", " << vdofs[ii + 2*el.Nodes()] << ")" << std::endl;
+         // // }
 
-         // mfem::out << "VDOFS_FEBIO = " << std::endl;
-         // vdofs_febio.Print();
-         // for (int ii=0; ii<el.Nodes(); ++ii)
-         // {
-         //    mfem::out << "Node " << ii << " = (" << vdofs_febio[3*ii] << ", " << vdofs_febio[3*ii + 1] << ", " << vdofs_febio[3*ii + 2] << ")" << std::endl;
-         // }
+         // // mfem::out << "VDOFS_FEBIO = " << std::endl;
+         // // vdofs_febio.Print();
+         // // for (int ii=0; ii<el.Nodes(); ++ii)
+         // // {
+         // //    mfem::out << "Node " << ii << " = (" << vdofs_febio[3*ii] << ", " << vdofs_febio[3*ii + 1] << ", " << vdofs_febio[3*ii + 2] << ")" << std::endl;
+         // // }
 
 			R.Assemble(vdofs_febio,fe);
 		}
@@ -578,7 +605,18 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
 		FESolidElement& el = m_Elem[iel];
 
       // get mfem submesh element id
-      int submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
+      int submesh_id = -1;
+      if (solid_submesh)
+      {
+         // serial
+         submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
+      }         
+      else
+      {
+         // parallel
+         // submesh_id = el.GetID()-1;
+         submesh_id = el.GetID();
+      }
 
       // mfem::out << "\n";
       // mfem::out << "Element id = " << submesh_id << std::endl;
@@ -593,6 +631,7 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
       //    trans->Transform(ip_node, curr_pos);
       //    mfem::out << std::setprecision(8) << "Node[" << j << "]=(" << curr_pos(0) << "," << curr_pos(1) << "," << curr_pos(2) << ")" << std::endl;
       // }
+   
 
 		if (el.isActive()) {
 
@@ -635,7 +674,7 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
          //    febio_map[i+2*el.Nodes()] = 3*i+2;
          // }
 
-         // // febio_map.Print();
+         // // // febio_map.Print();
 
          // int precision_out = 6;
          // int width_out = precision_out + 6;
@@ -693,7 +732,19 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
          // }
 
 			// assemble element matrix into global stiffness matrix
-			K.Assemble(ke);
+         mfem::SparseMatrix& mfemK = *dynamic_cast<MFEMGlobalMatrix*>(&K)->GetMfemMatrix();
+         mfem::DenseMatrix mfem_elmat(vdofs_febio.Size());
+         mfem_elmat = 0.0;
+         for (int i = 0; i < vdofs_febio.Size(); ++i)
+         {
+            for (int j = 0; j < vdofs_febio.Size(); ++j)
+            {
+               mfem_elmat(i,j) = ke(i,j);
+            }
+         }
+         mfemK.AddSubMatrix(vdofs_febio, vdofs_febio, mfem_elmat,0);
+
+			// K.Assemble(ke);
 		}
 	}
 }
@@ -1008,10 +1059,8 @@ void MFEMImmersedElasticDomain::BuildMatrixProfile(FEGlobalMatrix& M)
 	const int NE = Elements();
 	for (int j = 0; j<NE; ++j)
 	{
-      // dfes->GetElementVDofs(j,vdofs);
-
       FESolidElement& el = m_Elem[j];
-      int submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
+      int submesh_id = solid_submesh ? solid_submesh->GetSubMeshElementFromParent(el.GetID()-1) : el.GetID();
       dfes->GetElementVDofs(submesh_id,vdofs);
       elm.assign(vdofs.GetData(), vdofs.GetData() + vdofs.Size()); // check this
 		M.build_add(elm);

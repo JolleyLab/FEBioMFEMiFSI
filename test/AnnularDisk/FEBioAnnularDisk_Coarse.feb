@@ -40,7 +40,7 @@
 			<rtol>0.001</rtol>
 			<minIt>3</minIt>
 			<maxIt>10</maxIt>
-			<solver_type>UMFPack</solver_type>
+			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-06</lin_atol>
 			<lin_rtol>0.001</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
