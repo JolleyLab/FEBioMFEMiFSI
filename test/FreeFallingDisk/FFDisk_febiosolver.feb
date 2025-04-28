@@ -3,8 +3,7 @@
 	<Module type="mfemifsi"/>
 	<Control>
 		<analysis>0</analysis>
-		<!-- <time_steps>1500</time_steps> -->
-      <time_steps>10</time_steps>
+		<time_steps>1500</time_steps>
 		<step_size>0.001</step_size>
 		<plot_zero_state>0</plot_zero_state>
 		<plot_range>0,-1</plot_range>
@@ -37,18 +36,14 @@
 			<Subtract_viscous_stress>1</Subtract_viscous_stress>
 			<VMS_stabilization_scaling>1</VMS_stabilization_scaling>
 			<rho_inf>0.5</rho_inf>
-			<!-- <atol>1e-10</atol>
-			<rtol>1e-06</rtol> -->
-         <atol>1e-12</atol>
-			<rtol>1e-12</rtol>
+			<atol>1e-10</atol>
+			<rtol>1e-06</rtol>
 			<minIt>3</minIt>
 			<maxIt>10</maxIt>
 			<solver_type>FGMRES</solver_type>
          <!-- <solver_type>UMFPack</solver_type> -->
-			<!-- <lin_atol>1e-10</lin_atol> -->
-			<!-- <lin_rtol>1e-6</lin_rtol> -->
-         <lin_atol>1e-12</lin_atol>
-			<lin_rtol>1e-12</lin_rtol>
+			<lin_atol>1e-10</lin_atol>
+			<lin_rtol>1e-6</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
 			<inner_solver_type>Iterative</inner_solver_type>
 			<Ainv_atol>1e-06</Ainv_atol>

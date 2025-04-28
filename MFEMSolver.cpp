@@ -219,7 +219,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
 
    // Linear Solver Options
    BEGIN_PARAM_GROUP("Linear Solver");
-      ADD_PARAMETER(m.linsolvertype, "solver_type")->setEnums("UMFPack\0PARDISO\0FGMRES\0");
+      ADD_PARAMETER(m.linsolvertype, "solver_type")->setEnums("UMFPack\0PARDISO\0FGMRES\0CPARDISO\0");
       ADD_PARAMETER(m.lin_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "lin_atol");
       ADD_PARAMETER(m.lin_rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "lin_rtol");
       // ADD_PARAMETER(m.lin_minIt, FE_RANGE_GREATER_OR_EQUAL(1), "lin_minIt");
@@ -645,8 +645,14 @@ bool MFEMSolver::Init()
 	m.flowsolver->SetNewtonSolveMaxIt(m.maxIt);
 
 	// set linear solver and preconditioner
-   if (m.linsolvertype == m.LinearSolverType::PARDISO || m.linsolvertype == m.LinearSolverType::UMFPACK)
+   if (m.linsolvertype == m.LinearSolverType::PARDISO || m.linsolvertype == m.LinearSolverType::UMFPACK || m.linsolvertype == m.LinearSolverType::CPARDISO)
    {
+      #ifdef MFEM_USE_MPI
+      MFEM_ASSERT(m.linsolvertype == m.LinearSolverType::CPARDISO, "CPARDISO is the only supported direct linear solver in parallel");
+      #else
+      MFEM_ASSERT(m.linsolvertype != m.LinearSolverType::CPARDISO, "CPARDISO is not supported in serial");
+      #endif
+
       m.direct_solver = true;
       m.flowsolver->UseDirectSolver();
    }

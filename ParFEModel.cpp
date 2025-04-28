@@ -1,9 +1,8 @@
 #include "ParFEModel.h"
-#include "FECore/FEModel.cpp"
-#include "FECore/FECoreKernel.h"
-#include "FECore/FEMaterial.h"
-#include "FECore/FEDomain.h"
-#include "FECore/FESolidDomain.h"
+#include <FECore/FECoreKernel.h>
+#include <FECore/FEMaterial.h>
+#include <FECore/FEDomain.h>
+#include <FECore/FESolidDomain.h>
 
 #include "MFEMMesh.h"
 #include "MFEMLoad.h"
