@@ -581,6 +581,8 @@ void ImmersedFEBioSolid::ReformStiffness()
    // // zero the global matrix
    // m_K->Zero();
 
+
+
    if (reshape_stiffness)
    {
       // setup sparse matrix profile the first time

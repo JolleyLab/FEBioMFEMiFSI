@@ -111,6 +111,10 @@ void MFEMGlobalMatrix::CreateProfile(FEModel* pfem, int neq, bool reshape)
    // double *data = m_pA->Values();
    // mfem_K = new mfem::SparseMatrix(I,J,data,neq,neq,false,false,true);
 
+
+
+
+
    mfem_K = new mfem::SparseMatrix(neq);
 }
 

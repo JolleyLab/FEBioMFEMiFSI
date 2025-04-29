@@ -731,18 +731,21 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
          //    mfem::out << "Element stiffness matrix has a NAN!" << std::endl;
          // }
 
+
+
 			// assemble element matrix into global stiffness matrix
          mfem::SparseMatrix& mfemK = *dynamic_cast<MFEMGlobalMatrix*>(&K)->GetMfemMatrix();
-         mfem::DenseMatrix mfem_elmat(vdofs_febio.Size());
-         mfem_elmat = 0.0;
-         for (int i = 0; i < vdofs_febio.Size(); ++i)
-         {
-            for (int j = 0; j < vdofs_febio.Size(); ++j)
-            {
-               mfem_elmat(i,j) = ke(i,j);
-            }
-         }
-         mfemK.AddSubMatrix(vdofs_febio, vdofs_febio, mfem_elmat,0);
+         // mfem::DenseMatrix mfem_elmat(vdofs_febio.Size());
+         // mfem_elmat = 0.0;
+         // for (int i = 0; i < vdofs_febio.Size(); ++i)
+         // {
+         //    for (int j = 0; j < vdofs_febio.Size(); ++j)
+         //    {
+         //       mfem_elmat(i,j) = ke(i,j);
+         //    }
+         // }
+         mfem::DenseMatrix mfem_elmat(*ke, vdofs_febio.Size(), vdofs_febio.Size());
+         mfemK.AddSubMatrix(vdofs_febio, vdofs_febio, mfem_elmat, 0);
 
 			// K.Assemble(ke);
 		}

@@ -43,7 +43,7 @@
 			<solver_type>FGMRES</solver_type>
          <!-- <solver_type>UMFPack</solver_type> -->
 			<lin_atol>1e-10</lin_atol>
-			<lin_rtol>1e-6</lin_rtol>
+			<lin_rtol>1e-06</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
 			<inner_solver_type>Iterative</inner_solver_type>
 			<Ainv_atol>1e-06</Ainv_atol>
