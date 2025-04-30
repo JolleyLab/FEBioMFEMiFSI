@@ -35,6 +35,7 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 	}
 
 	int indices[FEElement::MAX_NODES] = { 0 };
+   int elem_counter = 0;
 	for (int n = 0; n < febioMesh.Domains(); ++n)
 	{
 		FEDomain& dom = febioMesh.Domain(n);
@@ -45,6 +46,10 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 			for (int j = 0; j < el.Nodes(); j++) {
 				indices[j] = el.m_node[j];
 			}
+
+         // Set the FEBio element id for the mfem element
+         newMesh->SetFEBioElementID(elem_counter, el.GetID());
+         elem_counter++;
 
 			switch (el.Shape())
 			{

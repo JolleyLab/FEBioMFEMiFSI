@@ -34,9 +34,21 @@ public:
       return m_domMap[dom];
    }
 
+   void SetFEBioElementID(int mfem_id, int febio_id)
+   {
+      m_mfem_2_febio_elemMap[mfem_id] = febio_id;
+   };
+
+   int GetFEBioElementID(int mfem_id)
+   {
+      if (m_mfem_2_febio_elemMap.find(mfem_id) == m_mfem_2_febio_elemMap.end()) return -1;
+      return m_mfem_2_febio_elemMap[mfem_id];
+   };
+
 private:
 	std::map<FEFacetSet*, int> m_surfMap;
    std::map<FEDomain*, int> m_domMap;
+   std::map<int,int> m_mfem_2_febio_elemMap;
 };
 
 MFEMMesh* CreateMFEMMesh3D(FEMesh& mesh);

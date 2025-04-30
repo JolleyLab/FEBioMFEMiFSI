@@ -256,7 +256,8 @@ void ParFEModel::ParCopyDomain(FEDomain &dom, FEDomain &par_dom, mfem::ParFinite
       // get global febio element id
       // NOTE: febio is 1-based, mfem is 0-based for element numbering
       // global elem id (febio is 1-based, mfem is 0-based)
-      int glob_febio_elem_id = submesh_to_parent_elem_map[glob_submesh_elem_id] + 1;
+      // int glob_febio_elem_id = submesh_to_parent_elem_map[glob_submesh_elem_id] + 1;
+      int glob_febio_elem_id = m_serial_mesh->GetFEBioElementID(submesh_to_parent_elem_map[glob_submesh_elem_id]);
 
       // determine which domain this element belongs to
       MFEMImmersedElasticDomain *immersed_dom = nullptr;
@@ -283,6 +284,7 @@ void ParFEModel::ParCopyDomain(FEDomain &dom, FEDomain &par_dom, mfem::ParFinite
             break;
          }
       }
+      MFEM_ASSERT(el != nullptr, "Error: Could not find element in immersed domain");
 
       // copy the element data to new domain element
       FESolidElement* pel = &dynamic_cast<FESolidDomain*>(&par_dom)->Element(i);

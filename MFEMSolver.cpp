@@ -520,21 +520,25 @@ bool MFEMSolver::Init()
       for (int i = 0; i < femesh.Domains(); ++i)
       {
          FEDomain& dom = femesh.Domain(i);
+         int dom_attr = m.mesh->GetDomainAttribute(&dom);
          if (dom.IsActive() && dynamic_cast<MFEMSolidMaterial*>(dom.GetMaterial()))
          {
-            solid_domain_attr[i] = i+1;
+            // solid_domain_attr[i] = i+1;
+            solid_domain_attr[i] = dom_attr;
             mfem_solid_material = true;
          }
          if (dom.IsActive() && dynamic_cast<FEElasticMaterial*>(dom.GetMaterial()))
          {
-            solid_domain_attr[i] = i+1;
+            // solid_domain_attr[i] = i+1;
+            solid_domain_attr[i] = dom_attr;
             febio_solid_material = true;
          }
          if(dom.IsActive() && dynamic_cast<MFEMNewtonianFluid*>(dom.GetMaterial()))
          {
             Array<int> domain_attr(m.mesh->attributes.Max());
             domain_attr = 0;
-            domain_attr[i] = i+1;
+            // domain_attr[i] = i+1;
+            domain_attr[i] = dom_attr;
             m.fluid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,domain_attr));
             if (m.fluid_mesh == nullptr) return false;
          }

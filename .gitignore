@@ -410,3 +410,5 @@ run_mpi_lldb.sh
 *.DS_Store
 *.log
 results_mfem_solver*/
+*.fs2
+*.fs
