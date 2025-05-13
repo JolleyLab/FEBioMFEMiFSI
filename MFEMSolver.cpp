@@ -27,6 +27,8 @@ using namespace immersed_solid_serial;
 using namespace mat;
 using namespace mfem;
 
+double ComputeVectorH1Error(GridFunction *u_gf, VectorCoefficient *ex_u, MatrixCoefficient *ex_gradu, const IntegrationRule *irs[]);         
+
 #ifndef MFEM_USE_MPI
 // we override this so we can use the FEBio linear solvers
 class FEBio_INS_Solver : public INS_Solver
@@ -169,6 +171,11 @@ public:
    int vol_type = NearlyIncompressibleMaterial::volumetric_energy::ST91;
    // TO DO make vol_type a drop down option with nearly incompressible materials
 
+   // track a node in the solid mesh
+   bool track_node = false;
+   FEParamVec3 m_track_node_pos;
+   FILE *f = nullptr;
+   Vector coord, disp;
 public:
    // Custom stream buffer for writing to the log file
    CustomStreamBuffer customBuffer;
@@ -201,6 +208,8 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.subtract_viscous_stress, "Subtract_viscous_stress");
       ADD_PARAMETER(m.three_field, "Three_field_formulation");
       ADD_PARAMETER(m.stabs_scale, FE_RANGE_NOT_EQUAL(0.0), "VMS_stabilization_scaling");
+      ADD_PARAMETER(m.track_node, "Track_node");
+      ADD_PARAMETER(m.m_track_node_pos, "Track_node_position");
    END_PARAM_GROUP();
 
    // Time Stepping Options
@@ -1047,6 +1056,37 @@ bool MFEMSolver::Init()
 
 	double dt = fem->GetTime().timeIncrement;
 	m.flowsolver->Setup(dt);
+
+   if (m.immersed_solid && m.track_node)
+   {
+      std::string node_filename = fname + "/node_pos.txt";
+      
+      m.coord.SetSize(3);
+      m.coord = 0.0;
+      m.disp.SetSize(3);
+      m.disp = 0.0;
+
+      auto immersed_solidsolver = m.flowsolver->GetImmersedSolid();
+      MFEM_ASSERT(m.m_track_node_pos.isConst(), "Node position must be a constant");
+      vec3d &node_pos = m.m_track_node_pos.constValue();
+      m.coord(0) = node_pos.x;
+      m.coord(1) = node_pos.y;
+      m.coord(2) = node_pos.z;
+
+      immersed_solidsolver->TrackNodalDisplacement(m.coord,m.disp);
+      #ifdef MFEM_USE_MPI
+      if(Mpi::Root()) {
+      #endif
+      m.f = fopen(node_filename.c_str(), "w");
+      fprintf(m.f, "====================================================================================================================================\n");
+      fprintf(m.f, "        Time               Tip Displacement X          Tip Displacement Y          Tip Displacement Z         |Tip Displacement|\n");
+      fprintf(m.f, "%20.16e     %20.16e      %20.16e      %20.16e     %20.16e\n",0.0,m.disp(0),m.disp(1),m.disp(2),m.disp.Norml2());
+      fflush(m.f);
+      fflush(stdout);
+      #ifdef MFEM_USE_MPI
+      }
+      #endif
+   }
    
 	return true;
 }
@@ -1161,11 +1201,180 @@ bool MFEMSolver::SolveStep()
    }
    #endif
 
+   // store data in txt files
+   if (m.immersed_solid && m.track_node)
+   {
+      auto immersed_solidsolver = m.flowsolver->GetImmersedSolid();
+      immersed_solidsolver->TrackNodalDisplacement(m.coord,m.disp);
+
+      #ifdef MFEM_USE_MPI
+      if(Mpi::Root()) {
+      #endif
+         fprintf(m.f, "%20.16e     %20.16e      %20.16e      %20.16e     %20.16e\n",t,m.disp(0),m.disp(1),m.disp(2),m.disp.Norml2());
+         fflush(m.f);
+         fflush(stdout);
+      #ifdef MFEM_USE_MPI
+      }
+      #endif
+   }
+
 	// print out mfem timing data
 	if (timeStep == analysis->m_ntime)
 	{
 		m.flowsolver->PrintTimingData();
+
+      // // print out relative L2 error at final time step
+      // double err_u = 0.0;
+      // double err_p = 0.0;
+
+      // // exact solutions
+      // auto vel_exact = [](const Vector &x, double t, Vector &u) -> void {
+      //    u.SetSize(x.Size());
+      //    u = 0.0;
+      // };
+
+      // auto grad_vel_exact = [](const Vector &x, double t, DenseMatrix &gradu) -> void {
+      //    gradu.SetSize(x.Size());
+      //    gradu = 0.0;
+      // };
+
+      // auto pres_exact = [](const Vector &x, double t) -> double {
+      //    double p_return = 0.0;
+
+      //    // parameters
+      //    double R = 0.25;
+      //    double w = 0.06250;
+      //    double mu = 1.0;
+      //    double len = 1.0;
+
+      //    // compute r
+      //    Vector x_shifted(x.Size());
+      //    x_shifted = x;
+      //    x_shifted(0) -= 0.5;
+      //    x_shifted(1) -= 0.5;
+
+      //    // compute magnitude of vector
+      //    double r = x_shifted.Norml2();
+
+      //    // compute pres
+      //    if (r >= R + w)
+      //    {
+      //       p_return = - M_PI * mu * ( (R + w) * (R + w) - R * R)/(2.0 * len*len);
+      //    }
+      //    else if (r > R && r < (R + w))
+      //    {
+      //       p_return = mu * log((R + w)/r) - M_PI * mu * ( (R + w) * (R + w) - R * R)/(2.0 * len*len);
+      //    }
+      //    else if (r <= R)
+      //    {
+      //       p_return = mu * log(1.0 + w/R) - M_PI * mu * ( (R + w) * (R + w) - R * R)/(2.0 * len*len);
+      //    }
+      //    else
+      //    {
+      //       MFEM_ABORT("Error: r is out of range");
+      //    }
+
+      //    return p_return;
+      // };
+
+      // VectorFunctionCoefficient vel_excoeff(m.flowsolver->GetMesh()->Dimension(), vel_exact);
+      // FunctionCoefficient p_excoeff(pres_exact);
+      // vel_excoeff.SetTime(t);
+      // p_excoeff.SetTime(t);
+      
+      // // compute relative L2 error on finer mesh
+      // int order_err = m.orderv + 3;
+      // const IntegrationRule *irs[Geometry::NumGeom];
+      // for (int i=0; i < Geometry::NumGeom; ++i)
+      // {
+      //    irs[i] = &(IntRules.Get(i, order_err));
+      // }
+      // err_u  = m.u_gf->ComputeL2Error(vel_excoeff, irs);
+      // err_p  = m.p_gf->ComputeL2Error(p_excoeff, irs);
+
+      // // compute velocity h1 norm
+      // MatrixFunctionCoefficient gradu_excoeff(m.flowsolver->GetMesh()->Dimension(),grad_vel_exact);
+
+      // // set time on coefficient
+      // gradu_excoeff.SetTime(t);
+      // double h1_err_u = ComputeVectorH1Error(m.u_gf,&vel_excoeff,&gradu_excoeff,irs);
+
+      // #ifdef MFEM_USE_MPI
+      // if (Mpi::Root())
+      // {
+      //    mfem::out << setprecision(16);
+      //    // absolute h1 error
+      //    // h1 norm for velocity
+      //    mfem::out << "|| u_h - u_ex ||_h1 = " << h1_err_u << "\n";
+
+      //    // absolute L2 error
+      //    mfem::out << "|| u_h - u_ex || = " << err_u << "\n";
+      //    mfem::out << "|| p_h - p_ex || = " << err_p << "\n";  
+      // }
+      // #else
+      // mfem::out << setprecision(16);
+      // // absolute h1 error
+      // // h1 norm for velocity
+      // mfem::out << "|| u_h - u_ex ||_h1 = " << h1_err_u << "\n";
+
+      // // absolute L2 error
+      // mfem::out << "|| u_h - u_ex || = " << err_u << "\n";
+      // mfem::out << "|| p_h - p_ex || = " << err_p << "\n";  
+      // #endif
 	}
 
 	return true;
+}
+
+double ComputeVectorH1Error(mfem::GridFunction *u_gf, mfem::VectorCoefficient *ex_u, mfem::MatrixCoefficient *ex_gradu, const mfem::IntegrationRule *irs[])
+{
+   double error_temp = 0.0;
+   const mfem::FiniteElement *fe;
+   mfem::ElementTransformation *Tr;
+   mfem::DenseMatrix grad;
+   int intorder;
+   int dim = u_gf->FESpace()->GetMesh()->SpaceDimension();
+   mfem::DenseMatrix mat(dim);
+   Vector uvec(dim), vec(dim);
+
+   for (int i = 0; i < u_gf->FESpace()->GetNE(); i++)
+   {
+      fe = u_gf->FESpace()->GetFE(i);
+      Tr = u_gf->FESpace()->GetElementTransformation(i);
+      intorder = 2*fe->GetOrder() + 3; // <--------
+      const mfem::IntegrationRule *ir;
+      if (irs)
+      {
+         ir = irs[fe->GetGeomType()];
+      }
+      else
+      {
+         ir = &(IntRules.Get(fe->GetGeomType(), intorder));
+      }
+      for (int j = 0; j < ir->GetNPoints(); j++)
+      {
+         const mfem::IntegrationPoint &ip = ir->IntPoint(j);
+         Tr->SetIntPoint(&ip);
+         u_gf->GetVectorGradient(*Tr,grad);
+         ex_gradu->Eval(mat,*Tr,ip);
+         mat.Add(-1.0,grad);
+
+         u_gf->GetVectorValue(*Tr,ip,vec);
+         ex_u->Eval(uvec,*Tr,ip);
+         vec -= uvec;
+
+         error_temp += ip.weight * Tr->Weight() * ( mat.FNorm2() + vec*vec);
+      }
+   }
+
+   #ifdef MFEM_USE_MPI
+   // parallelization
+   double glob_error = 0.0;
+   double local_error = abs(error_temp);
+   MPI_Allreduce(&local_error, &glob_error, 1, MPI_DOUBLE, MPI_SUM, dynamic_cast<mfem::ParGridFunction*>(u_gf)->ParFESpace()->GetComm());
+   #else
+   double glob_error = abs(error_temp);
+   #endif
+   
+   return sqrt(glob_error);
 }
