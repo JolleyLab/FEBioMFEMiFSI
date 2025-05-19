@@ -4,6 +4,11 @@
 #include <FECore/FEMesh.h>
 #include <FECore/log.h>
 
+BEGIN_FECORE_CLASS(MFEMSurfaceLoad,FESurfaceLoad)
+   ADD_PARAMETER(m_backflow_stab, "backflow_stab");
+   ADD_PARAMETER(m_beta, "beta");
+END_FECORE_CLASS();
+
 mfem::Mesh* MFEMSurfaceLoad::GetMesh(MFEMSolver* solver)
 {
    if(solver->ImmersedSolid())
@@ -33,6 +38,20 @@ void MFEMSurfaceLoad::CopyFrom(FEModelLoad* pml)
    // SetSurface(surf);
 
    (*this).m_bdr_attr = m_load->m_bdr_attr;
+   (*this).m_backflow_stab = m_load->m_backflow_stab;
+   (*this).m_beta = m_load->m_beta;
+}
+
+void MFEMSurfaceLoad::Apply(MFEMSolver* solver, int attr)
+{
+   if (m_backflow_stab)
+   {
+      mfem::Mesh* mesh = GetMesh(solver);
+      mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
+      load_attr = 0;
+      load_attr[attr] = 1;
+      solver->AddBackflowStabilizationBC(m_beta, load_attr);
+   }
 }
 
 BEGIN_FECORE_CLASS(MFEMNeumannBC, MFEMSurfaceLoad)
@@ -48,6 +67,7 @@ void MFEMNeumannBC::Apply(MFEMSolver* solver, int attr)
 	load_attr = 0;
 	load_attr[attr] = 1;
 	solver->AddTractionBC(new FEVectorCoefficient(GetFEModel(), m_tx, m_ty, m_tz), load_attr);
+   MFEMSurfaceLoad::Apply(solver, attr);
 }
 
 void MFEMNeumannBC::CopyFrom(FEModelLoad* pml)
@@ -71,6 +91,7 @@ void MFEMTractionFreeBC::Apply(MFEMSolver* solver, int attr)
 	load_attr = 0;
 	load_attr[attr] = 1;
 	solver->AddTractionFreeBC(load_attr);
+   MFEMSurfaceLoad::Apply(solver, attr);
 }
 
 void MFEMTractionFreeBC::CopyFrom(FEModelLoad* pml)
@@ -92,6 +113,7 @@ void MFEMPressureBC::Apply(MFEMSolver* solver, int attr)
 	load_attr = 0;
 	load_attr[attr] = 1;
 	solver->AddPressureBC(new FEScalarCoefficient(GetFEModel(), m_p), load_attr);
+   MFEMSurfaceLoad::Apply(solver, attr);
 }
 
 void MFEMPressureBC::CopyFrom(FEModelLoad* pml)
@@ -103,32 +125,32 @@ void MFEMPressureBC::CopyFrom(FEModelLoad* pml)
    (*this).m_p = m_pbc->m_p;
 }
 
-BEGIN_FECORE_CLASS(MFEMBackflowStabilizationBC, MFEMSurfaceLoad)
-	ADD_PARAMETER(m_beta, "beta");
-END_FECORE_CLASS();
+// BEGIN_FECORE_CLASS(MFEMBackflowStabilizationBC, MFEMSurfaceLoad)
+// 	ADD_PARAMETER(m_beta, "beta");
+// END_FECORE_CLASS();
 
-MFEMBackflowStabilizationBC::MFEMBackflowStabilizationBC(FEModel* fem) : MFEMSurfaceLoad(fem)
-{
-   m_beta = 0.2;
-}
+// MFEMBackflowStabilizationBC::MFEMBackflowStabilizationBC(FEModel* fem) : MFEMSurfaceLoad(fem)
+// {
+//    m_beta = 0.2;
+// }
 
-void MFEMBackflowStabilizationBC::Apply(MFEMSolver* solver, int attr)
-{
-	mfem::Mesh* mesh = GetMesh(solver);
-	mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
-	load_attr = 0;
-	load_attr[attr] = 1;
-	solver->AddBackflowStabilizationBC(m_beta, load_attr);
-}
+// void MFEMBackflowStabilizationBC::Apply(MFEMSolver* solver, int attr)
+// {
+// 	mfem::Mesh* mesh = GetMesh(solver);
+// 	mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
+// 	load_attr = 0;
+// 	load_attr[attr] = 1;
+// 	solver->AddBackflowStabilizationBC(m_beta, load_attr);
+// }
 
-void MFEMBackflowStabilizationBC::CopyFrom(FEModelLoad* pml)
-{
-   MFEMSurfaceLoad::CopyFrom(pml);
-   MFEMBackflowStabilizationBC* m_bf = dynamic_cast<MFEMBackflowStabilizationBC*>(pml);
-   MFEM_ASSERT(m_bf, "MFEMBackflowStabilizationBC::CopyFrom failed");
-   CopyParameterListState(m_bf->GetParameterList());
-   (*this).m_beta = m_bf->m_beta;
-}
+// void MFEMBackflowStabilizationBC::CopyFrom(FEModelLoad* pml)
+// {
+//    MFEMSurfaceLoad::CopyFrom(pml);
+//    MFEMBackflowStabilizationBC* m_bf = dynamic_cast<MFEMBackflowStabilizationBC*>(pml);
+//    MFEM_ASSERT(m_bf, "MFEMBackflowStabilizationBC::CopyFrom failed");
+//    CopyParameterListState(m_bf->GetParameterList());
+//    (*this).m_beta = m_bf->m_beta;
+// }
 
 BEGIN_FECORE_CLASS(MFEMResistanceBC, MFEMSurfaceLoad)
 	ADD_PARAMETER(m_R, "R");
@@ -142,6 +164,7 @@ void MFEMResistanceBC::Apply(MFEMSolver* solver, int attr)
 	load_attr = 0;
 	load_attr[attr] = 1;
 	solver->AddResistanceBC(m_R, m_p0, load_attr);
+   MFEMSurfaceLoad::Apply(solver, attr);
 }
 
 void MFEMResistanceBC::CopyFrom(FEModelLoad* pml)
@@ -169,6 +192,7 @@ void MFEMWindkesselBC::Apply(MFEMSolver* solver, int attr)
 	load_attr = 0;
 	load_attr[attr] = 1;
 	solver->AddWindkesselBC(m_R, m_Rd, m_C, m_p0, m_pd, load_attr);
+   MFEMSurfaceLoad::Apply(solver, attr);
 }
 
 void MFEMWindkesselBC::CopyFrom(FEModelLoad* pml)

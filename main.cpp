@@ -112,7 +112,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    REGISTER_FECORE_CLASS(MFEMPeriodicBC, "periodic");
    
    // cardiovascular bcs
-   REGISTER_FECORE_CLASS(MFEMBackflowStabilizationBC, "backflow stabilization");
+   // REGISTER_FECORE_CLASS(MFEMBackflowStabilizationBC, "backflow stabilization");
    REGISTER_FECORE_CLASS(MFEMResistanceBC, "resistance (R)");
    REGISTER_FECORE_CLASS(MFEMWindkesselBC, "windkessel (RCR)");
    REGISTER_FECORE_CLASS(MFEMMappedInflowBC, "mapped inflow");

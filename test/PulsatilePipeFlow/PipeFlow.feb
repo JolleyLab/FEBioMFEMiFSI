@@ -30,7 +30,19 @@
 			<pressure_order>1</pressure_order>
 			<VMS>1</VMS>
 			<Laplace_form>0</Laplace_form>
+			<Zero_mean_pressure>0</Zero_mean_pressure>
+			<Wall_shear_stress>0</Wall_shear_stress>
+			<Vorticity>0</Vorticity>
+			<Q_criterion>0</Q_criterion>
+			<Immersed_solid>0</Immersed_solid>
+			<Solid_solver_type>MFEM</Solid_solver_type>
+			<Subtract_viscous_stress>1</Subtract_viscous_stress>
+			<Three_field_formulation>0</Three_field_formulation>
+			<VMS_stabilization_scaling>1</VMS_stabilization_scaling>
+			<Track_node>0</Track_node>
+			<Track_node_position>0,0,0</Track_node_position>
 			<rho_inf>0.5</rho_inf>
+			<step_save>1</step_save>
 			<atol>1e-06</atol>
 			<rtol>0.001</rtol>
 			<minIt>3</minIt>
@@ -16873,132 +16885,12 @@
 			<tri3 id="116">1570,1580,1605</tri3>
 			<tri3 id="117">1616,1611,1598</tri3>
 		</Surface>
-		<Surface name="BackflowStabilization2">
-			<tri3 id="1">8,9,1563</tri3>
-			<tri3 id="2">22,23,1557</tri3>
-			<tri3 id="3">1529,1557,23</tri3>
-			<tri3 id="4">1527,12,13</tri3>
-			<tri3 id="5">24,1,1562</tri3>
-			<tri3 id="6">1567,5,1548</tri3>
-			<tri3 id="7">1545,1539,1546</tri3>
-			<tri3 id="8">1548,5,6</tri3>
-			<tri3 id="9">1528,1548,6</tri3>
-			<tri3 id="10">1561,10,11</tri3>
-			<tri3 id="11">1548,1546,1555</tri3>
-			<tri3 id="12">3,4,1525</tri3>
-			<tri3 id="13">4,1567,1525</tri3>
-			<tri3 id="14">1522,1532,1531</tri3>
-			<tri3 id="15">1,1556,1562</tri3>
-			<tri3 id="16">1550,7,8</tri3>
-			<tri3 id="17">19,20,1558</tri3>
-			<tri3 id="18">1522,21,22</tri3>
-			<tri3 id="19">1522,22,1557</tri3>
-			<tri3 id="20">1532,1522,1557</tri3>
-			<tri3 id="21">13,14,1552</tri3>
-			<tri3 id="22">1527,13,1552</tri3>
-			<tri3 id="23">1536,1533,1535</tri3>
-			<tri3 id="24">1560,1562,1556</tri3>
-			<tri3 id="25">1534,1547,1543</tri3>
-			<tri3 id="26">17,18,1569</tri3>
-			<tri3 id="27">1554,17,1569</tri3>
-			<tri3 id="28">1556,3,1525</tri3>
-			<tri3 id="29">1546,1548,1528</tri3>
-			<tri3 id="30">15,16,1524</tri3>
-			<tri3 id="31">1551,1553,1538</tri3>
-			<tri3 id="32">1542,1531,1533</tri3>
-			<tri3 id="33">9,10,1523</tri3>
-			<tri3 id="34">9,1523,1563</tri3>
-			<tri3 id="35">1568,1563,1523</tri3>
-			<tri3 id="36">4,5,1567</tri3>
-			<tri3 id="37">1565,1569,1526</tri3>
-			<tri3 id="38">1529,1562,1560</tri3>
-			<tri3 id="39">1564,14,15</tri3>
-			<tri3 id="40">1564,1552,14</tri3>
-			<tri3 id="41">18,19,1526</tri3>
-			<tri3 id="42">1569,18,1526</tri3>
-			<tri3 id="43">19,1558,1526</tri3>
-			<tri3 id="44">23,24,1529</tri3>
-			<tri3 id="45">1550,1568,1545</tri3>
-			<tri3 id="46">1565,1554,1569</tri3>
-			<tri3 id="47">1566,1526,1558</tri3>
-			<tri3 id="48">17,1554,16</tri3>
-			<tri3 id="49">1525,1567,1555</tri3>
-			<tri3 id="50">1561,11,1559</tri3>
-			<tri3 id="51">11,12,1559</tri3>
-			<tri3 id="52">1543,1555,1546</tri3>
-			<tri3 id="53">1544,1549,1541</tri3>
-			<tri3 id="54">1547,1534,1560</tri3>
-			<tri3 id="55">1559,12,1527</tri3>
-			<tri3 id="56">1564,1524,1553</tri3>
-			<tri3 id="57">6,7,1528</tri3>
-			<tri3 id="58">7,1550,1528</tri3>
-			<tri3 id="59">20,21,1530</tri3>
-			<tri3 id="60">1530,1558,20</tri3>
-			<tri3 id="61">21,1522,1530</tri3>
-			<tri3 id="62">1536,1535,1537</tri3>
-			<tri3 id="63">15,1524,1564</tri3>
-			<tri3 id="64">1555,1543,1547</tri3>
-			<tri3 id="65">1529,24,1562</tri3>
-			<tri3 id="66">1545,1546,1528</tri3>
-			<tri3 id="67">1539,1537,1535</tri3>
-			<tri3 id="68">1534,1532,1560</tri3>
-			<tri3 id="69">1540,1538,1553</tri3>
-			<tri3 id="70">1556,1,3</tri3>
-			<tri3 id="71">1543,1535,1534</tri3>
-			<tri3 id="72">1556,1547,1560</tri3>
-			<tri3 id="73">1568,1549,1544</tri3>
-			<tri3 id="74">1565,1566,1542</tri3>
-			<tri3 id="75">1555,1567,1548</tri3>
-			<tri3 id="76">1541,1559,1527</tri3>
-			<tri3 id="77">1565,1526,1566</tri3>
-			<tri3 id="78">1538,1536,1537</tri3>
-			<tri3 id="79">1543,1546,1539</tri3>
-			<tri3 id="80">1551,1541,1527</tri3>
-			<tri3 id="81">1568,1544,1545</tri3>
-			<tri3 id="82">1533,1532,1534</tri3>
-			<tri3 id="83">1552,1553,1551</tri3>
-			<tri3 id="84">1533,1534,1535</tri3>
-			<tri3 id="85">1537,1544,1541</tri3>
-			<tri3 id="86">1549,1561,1559</tri3>
-			<tri3 id="87">1554,1565,1540</tri3>
-			<tri3 id="88">1543,1539,1535</tri3>
-			<tri3 id="89">1545,1544,1539</tri3>
-			<tri3 id="90">1538,1540,1536</tri3>
-			<tri3 id="91">1541,1549,1559</tri3>
-			<tri3 id="92">1530,1566,1558</tri3>
-			<tri3 id="93">1533,1531,1532</tri3>
-			<tri3 id="94">1529,1560,1532</tri3>
-			<tri3 id="95">1531,1530,1522</tri3>
-			<tri3 id="96">1547,1525,1555</tri3>
-			<tri3 id="97">1565,1542,1540</tri3>
-			<tri3 id="98">1541,1551,1538</tri3>
-			<tri3 id="99">1553,1524,1540</tri3>
-			<tri3 id="100">1536,1542,1533</tri3>
-			<tri3 id="101">1554,1540,1524</tri3>
-			<tri3 id="102">1561,1523,10</tri3>
-			<tri3 id="103">1523,1549,1568</tri3>
-			<tri3 id="104">1557,1529,1532</tri3>
-			<tri3 id="105">1553,1552,1564</tri3>
-			<tri3 id="106">1554,1524,16</tri3>
-			<tri3 id="107">1544,1537,1539</tri3>
-			<tri3 id="108">1566,1530,1531</tri3>
-			<tri3 id="109">1563,1550,8</tri3>
-			<tri3 id="110">1551,1527,1552</tri3>
-			<tri3 id="111">1528,1550,1545</tri3>
-			<tri3 id="112">1537,1541,1538</tri3>
-			<tri3 id="113">1568,1550,1563</tri3>
-			<tri3 id="114">1540,1542,1536</tri3>
-			<tri3 id="115">1531,1542,1566</tri3>
-			<tri3 id="116">1556,1525,1547</tri3>
-			<tri3 id="117">1561,1549,1523</tri3>
-		</Surface>
 	</Mesh>
 	<MeshDomains>
 		<SolidDomain name="Part1" mat="Material1"/>
 	</MeshDomains>
 	<Boundary>
-		<bc name="NoSlip1" surface="NoSlip1" type="no slip">
-		</bc>
+		<bc name="NoSlip1" surface="NoSlip1" type="no slip"/>
 		<bc name="PrescribedVelocity2" surface="PrescribedVelocity2" type="prescribed velocity">
 			<vx>0</vx>
 			<vy>0</vy>
@@ -17007,18 +16899,13 @@
 	</Boundary>
 	<Loads>
 		<surface_load name="Windkessel(RCR)1" surface="Windkessel(RCR)1" type="windkessel (RCR)">
+			<backflow_stab>1</backflow_stab>
+			<beta>0.2</beta>
 			<R>0.1</R>
 			<Rd>1</Rd>
 			<C>0.07957747</C>
 			<p_0>0</p_0>
 			<p_d>0</p_d>
-		</surface_load>
-      <!-- <surface_load name="Resistance(R)1" surface="Windkessel(RCR)1" type="resistance (R)">
-			<R>0.1</R>
-			<p_0>0</p_0>
-		</surface_load> -->
-		<surface_load name="BackflowStabilization2" surface="BackflowStabilization2" type="backflow stabilization">
-			<beta>0.2</beta>
 		</surface_load>
 	</Loads>
 	<Output>

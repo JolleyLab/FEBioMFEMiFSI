@@ -15,12 +15,15 @@ namespace mfem
 class MFEMSurfaceLoad : public FESurfaceLoad
 {
 public:
-   MFEMSurfaceLoad(FEModel* fem) : FESurfaceLoad(fem) {}
+   MFEMSurfaceLoad(FEModel* fem) : FESurfaceLoad(fem), m_backflow_stab(false) 
+   {
+      m_beta = 0.2;
+   };
 
    // Get the mesh
    mfem::Mesh* GetMesh(MFEMSolver* solver);
 
-	virtual void Apply(MFEMSolver* solver, int attr) = 0;
+	virtual void Apply(MFEMSolver* solver, int attr);
 
    virtual void CopyFrom(FEModelLoad* pml);
 
@@ -30,6 +33,10 @@ public:
 
 private:
    int m_bdr_attr; // bdr attribute ID for the boundary condition
+   bool m_backflow_stab; // flag for backflow stabilization
+	FEParamDouble m_beta;
+
+   DECLARE_FECORE_CLASS();
 };
 
 class MFEMBodyLoad : public FEBodyLoad
@@ -121,21 +128,21 @@ private:
 	DECLARE_FECORE_CLASS();
 };
 
-class MFEMBackflowStabilizationBC : public MFEMSurfaceLoad
-{
-public:
-	MFEMBackflowStabilizationBC(FEModel* fem);
+// class MFEMBackflowStabilizationBC : public MFEMSurfaceLoad
+// {
+// public:
+// 	MFEMBackflowStabilizationBC(FEModel* fem);
 
-	void Apply(MFEMSolver* solver, int attr) override;
+// 	void Apply(MFEMSolver* solver, int attr) override;
 
-   void CopyFrom(FEModelLoad* pml) override;
+//    void CopyFrom(FEModelLoad* pml) override;
 
-private:
-   // assumes constant beta
-	FEParamDouble m_beta;
+// private:
+//    // assumes constant beta
+// 	FEParamDouble m_beta;
 
-	DECLARE_FECORE_CLASS();
-};
+// 	DECLARE_FECORE_CLASS();
+// };
 
 class MFEMResistanceBC : public MFEMSurfaceLoad
 {
