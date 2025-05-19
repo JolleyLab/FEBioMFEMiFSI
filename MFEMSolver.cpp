@@ -1065,6 +1065,7 @@ bool MFEMSolver::Init()
    }
    if (m.wss)
    {
+      m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
       m.wss_gf = m.flowsolver->GetCurrentWSS();
       m.pvdc->RegisterField("WSS", m.wss_gf);
    }
@@ -1154,7 +1155,7 @@ bool MFEMSolver::SolveStep()
    if ((timeStep) % m.step_save == 0)
    {
       if (m.wss) m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
-      if (m.vorticity) m.flowsolver->ComputeCurl3D(*m.u_gf, *m.flowsolver->GetCurrentWSS());
+      if (m.vorticity) m.flowsolver->ComputeCurl3D(*m.u_gf, m.vorticity_gf);
       if (m.q_criterion) ComputeQCriterion(*m.u_gf, m.q_criterion_gf);
 
       m.pvdc->SetCycle(timeStep);
