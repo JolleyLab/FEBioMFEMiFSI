@@ -219,6 +219,9 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       // ADD_PARAMETER(m.stabilized_LSIC, "LSIC");
       ADD_PARAMETER(m.LaplaceForm, "Laplace_form");
       ADD_PARAMETER(m.zero_mean_pressure, "Zero_mean_pressure");
+      ADD_PARAMETER(m.wss, "Wall_shear_stress");
+      ADD_PARAMETER(m.vorticity, "Vorticity");
+      ADD_PARAMETER(m.q_criterion, "Q_criterion");
    END_PARAM_GROUP();
 
    // Immersed Solid Options
