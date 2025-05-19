@@ -27,7 +27,14 @@ using namespace immersed_solid_serial;
 using namespace mat;
 using namespace mfem;
 
-double ComputeVectorH1Error(GridFunction *u_gf, VectorCoefficient *ex_u, MatrixCoefficient *ex_gradu, const IntegrationRule *irs[]);         
+// additional functions
+double ComputeVectorH1Error(GridFunction *u_gf, VectorCoefficient *ex_u, MatrixCoefficient *ex_gradu, const IntegrationRule *irs[]);   
+void ComputeQCriterion(GridFunction &u_gf, GridFunction &q_gf);    
+template<typename T>
+T sq(T x)
+{
+   return x * x;
+};  
 
 #ifndef MFEM_USE_MPI
 // we override this so we can use the FEBio linear solvers
@@ -88,6 +95,19 @@ public:
 	ParaViewDataCollection* pvdc = nullptr; // paraview data collection
    #ifdef MFEM_USE_MPI
    ParMesh* fluid_pmesh = nullptr;
+   #endif
+   //additional output options
+   bool wss = false;
+   bool vorticity = false;
+   bool q_criterion = false;
+   #ifdef MFEM_USE_MPI
+   ParGridFunction* wss_gf = nullptr; // wall shear stress grid function
+   ParGridFunction vorticity_gf; // vorticity grid function
+   ParGridFunction q_criterion_gf; // Q-criterion grid function
+   #else
+   GridFunction* wss_gf = nullptr; // wall shear stress grid function
+   GridFunction vorticity_gf; // vorticity grid function
+   GridFunction q_criterion_gf; // Q-criterion grid function
    #endif
 
    // immersed solid
@@ -1040,7 +1060,21 @@ bool MFEMSolver::Init()
          m.pvdc->RegisterField("Indicator", s_gf);
       }      
    }
-   // TODO: add more outputs (curlv, wss, others)
+   if (m.wss)
+   {
+      m.wss_gf = m.flowsolver->GetCurrentWSS();
+      m.pvdc->RegisterField("WSS", m.wss_gf);
+   }
+   if (m.vorticity)
+   {
+      m.vorticity_gf.SetSpace(m.u_gf->FESpace());
+      m.pvdc->RegisterField("Vorticity", &m.vorticity_gf);
+   }
+   if (m.q_criterion)
+   {
+      m.q_criterion_gf.SetSpace(m.u_gf->FESpace());
+      m.pvdc->RegisterField("Q-Criterion", &m.q_criterion_gf);
+   }
 	m.pvdc->Save();
 
    if (m.immersed_solid)
@@ -1116,6 +1150,10 @@ bool MFEMSolver::SolveStep()
 	// save data
    if ((timeStep) % m.step_save == 0)
    {
+      if (m.wss) m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
+      if (m.vorticity) m.flowsolver->ComputeCurl3D(*m.u_gf, *m.flowsolver->GetCurrentWSS());
+      if (m.q_criterion) ComputeQCriterion(*m.u_gf, m.q_criterion_gf);
+
       m.pvdc->SetCycle(timeStep);
       m.pvdc->SetTime(t);
       m.pvdc->Save();
@@ -1384,4 +1422,96 @@ double ComputeVectorH1Error(mfem::GridFunction *u_gf, mfem::VectorCoefficient *e
    #endif
    
    return sqrt(glob_error);
+}
+
+// Computes Q = 0.5*(tr(\nabla u)^2 - tr(\nabla u \cdot \nabla u))
+void ComputeQCriterion(GridFunction &u_gf, GridFunction &q_gf)
+{
+   FiniteElementSpace *v_fes = u_gf.FESpace();
+   FiniteElementSpace *fes = q_gf.FESpace();
+
+   // AccumulateAndCountZones
+   Array<int> zones_per_vdof;
+   zones_per_vdof.SetSize(fes->GetVSize());
+   zones_per_vdof = 0;
+
+   q_gf = 0.0;
+
+   // Local interpolation
+   int elndofs;
+   Array<int> v_dofs, dofs;
+   Vector vals;
+   Vector loc_data;
+   int vdim = v_fes->GetVDim();
+   DenseMatrix grad_hat;
+   DenseMatrix dshape;
+   DenseMatrix grad;
+
+   for (int e = 0; e < fes->GetNE(); ++e)
+   {
+      fes->GetElementVDofs(e, dofs);
+      v_fes->GetElementVDofs(e, v_dofs);
+      u_gf.GetSubVector(v_dofs, loc_data);
+      vals.SetSize(dofs.Size());
+      ElementTransformation *tr = fes->GetElementTransformation(e);
+      const FiniteElement *el = fes->GetFE(e);
+      elndofs = el->GetDof();
+      int dim = el->GetDim();
+      dshape.SetSize(elndofs, dim);
+
+      for (int dof = 0; dof < elndofs; ++dof)
+      {
+         // Project
+         const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+         tr->SetIntPoint(&ip);
+
+         // Eval
+         // GetVectorGradientHat
+         el->CalcDShape(tr->GetIntPoint(), dshape);
+         grad_hat.SetSize(vdim, dim);
+         DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
+         MultAtB(loc_data_mat, dshape, grad_hat);
+
+         const DenseMatrix &Jinv = tr->InverseJacobian();
+         grad.SetSize(grad_hat.Height(), Jinv.Width());
+         Mult(grad_hat, Jinv, grad);
+
+         double q_val = 0.5 * (sq(grad(0, 0)) + sq(grad(1, 1)) + sq(grad(2, 2)))
+                        + grad(0, 1) * grad(1, 0) + grad(0, 2) * grad(2, 0)
+                        + grad(1, 2) * grad(2, 1);
+
+         vals(dof) = q_val;
+      }
+
+      // Accumulate values in all dofs, count the zones.
+      for (int j = 0; j < dofs.Size(); j++)
+      {
+         int ldof = dofs[j];
+         q_gf(ldof) += vals[j];
+         zones_per_vdof[ldof]++;
+      }
+   }
+
+   #ifdef MFEM_USE_MPI
+   // Communication
+
+   // Count the zones globally.
+   mfem::GroupCommunicator &gcomm = dynamic_cast<ParGridFunction*>(&q_gf)->ParFESpace()->GroupComm();
+   gcomm.Reduce<int>(zones_per_vdof, mfem::GroupCommunicator::Sum);
+   gcomm.Bcast(zones_per_vdof);
+
+   // Accumulate for all vdofs.
+   gcomm.Reduce<double>(q_gf.GetData(), mfem::GroupCommunicator::Sum);
+   gcomm.Bcast<double>(q_gf.GetData());
+
+   // Compute means
+   for (int i = 0; i < q_gf.Size(); i++)
+   {
+      const int nz = zones_per_vdof[i];
+      if (nz)
+      {
+         q_gf(i) /= nz;
+      }
+   }
+   #endif
 }
