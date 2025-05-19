@@ -482,6 +482,13 @@ void MFEMSolver::AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDoubl
    m.flowsolver->AddWindkesselBC(attr,R_val,Rd_val,C_val,p0_val,pd_val,Q0);
 }
 
+void MFEMSolver::AddMappedInflowBC_FromFile(std::string flowfile, bool periodic, mfem::Array<int>& attr)
+{
+   auto fluid_serial_mesh = m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh);
+   // TODO: setup different assumed normal velocity profiles, for now 0 = parabolic, interp type 1 = SPLINE
+   m.flowsolver->AddMappedInflowBC_FromFile(0,fluid_serial_mesh,flowfile,false,attr,1,periodic);
+}
+
 void MFEMSolver::AddBodyForce(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr)
 {
    m.flowsolver->AddBodyForce(coeff, attr);

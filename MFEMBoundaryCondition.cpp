@@ -122,3 +122,27 @@ void MFEMPeriodicBC::CopyFrom(FEBoundaryCondition* pbc)
    MFEM_ASSERT(m_periodic, "MFEMPeriodicBC::CopyFrom failed");
    CopyParameterListState(m_periodic->GetParameterList());
 }
+
+BEGIN_FECORE_CLASS(MFEMMappedInflowBC, MFEMBoundaryCondition)
+	ADD_PARAMETER(m_flowfile, "file_name");
+	ADD_PARAMETER(m_periodic, "periodic");
+END_FECORE_CLASS();
+
+void MFEMMappedInflowBC::Apply(MFEMSolver* solver, int attr)
+{
+	mfem::Mesh* mesh = GetMesh(solver);
+	mfem::Array<int> vel_bc_attr(mesh->bdr_attributes.Max());
+	vel_bc_attr = 0;
+	vel_bc_attr[attr] = 1;
+   solver->AddMappedInflowBC_FromFile(m_flowfile,m_periodic,vel_bc_attr);
+}
+
+void MFEMMappedInflowBC::CopyFrom(FEBoundaryCondition* pbc)
+{
+   MFEMBoundaryCondition::CopyFrom(pbc);
+   MFEMMappedInflowBC* m_vbc = dynamic_cast<MFEMMappedInflowBC*>(pbc);
+   MFEM_ASSERT(m_vbc, "MFEMMappedInflowBC::CopyFrom failed");
+   CopyParameterListState(m_vbc->GetParameterList());
+   (*this).m_flowfile = m_vbc->m_flowfile;
+   (*this).m_periodic = m_vbc->m_periodic;
+}

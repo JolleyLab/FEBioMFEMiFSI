@@ -94,3 +94,19 @@ private:
 
 	DECLARE_FECORE_CLASS();
 };
+
+class MFEMMappedInflowBC : public MFEMBoundaryCondition
+{
+public:
+	MFEMMappedInflowBC(FEModel* fem) : MFEMBoundaryCondition(fem) {};
+
+	void Apply(MFEMSolver* solver, int attr) override;
+
+   void CopyFrom(FEBoundaryCondition* pbc) override;
+
+private:
+   std::string m_flowfile;
+   bool m_periodic;
+
+	DECLARE_FECORE_CLASS();
+};
