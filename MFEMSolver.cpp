@@ -1143,7 +1143,7 @@ bool MFEMSolver::Init()
 
    if (m.immersed_solid && m.output_avg_velocity)
    {
-      std::string avg_velo_filename = fname + "/avg_velocity.txt";
+      std::string avg_velo_filename = fname + "/avg_solid_velocity.txt";
       m.avg_velo.SetSize(3);
       m.avg_velo = 0.0;
 
