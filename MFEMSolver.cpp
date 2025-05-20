@@ -30,6 +30,7 @@ using namespace mfem;
 // additional functions
 double ComputeVectorH1Error(GridFunction *u_gf, VectorCoefficient *ex_u, MatrixCoefficient *ex_gradu, const IntegrationRule *irs[]);   
 void ComputeQCriterion(GridFunction &u_gf, GridFunction &q_gf);    
+void ComputeAverageVelocity(int form_type, GridFunction &u_gf, GridFunction &v_gf, Vector &avg_velo, double &volume);
 template<typename T>
 T sq(T x)
 {
@@ -196,6 +197,12 @@ public:
    FEParamVec3 m_track_node_pos;
    FILE *f = nullptr;
    Vector coord, disp;
+
+   // output avg velocity of immersed solid
+   bool output_avg_velocity = false;
+   FILE *avg_velo_file = nullptr;
+   Vector avg_velo;
+   double volume = 0.0;
 public:
    // Custom stream buffer for writing to the log file
    CustomStreamBuffer customBuffer;
@@ -230,6 +237,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.stabs_scale, FE_RANGE_NOT_EQUAL(0.0), "VMS_stabilization_scaling");
       ADD_PARAMETER(m.track_node, "Track_node");
       ADD_PARAMETER(m.m_track_node_pos, "Track_node_position");
+      ADD_PARAMETER(m.output_avg_velocity, "Output_avg_velocity");
    END_PARAM_GROUP();
 
    // Time Stepping Options
@@ -1132,6 +1140,27 @@ bool MFEMSolver::Init()
       }
       #endif
    }
+
+   if (m.immersed_solid && m.output_avg_velocity)
+   {
+      std::string avg_velo_filename = fname + "/avg_velocity.txt";
+      m.avg_velo.SetSize(3);
+      m.avg_velo = 0.0;
+
+      ComputeAverageVelocity(m.form_type,*m.d_gf,*m.vib_gf,m.avg_velo,m.volume);
+
+      #ifdef MFEM_USE_MPI
+      if(Mpi::Root()) {
+      #endif
+      m.avg_velo_file = fopen(avg_velo_filename.c_str(), "w");
+      fprintf(m.avg_velo_file, "        Time                  Average Velocity X         Average Velocity Y         Average Velocity Z               Volume\n");
+      fprintf(m.avg_velo_file, "%20.16e     %20.16e     %20.16e     %20.16e     %20.16e\n",0.0,m.avg_velo(0),m.avg_velo(1),m.avg_velo(2),m.volume);  
+      fflush(m.avg_velo_file);
+      fflush(stdout);
+      #ifdef MFEM_USE_MPI
+      }
+      #endif
+   }
    
 	return true;
 }
@@ -1261,6 +1290,20 @@ bool MFEMSolver::SolveStep()
       #endif
          fprintf(m.f, "%20.16e     %20.16e      %20.16e      %20.16e     %20.16e\n",t,m.disp(0),m.disp(1),m.disp(2),m.disp.Norml2());
          fflush(m.f);
+         fflush(stdout);
+      #ifdef MFEM_USE_MPI
+      }
+      #endif
+   }
+   if (m.immersed_solid && m.output_avg_velocity)
+   {
+      ComputeAverageVelocity(m.form_type,*m.d_gf,*m.vib_gf,m.avg_velo,m.volume);
+
+      #ifdef MFEM_USE_MPI
+      if(Mpi::Root()) {
+      #endif
+         fprintf(m.avg_velo_file, "%20.16e     %20.16e     %20.16e     %20.16e     %20.16e\n",t,m.avg_velo(0),m.avg_velo(1),m.avg_velo(2),m.volume);  
+         fflush(m.avg_velo_file);
          fflush(stdout);
       #ifdef MFEM_USE_MPI
       }
@@ -1518,4 +1561,94 @@ void ComputeQCriterion(GridFunction &u_gf, GridFunction &q_gf)
       }
    }
    #endif
+}
+
+void ComputeAverageVelocity(int form_type, GridFunction &u_gf, GridFunction &v_gf, Vector &avg_velo, double &volume)
+{
+   const FiniteElement *fe;
+   ElementTransformation *Tr;
+   DenseMatrix gradu,F,I;
+   int intorder;
+   int dim = v_gf.FESpace()->GetMesh()->SpaceDimension();   
+   gradu.SetSize(dim);
+   gradu = 0.0;
+   F.SetSize(dim);
+   F = 0.0;
+   I.Diag(1.0,dim);
+   double J = 0.0;
+   double vx = 0.0;
+   double vy = 0.0;
+   double vz = 0.0;
+   double volume_integral = 0.0;
+   Vector v(dim);
+
+   for (int i = 0; i < v_gf.FESpace()->GetNE(); i++)
+   {
+      fe = v_gf.FESpace()->GetFE(i);
+      Tr = v_gf.FESpace()->GetElementTransformation(i);
+      intorder = 2*fe->GetOrder() + 3; // <--------
+      const IntegrationRule *ir;
+      ir = &(IntRules.Get(fe->GetGeomType(), intorder));
+      for (int j = 0; j < ir->GetNPoints(); j++)
+      {
+         const IntegrationPoint &ip = ir->IntPoint(j);
+         Tr->SetIntPoint(&ip);
+
+         if (form_type == ImmersedSolid::form_type::TotalLagrangian)
+         {
+            // Compute J
+            u_gf.GetVectorGradient(*Tr,gradu);
+            Add(1.0,gradu,1.0,I,F);
+            J = F.Det();
+
+            // Compute v
+            v_gf.GetVectorValue(*Tr,ip,v);
+
+            // v integral
+            vx += ip.weight * Tr->Weight() * v(0) * J;
+            vy += ip.weight * Tr->Weight() * v(1) * J;
+            if (dim == 3) vz += ip.weight * Tr->Weight() * v(2) * J;
+
+            // volume integral
+            volume_integral += ip.weight * Tr->Weight() * J;
+         }
+         else
+         {
+            // Compute v
+            v_gf.GetVectorValue(*Tr,ip,v);
+
+            // v integral
+            vx += ip.weight * Tr->Weight() * v(0);
+            vy += ip.weight * Tr->Weight() * v(1);
+            if (dim == 3) vz += ip.weight * Tr->Weight() * v(2);
+
+            // volume integral
+            volume_integral += ip.weight * Tr->Weight();
+         }      
+      }
+   }
+
+   #ifdef MFEM_USE_MPI
+   // parallelization
+   double glob_vx = 0.0;
+   double glob_vy = 0.0;
+   double glob_vz = 0.0;
+   double glob_volume = 0.0;
+   MPI_Allreduce(&vx, &glob_vx, 1, MPITypeMap<real_t>::mpi_type, MPI_SUM, dynamic_cast<ParGridFunction*>(&u_gf)->ParFESpace()->GetComm());
+   MPI_Allreduce(&vy, &glob_vy, 1, MPITypeMap<real_t>::mpi_type, MPI_SUM, dynamic_cast<ParGridFunction*>(&u_gf)->ParFESpace()->GetComm());
+   if (dim == 3) MPI_Allreduce(&vz, &glob_vz, 1, MPITypeMap<real_t>::mpi_type, MPI_SUM, dynamic_cast<ParGridFunction*>(&u_gf)->ParFESpace()->GetComm());
+   MPI_Allreduce(&volume_integral, &glob_volume, 1, MPITypeMap<real_t>::mpi_type, MPI_SUM, dynamic_cast<ParGridFunction*>(&u_gf)->ParFESpace()->GetComm());
+   #else
+   double glob_vx = vx;
+   double glob_vy = vy;
+   double glob_vz = vz;
+   double glob_volume = volume_integral;
+   #endif
+
+   avg_velo.SetSize(dim);
+   avg_velo(0) = glob_vx / glob_volume;
+   avg_velo(1) = glob_vy / glob_volume;
+   if (dim == 3) avg_velo(2) = glob_vz / glob_volume;
+
+   volume = glob_volume;
 }
