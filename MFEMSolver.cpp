@@ -121,7 +121,7 @@ public:
    GridFunction *vib_gf = nullptr; // immersed solid velocity grid function
    #endif
    ParaViewDataCollection *sdc = nullptr; // immersed solid paraview data collection
-   int solidsolvertype = 0; // 0 = MFEM, 1 = FEBio (default is MFEM)
+   int solidsolvertype = 1; // 0 = MFEM, 1 = FEBio (default is MFEM)
    ImmersedFEBioSolid *immersed_febio_solid = nullptr; // not owned
    bool three_field = false; // flag for 3-field formulation
    #ifdef MFEM_USE_MPI
@@ -151,6 +151,9 @@ public:
    // Time Stepping Options
    double rhoinf = 0.5;
    int step_save = 1; // frequency of storing data
+   int steady_state_step_save = 1; // frequency of storing data after steady state
+   double steady_state_time = 0.0;
+   bool steady_state_save = false;
 
    // Nonlinear Solver Options
    int minIt = 3;
@@ -244,6 +247,9 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
    BEGIN_PARAM_GROUP("Time Stepping");
       ADD_PARAMETER(m.rhoinf, FE_RANGE_CLOSED(0.0,1.0), "rho_inf");
       ADD_PARAMETER(m.step_save, FE_RANGE_GREATER_OR_EQUAL(1), "step_save");
+      ADD_PARAMETER(m.steady_state_save, "steady_state_save");
+      ADD_PARAMETER(m.steady_state_step_save, FE_RANGE_GREATER_OR_EQUAL(1), "steady_state_step_save");
+      ADD_PARAMETER(m.steady_state_time, FE_RANGE_GREATER_OR_EQUAL(0.0), "steady_state_time");
       ADD_PARAMETER(m.wss, "Save_Wall_Shear_Stress");
       ADD_PARAMETER(m.vorticity, "Save_Vorticity");
       ADD_PARAMETER(m.q_criterion, "Save_Q_Criterion");
@@ -1097,7 +1103,7 @@ bool MFEMSolver::Init()
       #else
       m.sdc = new ParaViewDataCollection(solid_filename, m.solid_mesh);  
       #endif
-      m.sdc->SetDataFormat(VTKFormat::BINARY);
+      m.sdc->SetDataFormat(VTKFormat::BINARY32);
       m.sdc->SetHighOrderOutput(true);
       m.sdc->SetLevelsOfDetail(m.orderd);
       m.sdc->RegisterField("Displacement", m.d_gf);
@@ -1181,7 +1187,12 @@ bool MFEMSolver::SolveStep()
 	m.flowsolver->Step(t, dt, timeStep);
    
 	// save data
-   if ((timeStep) % m.step_save == 0)
+   int curr_step_save = m.step_save;
+   if (m.steady_state_save && t >= m.steady_state_time)
+   {
+      curr_step_save = m.steady_state_step_save;
+   }   
+   if ((timeStep) % curr_step_save == 0)
    {
       if (m.wss) m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
       if (m.vorticity) m.flowsolver->ComputeCurl3D(*m.u_gf, m.vorticity_gf);

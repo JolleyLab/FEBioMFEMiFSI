@@ -1,6 +1,10 @@
 #include <FECore/sdk.h>
 #include <FECore/FEModule.h>
 #include <FECore/FEModel.h>
+#include <FEBioMech/FEIncompNeoHookean.h>
+#include <FEBioMech/FENeoHookean.h>
+#include <FEBioMech/FEStVenantKirchhoff.h>
+
 #include "MFEMAnalysis.h"
 #include "MFEMDomain.h"
 #include "MFEMSolver.h"
@@ -132,6 +136,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    REGISTER_FECORE_CLASS(FEAnnularDisk, "annular disk");
    REGISTER_FECORE_CLASS(FEIncompNeoHookean, "incompressible neo-hookean");
    REGISTER_FECORE_CLASS(FENeoHookean, "neo-hookean");
+   REGISTER_FECORE_CLASS(FEStVenantKirchhoff, "st. venant-kirchhoff");
 
    // plot variables
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");
