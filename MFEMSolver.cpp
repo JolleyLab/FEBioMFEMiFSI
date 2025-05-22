@@ -149,6 +149,7 @@ public:
    bool zero_mean_pressure = false;
 
    // Time Stepping Options
+   int ts_method = ins_solver::TimeSteppingMethod::GeneralizedAlpha;
    double rhoinf = 0.5;
    int step_save = 1; // frequency of storing data
    int steady_state_step_save = 1; // frequency of storing data after steady state
@@ -245,6 +246,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
 
    // Time Stepping Options
    BEGIN_PARAM_GROUP("Time Stepping");
+      ADD_PARAMETER(m.ts_method, "time_stepping_method")->setEnums("GenAlpha\0BackwardEuler\0");
       ADD_PARAMETER(m.rhoinf, FE_RANGE_CLOSED(0.0,1.0), "rho_inf");
       ADD_PARAMETER(m.step_save, FE_RANGE_GREATER_OR_EQUAL(1), "step_save");
       ADD_PARAMETER(m.steady_state_save, "steady_state_save");
@@ -275,6 +277,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
    // Preconditioner Options
    BEGIN_PARAM_GROUP("Preconditioner");
       // set preconditioner drop down menu, for now SIMPLE
+      ADD_PARAMETER(m.prec_type, "prec_type")->setEnums("SIMPLE\0SCR\0");
       ADD_PARAMETER(m.prec_inner_solver_type, "inner_solver_type")->setEnums("Iterative\0Direct\0");
       ADD_PARAMETER(m.prec_Ainv_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_atol");
       ADD_PARAMETER(m.prec_Ainv_rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_rtol");
@@ -688,6 +691,8 @@ bool MFEMSolver::Init()
       #endif
    }
    
+   // Time stepping method
+   m.flowsolver->SetTimeSteppingMethod(m.ts_method);
 	// set rho_inf for time stepping method
 	m.flowsolver->SetRhoInf(m.rhoinf);
 
