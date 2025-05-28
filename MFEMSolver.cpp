@@ -1143,7 +1143,7 @@ bool MFEMSolver::Init()
       #endif
       m.f = fopen(node_filename.c_str(), "w");
       fprintf(m.f, "====================================================================================================================================\n");
-      fprintf(m.f, "        Time               Tip Displacement X          Tip Displacement Y          Tip Displacement Z         |Tip Displacement|\n");
+      fprintf(m.f, "        Time              Node Displacement X         Node Displacement Y         Node Displacement Z        |Node Displacement|\n");
       fprintf(m.f, "%20.16e     %20.16e      %20.16e      %20.16e     %20.16e\n",0.0,m.disp(0),m.disp(1),m.disp(2),m.disp.Norml2());
       fflush(m.f);
       fflush(stdout);
