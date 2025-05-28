@@ -159,13 +159,13 @@ public:
    // Nonlinear Solver Options
    int minIt = 3;
    int maxIt = 10;
-   double atol = 1.0e-6;
+   double atol = 1.0e-10;
    double rtol = 1.0e-3;
 
    // Linear Solver Options
    // int lin_minIt;
    int lin_maxIt = 200;
-   double lin_atol = 1.0e-6;
+   double lin_atol = 1.0e-10;
    double lin_rtol = 1.0e-3;
    bool direct_solver = false;
    // PARDISO = OpenMP (serial code only), CPARDISO = MPI (parallel code only)
@@ -177,9 +177,9 @@ public:
    enum PrecInnerSolverType {Iterative = 0, Direct = 1}; // direct using UMFPACK
    int prec_inner_solver_type = PrecInnerSolverType::Iterative;
    bool direct_solver_prec = false;
-   double prec_Ainv_atol = 1.0e-6;
+   double prec_Ainv_atol = 1.0e-10;
    double prec_Ainv_rtol = 1.0e-3;
-   double prec_Sinv_atol = 1.0e-6;
+   double prec_Sinv_atol = 1.0e-10;
    double prec_Sinv_rtol = 1.0e-3;
 
    // immersed solid
