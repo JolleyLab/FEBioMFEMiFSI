@@ -170,7 +170,7 @@ public:
    bool direct_solver = false;
    // PARDISO = OpenMP (serial code only), CPARDISO = MPI (parallel code only)
    enum LinearSolverType { UMFPACK = 0, PARDISO = 1, FGMRES = 2, CPARDISO = 3 }; 
-   int linsolvertype = LinearSolverType::UMFPACK;
+   int linsolvertype = LinearSolverType::FGMRES;
 
    // Preconditioner Options
    int prec_type = ins_solver::PreconditionerType::SIMPLE;
