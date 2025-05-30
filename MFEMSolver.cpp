@@ -128,6 +128,9 @@ public:
    ParMesh* solid_pmesh = nullptr;
    #endif
 
+   // Output
+   mfem::VTKFormat output_format = mfem::VTKFormat::BINARY32; // ASCII, BINARY, or BINARY32
+
 public:
    // Material properties
    double fluid_density;
@@ -173,7 +176,7 @@ public:
    int linsolvertype = LinearSolverType::FGMRES;
 
    // Preconditioner Options
-   int prec_type = ins_solver::PreconditionerType::SIMPLE;
+   int prec_type = ins_solver::PreconditionerType::SIMPLE; // enum PreconditionerType {SIMPLE = 0, SCR = 1, aSCR = 2, ILU = 3};
    enum PrecInnerSolverType {Iterative = 0, Direct = 1}; // direct using UMFPACK
    int prec_inner_solver_type = PrecInnerSolverType::Iterative;
    bool direct_solver_prec = false;
@@ -276,8 +279,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
 
    // Preconditioner Options
    BEGIN_PARAM_GROUP("Preconditioner");
-      // set preconditioner drop down menu, for now SIMPLE
-      ADD_PARAMETER(m.prec_type, "prec_type")->setEnums("SIMPLE\0SCR\0");
+      ADD_PARAMETER(m.prec_type, "prec_type")->setEnums("SIMPLE\0SCR\0aSCR\0ILU\0");
       ADD_PARAMETER(m.prec_inner_solver_type, "inner_solver_type")->setEnums("Iterative\0Direct\0");
       ADD_PARAMETER(m.prec_Ainv_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_atol");
       ADD_PARAMETER(m.prec_Ainv_rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_rtol");
@@ -1063,7 +1065,7 @@ bool MFEMSolver::Init()
       m.pvdc = new ParaViewDataCollection(fname, m.mesh);
       #endif      
    }	
-	m.pvdc->SetDataFormat(VTKFormat::BINARY32);
+	m.pvdc->SetDataFormat(m.output_format);
 	m.pvdc->SetHighOrderOutput(true);
 	m.pvdc->SetLevelsOfDetail(m.orderv);
 	m.pvdc->SetCycle(0);
@@ -1108,7 +1110,7 @@ bool MFEMSolver::Init()
       #else
       m.sdc = new ParaViewDataCollection(solid_filename, m.solid_mesh);  
       #endif
-      m.sdc->SetDataFormat(VTKFormat::BINARY32);
+      m.sdc->SetDataFormat(m.output_format);
       m.sdc->SetHighOrderOutput(true);
       m.sdc->SetLevelsOfDetail(m.orderd);
       m.sdc->RegisterField("Displacement", m.d_gf);
