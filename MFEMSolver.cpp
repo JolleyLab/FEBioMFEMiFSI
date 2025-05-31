@@ -241,7 +241,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.solidsolvertype, "Solid_solver_type")->setEnums("MFEM\0FEBio\0");
       ADD_PARAMETER(m.subtract_viscous_stress, "Subtract_viscous_stress");
       ADD_PARAMETER(m.three_field, "Three_field_formulation");
-      ADD_PARAMETER(m.stabs_scale, FE_RANGE_NOT_EQUAL(0.0), "VMS_stabilization_scaling");
+      ADD_PARAMETER(m.stabs_scale, FE_RANGE_GREATER_OR_EQUAL(1.0), "VMS_stabilization_scaling");
       ADD_PARAMETER(m.track_node, "Track_node");
       ADD_PARAMETER(m.m_track_node_pos, "Track_node_position");
       ADD_PARAMETER(m.output_avg_velocity, "Output_avg_velocity");
