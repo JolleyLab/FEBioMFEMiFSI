@@ -130,7 +130,7 @@ public:
 
    // Output
    mfem::VTKFormat output_format = mfem::VTKFormat::BINARY32; // ASCII, BINARY, or BINARY32
-
+   int compression_level = 4; // zlib compression -1 default, max 9
 public:
    // Material properties
    double fluid_density;
@@ -164,6 +164,7 @@ public:
    int maxIt = 10;
    double atol = 1.0e-10;
    double rtol = 1.0e-3;
+   bool ns_no_error_nonconvergence = false;
 
    // Linear Solver Options
    // int lin_minIt;
@@ -262,6 +263,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
 
    // // Nonlinear Solver Options
    BEGIN_PARAM_GROUP("Nonlinear Solver");
+      ADD_PARAMETER(m.ns_no_error_nonconvergence, "no_error_nonconvergence");
       ADD_PARAMETER(m.atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "atol");
       ADD_PARAMETER(m.rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "rtol");
       ADD_PARAMETER(m.minIt, FE_RANGE_GREATER_OR_EQUAL(1), "minIt");
@@ -1066,8 +1068,10 @@ bool MFEMSolver::Init()
       #endif      
    }	
 	m.pvdc->SetDataFormat(m.output_format);
-	m.pvdc->SetHighOrderOutput(true);
+	m.pvdc->SetHighOrderOutput(false);
 	m.pvdc->SetLevelsOfDetail(m.orderv);
+   m.pvdc->SetCompression(true);
+   m.pvdc->SetCompressionLevel(m.compression_level);
 	m.pvdc->SetCycle(0);
 	m.pvdc->SetTime(0);
 	m.pvdc->RegisterField("Velocity", m.u_gf);
@@ -1111,8 +1115,10 @@ bool MFEMSolver::Init()
       m.sdc = new ParaViewDataCollection(solid_filename, m.solid_mesh);  
       #endif
       m.sdc->SetDataFormat(m.output_format);
-      m.sdc->SetHighOrderOutput(true);
+      m.sdc->SetHighOrderOutput(false);
       m.sdc->SetLevelsOfDetail(m.orderd);
+      m.sdc->SetCompression(true);
+      m.sdc->SetCompressionLevel(m.compression_level);
       m.sdc->RegisterField("Displacement", m.d_gf);
       m.sdc->RegisterField("Velocity", m.vib_gf);
       m.sdc->SetCycle(0);
