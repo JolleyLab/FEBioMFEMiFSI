@@ -130,7 +130,7 @@ public:
 
    // Output
    mfem::VTKFormat output_format = mfem::VTKFormat::BINARY32; // ASCII, BINARY, or BINARY32
-   int compression_level = 4; // zlib compression -1 default, max 9
+   int compression_level = -1; // zlib compression -1 default, max 9
 public:
    // Material properties
    double fluid_density;
@@ -577,34 +577,35 @@ bool MFEMSolver::Init()
       bool febio_solid_material = false;
       Array<int> solid_domain_attr(m.mesh->attributes.Max());
       solid_domain_attr = 0;
+      Array<int> fluid_domain_attr(m.mesh->attributes.Max());
+      fluid_domain_attr = 0;
       for (int i = 0; i < femesh.Domains(); ++i)
       {
          FEDomain& dom = femesh.Domain(i);
          int dom_attr = m.mesh->GetDomainAttribute(&dom);
          if (dom.IsActive() && dynamic_cast<MFEMSolidMaterial*>(dom.GetMaterial()))
          {
-            // solid_domain_attr[i] = i+1;
             solid_domain_attr[i] = dom_attr;
             mfem_solid_material = true;
          }
          if (dom.IsActive() && dynamic_cast<FEElasticMaterial*>(dom.GetMaterial()))
          {
-            // solid_domain_attr[i] = i+1;
             solid_domain_attr[i] = dom_attr;
             febio_solid_material = true;
          }
          if(dom.IsActive() && dynamic_cast<MFEMNewtonianFluid*>(dom.GetMaterial()))
          {
-            Array<int> domain_attr(m.mesh->attributes.Max());
-            domain_attr = 0;
-            // domain_attr[i] = i+1;
-            domain_attr[i] = dom_attr;
-            m.fluid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,domain_attr));
-            if (m.fluid_mesh == nullptr) return false;
+            fluid_domain_attr[i] = dom_attr;            
          }
       }
 
-      // create solid mesh as sum of all solid domains, this will preserve solid domain numbering
+      // create each mesh as sum of all domains (e.g. mfem solid mesh = sum of all febio solid domains), this will preserve domain numbering
+      // RB: 6-4-25, fixes bug with mixed meshes and immersed fsi
+      // fluid 
+      m.fluid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,fluid_domain_attr));
+      if (m.fluid_mesh == nullptr) return false;
+
+      // solid
       if (mfem_solid_material && febio_solid_material)
       {
          feLogError("Cannot have both FEBio and MFEM solid materials in the same mesh");
@@ -1038,7 +1039,7 @@ bool MFEMSolver::Init()
       ParFiniteElementSpace *dfes = m.flowsolver->GetImmersedSolidDisplacement()->ParFESpace();
       m.par_fem->BuildLocalFEBioMesh(dfes);
    }
-   
+
    // delete the serial MFEM meshes
    delete m.mesh;
    delete m.fluid_mesh;
