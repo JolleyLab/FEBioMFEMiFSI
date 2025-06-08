@@ -711,6 +711,11 @@ bool MFEMSolver::Init()
 	m.flowsolver->SetNewtonSolveMinIt(m.minIt);
 	m.flowsolver->SetNewtonSolveMaxIt(m.maxIt);
 
+   // flag for no error on non-convergence of newton solver
+   // useful for immersed FSI with thin structures and vms stabilization 
+   // scaling
+   if (m.ns_no_error_nonconvergence) m.flowsolver->SetNewtonSolveNoErrorNonConvergence();
+
 	// set linear solver and preconditioner
    if (m.linsolvertype == m.LinearSolverType::PARDISO || m.linsolvertype == m.LinearSolverType::UMFPACK || m.linsolvertype == m.LinearSolverType::CPARDISO)
    {
