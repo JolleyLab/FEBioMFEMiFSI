@@ -4,6 +4,7 @@
 #include <FEBioMech/FEIncompNeoHookean.h>
 #include <FEBioMech/FENeoHookean.h>
 #include <FEBioMech/FEStVenantKirchhoff.h>
+#include <FEBioMech/FEFungOrthotropic.h>
 
 #include "MFEMAnalysis.h"
 #include "MFEMDomain.h"
@@ -137,6 +138,13 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    REGISTER_FECORE_CLASS(FEIncompNeoHookean, "incompressible neo-hookean");
    REGISTER_FECORE_CLASS(FENeoHookean, "neo-hookean");
    REGISTER_FECORE_CLASS(FEStVenantKirchhoff, "st. venant-kirchhoff");
+   REGISTER_FECORE_CLASS(FEFungOrthotropic, "fung orthotropic");
+
+   // Immersed solid bcs
+   // Surface Loads
+   REGISTER_FECORE_CLASS(ImmersedTractionLoad, "immersed traction");
+   REGISTER_FECORE_CLASS(ImmersedPressureLoad, "immersed pressure load");
+   REGISTER_FECORE_CLASS(ImmersedPresDispBC, "immersed prescribed displacement");
 
    // plot variables
 	REGISTER_FECORE_CLASS(FEPltMFemPressure, "mfem pressure");

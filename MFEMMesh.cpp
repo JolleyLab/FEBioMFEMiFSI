@@ -51,14 +51,6 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 				indices[j] = el.m_node[j];
 			}
 
-         // // Set the FEBio element id for the mfem element
-         // newMesh->SetFEBioElementID(elem_counter, el.GetID());
-         // // if (elem_counter == 8482 + 620 || elem_counter == 8482 + 104)
-         // // {
-         // //    int val = 0;
-         // // } 
-         // elem_counter++;
-
 			switch (el.Shape())
 			{
          case ET_TET4: 
@@ -77,15 +69,11 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 			default:
 				assert(false);
 			}
-
-         // newMesh->GetElementCenter(new_elem_num, elem_center);
-         // elem_center_std[0] = elem_center(0);
-         // elem_center_std[1] = elem_center(1);
-         // elem_center_std[2] = elem_center(2);
-         // newMesh->SetFEBioElementID(elem_center_std, el.GetID());
 		}
 	}
 
+   newMesh->SetNumSurfaces(febioMesh.FacetSets());
+   int mfem_glob_surf_id = 0;
 	for (int n = 0; n < febioMesh.FacetSets(); ++n)
 	{
 		FEFacetSet& surf = febioMesh.FacetSet(n);
@@ -98,6 +86,9 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 			for (int j = 0; j < face.Nodes(); j++) {
 				indices[j] = face.node[j];
 			}
+
+         newMesh->SetFEBioSurfaceElementID(n+1,mfem_glob_surf_id,i);
+         mfem_glob_surf_id++;
 
          switch (face.ntype)
          {

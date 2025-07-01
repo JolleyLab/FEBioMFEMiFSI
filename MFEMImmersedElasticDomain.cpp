@@ -262,8 +262,8 @@ mfem::Array<int> &MFEMImmersedElasticDomain::TransformVDofs(mfem::Array<int> &vd
 // RESIDUAL
 void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std::vector<MFEMBodyForce*> &bfs)
 {
+   // Loop over elements
 	int NE = Elements();
-	// #pragma omp parallel for shared (NE)
 	for (int i=0; i<NE; ++i)
 	{
 		// get the element

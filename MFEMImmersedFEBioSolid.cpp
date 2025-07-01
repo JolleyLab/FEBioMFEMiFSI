@@ -6,6 +6,8 @@
 #include "mfem.hpp"
 #include <general/forall.hpp>
 
+
+
 using namespace mfem;
 using namespace immersed_solid_serial;
 
@@ -282,6 +284,56 @@ void ImmersedFEBioSolid::Initiator()
    // at the integration points) to the generalized midpoint
 	fem->Update();
 
+   // update surface data
+   FEMesh &mesh = fem->GetMesh();
+   FETimeInfo &tp = fem->GetTime();
+   for (int i=0; i<mesh.Surfaces(); ++i)
+   {
+      FESurface* ps = &mesh.Surface(i);
+      // ps->Update(tp);
+      for (int e=0; e<ps->Elements(); ++e) 
+      {
+         FESurfaceElement& el = ps->Element(e);
+
+         // check if active
+         if (el.GetID() == -1) continue;         
+
+         int nint = el.GaussPoints();
+         int neln = el.Nodes();
+
+         vec3d rt[FEElement::MAX_NODES];
+         // ps->NodalCoordinates(el, rt);
+         for (int ii = 0; ii < neln; ++ii) rt[ii] = mesh.Node(el.m_lnode[ii]).m_rt;  
+
+         // // ps->GetNodalCoordinates(el, alpha_f, rt);
+         // for (int j = 0; j<neln; ++j) 
+         // {
+         //    FENode& node = mesh.Node(el.m_lnode[j]);
+         //    rt[j] = node.m_rt*alpha_f + node.m_rp*(1.0 - alpha_f);
+         // }
+                
+
+         for (int n = 0; n < nint; ++n)
+         {
+            FESurfaceMaterialPoint& mp = static_cast<FESurfaceMaterialPoint&>(*el.GetMaterialPoint(n));
+
+            // material point coordinates
+		      mp.m_rt = el.Evaluate(rt, n); // sets current position at int point to midpoint value
+
+            double* Gr = el.Gr(n);
+            double* Gs = el.Gs(n);
+
+            mp.dxr = vec3d(0, 0, 0);
+            mp.dxs = vec3d(0, 0, 0);
+            for (int a = 0; a < neln; ++a)
+            {
+               mp.dxr += rt[a] * Gr[a];
+               mp.dxs += rt[a] * Gs[a];
+            }
+         }
+      }
+   }
+
 	for (int i = 0; i < fem->ModelLoads(); ++i)
 	{
 		FEModelLoad* pl = fem->ModelLoad(i);
@@ -415,7 +467,9 @@ void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambd
 	// setup the global vector
 	zero(R);
 
-	// calculate residual (note: no surface forces considered)
+	// calculate residual
+
+   // domain residual and body forces
    FEMesh& mesh = fem->GetMesh();
    for (int i=0; i<mesh.Domains(); ++i) 
 	{
@@ -426,6 +480,121 @@ void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambd
          mfd->AssembleDomainResidual(*m_R,m_body_forces);
       }	
 	}
+
+   // surface forces
+   if (immersed_surface_loads)
+   {
+      auto solid_submesh = dynamic_cast<mfem::SubMesh*>(pmesh);
+      FESurface& surf = mesh.Surface(0); // assumes one surface was built for all loads
+      int NBE = surf.Elements();
+      int dofPerNode = dfes->GetVDim();
+      mfem::Array<int> vdofs, vdofs_febio;
+
+      double dt = tp.timeIncrement;
+      double am = tp.alpham;
+      double av = tp.alphaf*tp.gamma*dt;
+      double af = tp.alphaf*tp.beta*dt*dt;
+      std::vector<double> factors({am, av, af, dt});
+
+      std::cout << "num bdr elems = " << NBE << std::endl;
+
+      for (int b=0; b<NBE; ++b)
+      {
+         const int bdr_attr = pmesh->GetBdrAttribute(b);
+         for (int i=0; i < fem->ModelLoads(); ++i)
+         {
+            FEImmersedSurfaceLoad* sl = dynamic_cast<FEImmersedSurfaceLoad*>(fem->ModelLoad(i));
+            if (sl && sl->IsActive())
+            {
+               int curr_bdr_attr = sl->GetBoundaryID();
+               if (curr_bdr_attr != bdr_attr-1) { continue; }
+
+               vector<double> fe;
+               vec3d re[FEElement::MAX_NODES];
+               std::vector<double> G(dofPerNode, 0.0);
+
+               // get the next element
+               FESurfaceElement& el = surf.Element(b);
+
+               // get corresponding mfem element id
+               int submesh_id = -1;
+               if (solid_submesh)
+               {
+                  // serial
+                  MFEM_ABORT("Not implemented");
+               }         
+               else
+               {
+                  // parallel
+                  submesh_id = el.GetID();
+               }
+
+               // init the element vector
+               int neln = el.ShapeFunctions(orderd);
+               int ndof = dofPerNode * neln;
+               fe.assign(ndof, 0.0);
+
+               // get the nodal coordinates
+               if (sl->IsLinear())
+                  surf.GetReferenceNodalCoordinates(el, re);
+               else
+                  surf.GetNodalCoordinates(el, re);
+
+               // calculate element vector
+               FESurfaceDofShape dof_a;
+               double* w = el.GaussWeights();
+               int nint = el.GaussPoints();
+               for (int n = 0; n < nint; ++n)
+               {
+                  FESurfaceMaterialPoint& pt = static_cast<FESurfaceMaterialPoint&>(*el.GetMaterialPoint(n));
+
+                  // kinematics at integration points
+                  pt.dxr = el.eval_deriv1(re, n);
+                  pt.dxs = el.eval_deriv2(re, n);
+
+                  pt.m_shape = el.H(n);
+
+                  double* H = el.H(orderd, n);
+                  double* Hr = el.Gr(orderd, n);
+                  double* Hs = el.Gr(orderd, n);
+
+                  // put it all together
+                  for (int j = 0; j<neln; ++j)
+                  {
+                     // shape function and derivatives
+                     dof_a.index = j;
+                     dof_a.shape = H[j];
+                     dof_a.shape_deriv_r = Hr[j];
+                     dof_a.shape_deriv_s = Hs[j];
+
+                     // evaluate the integrand
+                     sl->ResidualIntegrand(pt, dof_a, G, factors);
+
+                     for (int k = 0; k < dofPerNode; ++k)
+                     {
+                        fe[dofPerNode * j + k] -= G[k] * w[n];
+                     }
+                  }
+               }
+
+               // assemble element 'fe'-vector into global R vector
+               dfes->GetBdrElementVDofs(submesh_id,vdofs);
+               
+               // reorder to match febio elem vector [xyz,xyz,xyz,...]
+               vdofs_febio.SetSize(vdofs.Size());
+               int nd = el.Nodes();
+               for (int j=0; j < nd; ++j)
+               {
+                  vdofs_febio[3*j]   = vdofs[j];
+                  vdofs_febio[3*j+1] = vdofs[j+nd];
+                  vdofs_febio[3*j+2] = vdofs[j+2*nd];
+               }
+
+               m_R->Assemble(vdofs_febio,fe);
+            }
+         }
+      }
+   }
 
    // TODO: contact
 
@@ -483,6 +652,7 @@ mfem::Operator &ImmersedFEBioSolid::FormLHS()
    double am = tp.alpham;
    double av = tp.alphaf*tp.gamma*dt;
    double af = tp.alphaf*tp.beta*dt*dt;
+   std::vector<double> factors({am, av, af, dt});
    for (int i=0; i<mesh.Domains(); ++i) 
 	{
 		FEDomain& dom = mesh.Domain(i);
@@ -492,6 +662,136 @@ mfem::Operator &ImmersedFEBioSolid::FormLHS()
          mfd->AssembleDomainStiffness(*m_K,am,av,af,m_body_forces);
       }	
 	}
+
+   // surface forces
+   if (immersed_surface_loads)
+   {
+      auto solid_submesh = dynamic_cast<mfem::SubMesh*>(pmesh);
+      FESurface& surf = mesh.Surface(0); // assumes one surface was built for all loads
+      int NBE = surf.Elements();
+
+      FEElementMatrix ke;
+      int dofPerNode_a = dfes->GetVDim();
+      int dofPerNode_b = dfes->GetVDim();
+      int order_a = orderd;
+      int order_b = orderd;
+
+      vec3d rt[FEElement::MAX_NODES];
+      matrix kab(dofPerNode_a, dofPerNode_b);
+      FESurfaceDofShape dof_a, dof_b;
+
+      mfem::Array<int> vdofs, vdofs_febio;
+      for (int b=0; b<NBE; ++b)
+      {
+         const int bdr_attr = pmesh->GetBdrAttribute(b);
+         for (int i=0; i < fem->ModelLoads(); ++i)
+         {
+            FEImmersedSurfaceLoad* sl = dynamic_cast<FEImmersedSurfaceLoad*>(fem->ModelLoad(i));
+            if (sl && sl->IsActive())
+            {
+               int curr_bdr_attr = sl->GetBoundaryID();
+               if (curr_bdr_attr != bdr_attr-1) { continue; }
+
+               // get the next element
+               FESurfaceElement& el = surf.Element(b);
+
+               // get corresponding mfem element id
+               int submesh_id = -1;
+               if (solid_submesh)
+               {
+                  // serial
+                  MFEM_ABORT("Not implemented");
+               }         
+               else
+               {
+                  // parallel
+                  submesh_id = el.GetID();
+               }
+
+               // get vdofs
+               dfes->GetBdrElementVDofs(submesh_id,vdofs);
+               // reorder to match febio elem vector [xyz,xyz,xyz,...]
+               vdofs_febio.SetSize(vdofs.Size());
+               int nd = el.Nodes();
+               for (int j=0; j < nd; ++j)
+               {
+                  vdofs_febio[3*j]   = vdofs[j];
+                  vdofs_febio[3*j+1] = vdofs[j+nd];
+                  vdofs_febio[3*j+2] = vdofs[j+2*nd];
+               }
+
+               // shape functions
+               int neln = el.Nodes();
+               int nn_a = el.ShapeFunctions(dofPerNode_a);
+               int nn_b = el.ShapeFunctions(dofPerNode_b);
+
+               // get the element stiffness matrix
+               int ndof_a = dofPerNode_a * nn_a;
+               int ndof_b = dofPerNode_b * nn_b;
+               ke.resize(ndof_a, ndof_b);
+
+               // calculate element stiffness
+               int nint = el.GaussPoints();
+
+               // gauss weights
+               double* w = el.GaussWeights();
+
+               // nodal coordinates
+               surf.GetNodalCoordinates(el, rt);
+
+               // repeat over integration points
+               ke.zero();
+               for (int n = 0; n<nint; ++n)
+               {
+                  FESurfaceMaterialPoint& pt = static_cast<FESurfaceMaterialPoint&>(*el.GetMaterialPoint(n));
+
+                  double* Gr = el.Gr(n);
+                  double* Gs = el.Gs(n);
+
+                  // tangents at integration point
+                  pt.dxr = vec3d(0, 0, 0);
+                  pt.dxs = vec3d(0, 0, 0);
+                  for (int j = 0; j<neln; ++j)
+                  {
+                     pt.dxr += rt[j] * Gr[j];
+                     pt.dxs += rt[j] * Gs[j];
+                  }
+
+                  // calculate stiffness component
+                  for (int ia = 0; ia < nn_a; ++ia)
+                  {
+                     // shape function values
+                     dof_a.index = ia;
+                     dof_a.shape = el.H(order_a, n)[ia];
+                     dof_a.shape_deriv_r = el.Gr(order_a, n)[ia];
+                     dof_a.shape_deriv_s = el.Gs(order_a, n)[ia];
+
+                     for (int jb = 0; jb < nn_b; ++jb)
+                     {
+                        // shape function values
+                        dof_b.index = jb;
+                        dof_b.shape = el.H(order_b, n)[jb];
+                        dof_b.shape_deriv_r = el.Gr(order_b, n)[jb];
+                        dof_b.shape_deriv_s = el.Gs(order_b, n)[jb];
+
+                        // evaluate integrand
+                        kab.zero();
+                        sl->StiffnessIntegrand(pt, dof_a, dof_b, kab, factors);
+
+                        // add it to the local element matrix
+                        ke.adds(dofPerNode_a * ia, dofPerNode_b * jb, kab, -w[n]);
+                     }
+                  }
+               }
+
+               // assemble
+               mfem::SparseMatrix& mfemK = *m_K->GetMfemMatrix();
+               mfem::DenseMatrix mfem_elmat(*ke, vdofs_febio.Size(), vdofs_febio.Size());
+               mfemK.AddSubMatrix(vdofs_febio, vdofs_febio, mfem_elmat, 0);
+            }
+         }
+      }
+   }
 
    // TODO: contact
 

@@ -181,9 +181,9 @@ public:
    enum PrecInnerSolverType {Iterative = 0, Direct = 1}; // direct using UMFPACK
    int prec_inner_solver_type = PrecInnerSolverType::Iterative;
    bool direct_solver_prec = false;
-   double prec_Ainv_atol = 1.0e-10;
+   double prec_Ainv_atol = 1.0e-6;
    double prec_Ainv_rtol = 1.0e-3;
-   double prec_Sinv_atol = 1.0e-10;
+   double prec_Sinv_atol = 1.0e-6;
    double prec_Sinv_rtol = 1.0e-3;
 
    // immersed solid
@@ -575,10 +575,10 @@ bool MFEMSolver::Init()
       // create fluid and solid submeshes from mfem version of FEBio mesh
       bool mfem_solid_material = false;
       bool febio_solid_material = false;
-      Array<int> solid_domain_attr(m.mesh->attributes.Max());
-      solid_domain_attr = 0;
       Array<int> fluid_domain_attr(m.mesh->attributes.Max());
       fluid_domain_attr = 0;
+      Array<int> solid_domain_attr(m.mesh->attributes.Max());
+      solid_domain_attr = 0;
       for (int i = 0; i < femesh.Domains(); ++i)
       {
          FEDomain& dom = femesh.Domain(i);
@@ -599,7 +599,8 @@ bool MFEMSolver::Init()
          }
       }
 
-      // create each mesh as sum of all domains (e.g. mfem solid mesh = sum of all febio solid domains), this will preserve domain numbering
+      // create each mesh as sum of all domains (e.g. mfem solid mesh = sum of all febio solid domains), this will preserve domain numbering.
+      // This assumes each solid domain is deformable.
       // RB: 6-4-25, fixes bug with mixed meshes and immersed fsi
       // fluid 
       m.fluid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,fluid_domain_attr));
@@ -626,6 +627,9 @@ bool MFEMSolver::Init()
       feLog("-------------------------------\nSolid Mesh\n");
       m.solid_mesh->PrintCharacteristics();
       feLog("-------------------------------\n");
+
+      // m.fluid_mesh->Save("fluid_mesh.mesh");
+      // m.solid_mesh->Save("solid_mesh.mesh");
    }
    else
    {
@@ -643,10 +647,8 @@ bool MFEMSolver::Init()
    if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
    {
       // create ParFEModel
-      m.par_fem = new ParFEModel(fem);
-      m.par_fem->SetMFEMSerialMesh(m.mesh);
+      m.par_fem = new ParFEModel(fem, m.mesh);
       m.par_fem->SetMFEMSubMesh(m.solid_mesh);
-      m.par_fem->SetupBCs(); // Probably not needed if only clear mesh and not surfaces associated with each bc!
    }
    #endif
 
@@ -789,9 +791,6 @@ bool MFEMSolver::Init()
 		m.flowsolver->SetViscousTermType(ins_solver::ViscousTermType::LaplaceForm);
 	}
 
-   // TODO: In parallel these need to be set after creating the ParFESpaces
-   // so the correct boundary dofs get selected on each processor!
-
    // Here we assume the immersed solid has no initial or boundary conditions set
    // Set the initial conditions.
 	for (int i = 0; i < fem->InitialConditions(); ++i)
@@ -835,7 +834,7 @@ bool MFEMSolver::Init()
 
       // surface loads
 		MFEMSurfaceLoad* sl = dynamic_cast<MFEMSurfaceLoad*>(fem->ModelLoad(i));
-		if (sl && sl->IsActive())
+		if (sl && sl->IsActive() && !dynamic_cast<FEImmersedSurfaceLoad*>(sl))
 		{
          FESurface* surf = &sl->GetSurface();
          int id = 0;
@@ -992,6 +991,62 @@ bool MFEMSolver::Init()
          // add immersed solid to the flow solver
          m.flowsolver->AddImmersedSolid(m.immersed_febio_solid,m.stabs_scale);
 
+         // add any immersed solid BCs
+         for (int i = 0; i < fem->ModelLoads(); ++i)
+         {
+            // // nodal loads
+            // MFEMNodalLoad* nl = dynamic_cast<MFEMNodalLoad*>(fem->ModelLoad(i));
+            // if (nl && nl->IsActive())
+            // {
+            //    nl->Apply(this);
+            // }
+
+            // surface loads
+            FEImmersedSurfaceLoad* im_sl = dynamic_cast<FEImmersedSurfaceLoad*>(fem->ModelLoad(i));
+            if (im_sl && im_sl->IsActive())
+            {
+               FESurface* surf = &im_sl->GetSurface();
+               int id = 0;
+               if (surf)
+               {
+                  FEFacetSet* set = surf->GetFacetSet();
+                  id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
+                  im_sl->SetBoundaryID(id-1); // store for later use
+               }
+               else
+               {
+                  id = im_sl->GetBoundaryID(); assert(id > 0);
+               }
+
+               im_sl->Apply(this, id - 1);
+               m.immersed_febio_solid->immersed_surface_loads = true;
+            }
+
+            // // body loads
+            // MFEMBodyLoad* bl = dynamic_cast<MFEMBodyLoad*>(fem->ModelLoad(i));
+            // if (bl && bl->IsActive())
+            // {
+            //    std::vector<int> &dom_id_list = bl->GetDomainIDList();
+            //    if (dom_id_list.size() != 0)
+            //    {
+            //       for (int j=0; j<dom_id_list.size(); ++j)
+            //       {
+            //          int id = dom_id_list[j]; assert(id > 0);
+            //          bl->Apply(this, id - 1);
+            //       }
+            //    }
+            //    else
+            //    {
+            //       for (int j=0; j<bl->Domains(); ++j)
+            //       {
+            //          FEDomain* dom = bl->Domain(j);
+            //          int id = m.mesh->GetDomainAttribute(dom); assert(id > 0);
+            //          bl->Apply(this, id - 1);
+            //       }
+            //    }                  
+            // }
+         }
+
          // immersed solid grid functions
          m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
          m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
@@ -1043,12 +1098,15 @@ bool MFEMSolver::Init()
    {
       ParFiniteElementSpace *dfes = m.flowsolver->GetImmersedSolidDisplacement()->ParFESpace();
       m.par_fem->BuildLocalFEBioMesh(dfes);
+
+      // clear FEBio serial surface mesh data
+      m.par_fem->ClearSerialSurfaces();
    }
 
    // delete the serial MFEM meshes
    delete m.mesh;
    delete m.fluid_mesh;
-   delete m.solid_mesh;  
+   delete m.solid_mesh;   
    #endif
 
 	// setup output in paraview format

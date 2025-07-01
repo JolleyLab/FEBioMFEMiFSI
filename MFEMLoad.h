@@ -213,3 +213,89 @@ private:
 
 	DECLARE_FECORE_CLASS();
 };
+
+// immersed solid surface loads (only with FEBio solver currently)
+class FEImmersedSurfaceLoad : public FESurfaceLoad
+{
+public:
+   FEImmersedSurfaceLoad(FEModel* fem);
+
+   // factors = [am, af, av, dt] = [alpha_m, alphaf*gamma*dt, alphaf*beta*dt*dt, dt]
+   virtual void ResidualIntegrand(FESurfaceMaterialPoint& pt, const FESurfaceDofShape& dof_a, std::vector<double>& val, std::vector<double> &factors) = 0;
+
+   virtual void StiffnessIntegrand(FESurfaceMaterialPoint& pt, const FESurfaceDofShape& dof_a, const FESurfaceDofShape& dof_b, matrix& kab, std::vector<double> &factors) = 0;
+
+   virtual void Apply(MFEMSolver* solver, int attr) = 0;
+
+   bool IsLinear() { return m_blinear; };
+   bool IsShellBottom() { return m_bshellb; };
+
+   void SetBoundaryID(int id) { m_bdr_attr = id; };
+   double GetBoundaryID() { return m_bdr_attr; };
+
+private:
+   int m_bdr_attr; // bdr attribute ID for the boundary condition
+	bool			m_bshellb;
+	bool			m_blinear;
+   bool        m_evalrefconfig; // flag to evaluate in the reference configuration
+
+   DECLARE_FECORE_CLASS();
+};
+
+class ImmersedTractionLoad : public FEImmersedSurfaceLoad
+{
+public:
+   ImmersedTractionLoad(FEModel* fem);
+
+   void Apply(MFEMSolver* solver, int attr) override;
+
+   void ResidualIntegrand(FESurfaceMaterialPoint& pt, const FESurfaceDofShape& dof_a, std::vector<double>& val, std::vector<double> &factors) override;
+
+   void StiffnessIntegrand(FESurfaceMaterialPoint& pt, const FESurfaceDofShape& dof_a, const FESurfaceDofShape& dof_b, matrix& kab, std::vector<double> &factors) override;
+
+private:
+   // FEParamVec3 m_traction;
+   FEParamDouble m_tx;
+   FEParamDouble m_ty;
+   FEParamDouble m_tz;
+   double m_scale;
+
+   DECLARE_FECORE_CLASS();
+};
+
+class ImmersedPressureLoad : public FEImmersedSurfaceLoad
+{
+public:
+   ImmersedPressureLoad(FEModel* fem);
+
+   void Apply(MFEMSolver* solver, int attr) override;
+
+   void ResidualIntegrand(FESurfaceMaterialPoint& pt, const FESurfaceDofShape& dof_a, std::vector<double>& val, std::vector<double> &factors) override;
+
+   void StiffnessIntegrand(FESurfaceMaterialPoint& pt, const FESurfaceDofShape& dof_a, const FESurfaceDofShape& dof_b, matrix& kab, std::vector<double> &factors) override;
+
+private:
+   FEParamDouble	m_pressure;	//!< pressure value
+	bool			m_bsymm;	//!< use symmetric formulation
+
+   DECLARE_FECORE_CLASS();
+};
+
+class ImmersedPresDispBC : public FEImmersedSurfaceLoad
+{
+public:
+   ImmersedPresDispBC(FEModel* fem);
+
+   void Apply(MFEMSolver* solver, int attr) override;
+
+   void ResidualIntegrand(FESurfaceMaterialPoint& pt, const FESurfaceDofShape& dof_a, std::vector<double>& val, std::vector<double> &factors) override;
+
+   void StiffnessIntegrand(FESurfaceMaterialPoint& pt, const FESurfaceDofShape& dof_a, const FESurfaceDofShape& dof_b, matrix& kab, std::vector<double> &factors) override;
+
+private:
+   FEParamVec3 m_pres_disp; // prescribed displacement
+	FEParamDouble m_kappa_s; // penalty parameter
+   FEParamDouble m_eta_s; // damping parameter
+
+   DECLARE_FECORE_CLASS();
+};

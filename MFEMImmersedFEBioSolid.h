@@ -6,6 +6,7 @@
 #include "mfem.hpp"
 #include <vector>
 
+
 using namespace immersed_solid_serial;
 
 class ImmersedFEBioSolid : public ImmersedSolid
@@ -54,7 +55,11 @@ public:
    // Global matrix
    MFEMGlobalMatrix *m_K = nullptr; // owned
 
-   // Model loads (body forces only!)
+   // Model loads
+   // surface loads
+   bool immersed_surface_loads = false;   
+
+   // body loads
    std::vector<MFEMBodyForce*> m_body_forces;
 
    // Submesh Transfer Maps

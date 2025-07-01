@@ -11,7 +11,7 @@ class MFEMMesh;
 class ParFEModel
 {
 public:
-   ParFEModel(FEModel* fem);
+   ParFEModel(FEModel* fem, MFEMMesh* mesh_);
    ~ParFEModel();
 
    // // Copy data from FEModel to ParFEModel and construct 
@@ -20,8 +20,6 @@ public:
 
    // Tag each bc with its mesh attribute
    void SetupBCs();
-
-   void SetMFEMSerialMesh(MFEMMesh* mesh);
 
    void SetMFEMSubMesh(mfem::SubMesh* submesh)
    {
@@ -33,6 +31,8 @@ public:
    // Updates domain data to contain only the elements within a partition
    // specified by mfem ParMesh
    void ParCopyDomain(FEDomain &dom, FEDomain &par_dom, mfem::ParFiniteElementSpace &pfes);
+
+   void ClearSerialSurfaces();
 
 private:
    // FE model
@@ -46,6 +46,12 @@ private:
 
    // Serial submesh
    mfem::SubMesh* m_submesh = nullptr;
+
+   // FEBio local surface mesh
+   FESurface* m_febio_surf = nullptr;
+
+   // Array of FESurfaces
+   mfem::Array<FESurface*> serial_surf_list;
 
    // Array of maps from FEBio element id to local mfem element id
    std::vector<mfem::Array<int>> m_list_elem_id_maps;
