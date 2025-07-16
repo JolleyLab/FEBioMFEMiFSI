@@ -524,7 +524,7 @@ void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambd
                else
                {
                   // parallel
-                  submesh_id = el.GetID();
+                  submesh_id = el.GetID() - 1;
                }
 
                // init the element vector
@@ -703,7 +703,7 @@ mfem::Operator &ImmersedFEBioSolid::FormLHS()
                else
                {
                   // parallel
-                  submesh_id = el.GetID();
+                  submesh_id = el.GetID() - 1;
                }
 
                // get vdofs

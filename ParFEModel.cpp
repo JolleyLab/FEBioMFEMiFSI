@@ -363,7 +363,19 @@ void ParFEModel::ParCopyDomain(FEDomain &dom, FEDomain &par_dom, mfem::ParFinite
       // copy the element data to new domain element
       FESolidElement* pel = &dynamic_cast<FESolidDomain*>(&par_dom)->Element(i);
       *pel = *el;
-      pel->SetID(i); // set local febio element id = mfem element id
+      pel->SetID(i+1); // set local febio element id = mfem element id + 1
+
+      // reset some data in pel
+
+      // reset the material point pointer in each Gauss point
+      for (int j=0; j<pel->GaussPoints(); ++j)
+      {
+         FEMaterialPoint* pmp = pel->GetMaterialPoint(j);
+         if (pmp) pmp->m_elem = pel; // reset the element pointer in material point
+      }
+
+      // reset local id in FEBio
+
 
 
       // std::cout << "Local mfem element id = " << i
@@ -638,7 +650,7 @@ void ParFEModel::ParCopyDomain(FEDomain &dom, FEDomain &par_dom, mfem::ParFinite
          // copy data from febio surface element to new local surface element
          FESurfaceElement* pel = &m_febio_surf->Element(i);
          *pel = *el;
-         pel->SetID(i); // set local febio surface element id = mfem surface element id
+         pel->SetID(i+1); // set local febio surface element id = mfem surface element id + 1
          
          
          // NOT SURE IF NEEDED

@@ -282,8 +282,8 @@ void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std:
       else
       {
          // parallel
-         // submesh_id = el.GetID()-1;
-         submesh_id = el.GetID();
+         submesh_id = el.GetID()-1;
+         // submesh_id = el.GetID();
       }
 
       // const mfem::Array<int>& parent_elem_ids = solid_submesh->GetParentElementIDMap();
@@ -614,8 +614,8 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
       else
       {
          // parallel
-         // submesh_id = el.GetID()-1;
-         submesh_id = el.GetID();
+         submesh_id = el.GetID()-1;
+         // submesh_id = el.GetID();
       }
 
       // mfem::out << "\n";
@@ -1063,7 +1063,7 @@ void MFEMImmersedElasticDomain::BuildMatrixProfile(FEGlobalMatrix& M)
 	for (int j = 0; j<NE; ++j)
 	{
       FESolidElement& el = m_Elem[j];
-      int submesh_id = solid_submesh ? solid_submesh->GetSubMeshElementFromParent(el.GetID()-1) : el.GetID();
+      int submesh_id = solid_submesh ? solid_submesh->GetSubMeshElementFromParent(el.GetID()-1) : el.GetID() - 1;
       dfes->GetElementVDofs(submesh_id,vdofs);
       elm.assign(vdofs.GetData(), vdofs.GetData() + vdofs.Size()); // check this
 		M.build_add(elm);
