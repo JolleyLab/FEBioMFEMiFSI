@@ -496,8 +496,6 @@ void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambd
       double af = tp.alphaf*tp.beta*dt*dt;
       std::vector<double> factors({am, av, af, dt});
 
-      std::cout << "num bdr elems = " << NBE << std::endl;
-
       for (int b=0; b<NBE; ++b)
       {
          const int bdr_attr = pmesh->GetBdrAttribute(b);
