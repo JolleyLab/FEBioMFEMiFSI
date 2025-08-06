@@ -169,8 +169,6 @@ endif()
 add_definitions(-DiFSI_USE_MPI)
 add_definitions(-DiFSI_USE_GSLIB)
 
-
-
 # Import FSI_Solver
 message(STATUS "Looking for fsi_solver ...")
 set(FSI_Solver_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../FSI_Solver_v2.0/build/" CACHE PATH "Path to the FSI_Solver build or install prefix.")
