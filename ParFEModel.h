@@ -2,7 +2,7 @@
 
 #include <FECore/FEModel.h>
 
-#ifdef iFSI_USE_MPI
+#ifdef MFEM_USE_MPI
 
 class MFEMMesh;
 
