@@ -174,22 +174,22 @@ void ImmersedFEBioSolid::Predictors(mfem::Vector &vf, mfem::Vector &vdotf)
    #ifdef MFEM_USE_GSLIB
    finder_fluid->Interpolate(interp_points_in_solid,temp_del_gf,ddotnp1_gf,orderingtype);
    #endif
-   // #ifdef MFEM_USE_MPI
-   // ddotnp1_gf.ParallelProject(ddotnp1);
-   // #else
-   // ddotnp1_gf.GetTrueDofs(ddotnp1);
-   // #endif
+   #ifdef MFEM_USE_MPI
+   ddotnp1_gf.ParallelProject(ddotnp1);
+   #else
+   ddotnp1_gf.GetTrueDofs(ddotnp1);
+   #endif
 
    // d2dotnp1 = vdot_np1
    temp_del_gf.SetFromTrueDofs(vdotf);
    #ifdef MFEM_USE_GSLIB
    finder_fluid->Interpolate(interp_points_in_solid,temp_del_gf,d2dotnp1_gf,orderingtype);
    #endif
-   // #ifdef MFEM_USE_MPI
-   // d2dotnp1_gf.ParallelProject(d2dotnp1);
-   // #else
-   // d2dotnp1_gf.GetTrueDofs(d2dotnp1);   
-   // #endif
+   #ifdef MFEM_USE_MPI
+   d2dotnp1_gf.ParallelProject(d2dotnp1);
+   #else
+   d2dotnp1_gf.GetTrueDofs(d2dotnp1);   
+   #endif
 
    #ifndef MFEM_USE_MPI
    // transfer gf defined on solid submesh to global mesh (FEBio representation)
@@ -369,16 +369,9 @@ void ImmersedFEBioSolid::Correctors(mfem::Vector &del)
    temp_delvdot_ib_gf.ParallelProject(delvdot_ib);
    #else
    temp_delvdot_ib_gf.GetTrueDofs(delvdot_ib);
-   #endif 
+   #endif
 
-   // #ifdef MFEM_USE_MPI
-   // double norm = mfem::InnerProduct(MPI_COMM_WORLD,del,del);
-   // #else
-   // double norm = mfem::InnerProduct(del,del);
-   // #endif
-   // mfem::out << "Corrector norm = " << std::setprecision(16) << sqrt(norm) << std::endl;
-
-   // d2dotnp1.Add(-1.0,delvdot_ib);
+   d2dotnp1.Add(-1.0,delvdot_ib);
    ddotnp1.Add(-gamma*dt,delvdot_ib); // only updated to keep ddotn_gf current
    dnp1.Add(-beta*dt*dt,delvdot_ib); // for moving mfem mesh
 
@@ -397,7 +390,7 @@ void ImmersedFEBioSolid::Correctors(mfem::Vector &del)
    mfem::Vector &d = *dnp1_global_gf;
    #else
    mfem::Vector &delvdot = temp_delvdot_ib_gf;
-   
+
    dnp1_gf.SetFromTrueDofs(dnp1);
    mfem::Vector &d = dnp1_gf;
    #endif
@@ -444,6 +437,10 @@ void ImmersedFEBioSolid::Update()
    // update ddotn_gf in mfem
    ddotn = ddotnp1;
    ddotn_gf.SetFromTrueDofs(ddotn);
+
+   // update d2dotn_gf in mfem
+   d2dotn = d2dotnp1;
+   d2dotn_gf.SetFromTrueDofs(d2dotn);
 
    // update solid mesh (if UL formulation) //
    MoveMesh(dn_gf);
@@ -892,6 +889,90 @@ void ImmersedFEBioSolid::ReformStiffness()
 
    mfem::SparseMatrix *mfemK = m_K->GetMfemMatrix();
    *mfemK = 0.0;
+}
+
+void ImmersedFEBioSolid::UpdateFEBioDataFromRestart()
+{
+   #ifndef MFEM_USE_MPI
+   // // transfer submesh delvdot to global
+   // delvdot_global_gf = 0.0;
+   // submeshsolid_to_global_d->Transfer(temp_delvdot_ib_gf,delvdot_global_gf);
+   // mfem::Vector &delvdot = delvdot_global_gf;
+
+   // // transfer displacement to global
+   // dnp1_gf.SetFromTrueDofs(dnp1);
+   // *dnp1_global_gf = 0.0;
+   // submeshsolid_to_global_d->Transfer(dnp1_gf,*dnp1_global_gf);
+   // mfem::Vector &d = *dnp1_global_gf;
+
+   MFEM_ABORT("TODO in serial");
+
+   #else
+   mfem::Vector &d = dn_gf;
+   mfem::Vector &ddot = ddotn_gf;
+   mfem::Vector &d2dot = d2dotn_gf;
+   #endif
+   
+   // update nodal data
+	FEMesh& mesh = fem->GetMesh();
+   int dofVIMX = fem->GetDOFIndex("im_vx");
+   int dofVIMY = fem->GetDOFIndex("im_vy");
+   int dofVIMZ = fem->GetDOFIndex("im_vz");
+   int NN = mesh.Nodes();
+	for (int i=0; i<NN; ++i)
+	{      
+		FENode& ni = mesh.Node(i);
+      
+      int idx = dfes->GetOrdering() == mfem::Ordering::byNODES ? i + 0*NN : i*3 + 0;
+      int idy = dfes->GetOrdering() == mfem::Ordering::byNODES ? i + 1*NN : i*3 + 1;
+      int idz = dfes->GetOrdering() == mfem::Ordering::byNODES ? i + 2*NN : i*3 + 2;
+
+      // acceleration
+      ni.m_at(0) = d2dot[idx];
+      ni.m_at(1) = d2dot[idy];
+      ni.m_at(2) = d2dot[idz];
+
+      // velocity
+      vec3d vt = ni.get_vec3d(dofVIMX, dofVIMY, dofVIMZ);
+      vt(0) = ddot[idx];
+      vt(1) = ddot[idy];
+      vt(2) = ddot[idz];
+      ni.set_vec3d(dofVIMX, dofVIMY, dofVIMZ, vt);
+
+      // position from displacement
+      ni.m_rt(0) = d[idx] + ni.m_r0(0);
+      ni.m_rt(1) = d[idy] + ni.m_r0(1);
+      ni.m_rt(2) = d[idz] + ni.m_r0(2);
+   }
+
+   // update material point quantities
+   // this should also be read in from the restart file
+   // for (int i=0; i<mesh.Domains(); ++i)
+   // {
+   //    FEDomain& dom = mesh.Domain(i);
+   //    MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+   //    if (mfd && mfd->IsActive())
+   //    {
+   //       FEElasticMaterial* pme = dynamic_cast<FEElasticMaterial*>(mfd->GetMaterial());
+   //       assert(pme);
+   //       for (int j=0; j<mfd->Elements(); ++j)
+   //       {
+   //          FESolidElement& el = mfd->Element(j);
+   //          if (el.isActive())
+   //          {
+   //             int n = el.GaussPoints();
+   //             for (int k = 0; k < n; ++k)
+   //             {
+   //                FEMaterialPoint& mp = *el.GetMaterialPoint(k);
+   //                FEElasticMaterialPoint& pt = *mp.ExtractData<FEElasticMaterialPoint>();
+   //                pt.m_Wt = pme->StrainEnergyDensity(mp);
+
+   //                // TO DO: mp.Update(timeInfo);
+   //             }
+   //          }
+   //       }
+   //    }      
+   // }
 }
 
 ImmersedFEBioSolid::~ImmersedFEBioSolid()

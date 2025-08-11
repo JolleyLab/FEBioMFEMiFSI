@@ -206,6 +206,7 @@ void MFEMImmersedElasticDomain::UpdateElementStress(int iel, const FETimeInfo& t
 		// (Apply only for mid-point rule)
 		if (m_alphaf == 0.5)
 		{
+         MFEM_ABORT("TO DO");
 			FEElasticMaterial* pme = dynamic_cast<FEElasticMaterial*>(m_pMat);
 
 			// evaluate strain energy at current time

@@ -116,9 +116,11 @@ public:
    #ifdef MFEM_USE_MPI
    ParGridFunction *d_gf = nullptr; // immersed solid displacement grid function
    ParGridFunction *vib_gf = nullptr; // immersed solid velocity grid function
+   ParGridFunction *a_gf = nullptr; // immersed solid acceleration grid function
    #else
    GridFunction *d_gf = nullptr; // immersed solid displacement grid function
    GridFunction *vib_gf = nullptr; // immersed solid velocity grid function
+   GridFunction *a_gf = nullptr; // immersed solid acceleration grid function
    #endif
    ParaViewDataCollection *sdc = nullptr; // immersed solid paraview data collection
    int solidsolvertype = 1; // 0 = MFEM, 1 = FEBio (default is MFEM)
@@ -131,6 +133,16 @@ public:
    // Output
    mfem::VTKFormat output_format = mfem::VTKFormat::BINARY32; // ASCII, BINARY, or BINARY32
    int compression_level = -1; // zlib compression -1 default, max 9
+
+   // Restarting
+   std::string restart_folder = "RestartFiles";
+   bool write_restarts = false;
+   int restart_step_save = 1;
+   bool restarting = false;
+   int restart_step = 1;
+   double restart_t = 0.0;
+   double restart_dt = 0.0;
+
 public:
    // Material properties
    double fluid_density;
@@ -256,6 +268,10 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.steady_state_save, "steady_state_save");
       ADD_PARAMETER(m.steady_state_step_save, FE_RANGE_GREATER_OR_EQUAL(1), "steady_state_step_save");
       ADD_PARAMETER(m.steady_state_time, FE_RANGE_GREATER_OR_EQUAL(0.0), "steady_state_time");
+      ADD_PARAMETER(m.write_restarts, "write_restart_files");
+      ADD_PARAMETER(m.restart_step_save, FE_RANGE_GREATER_OR_EQUAL(1), "restart_step_save");
+      ADD_PARAMETER(m.restarting, "restart_simulation");
+      ADD_PARAMETER(m.restart_step, FE_RANGE_GREATER_OR_EQUAL(1), "restart_step");
       ADD_PARAMETER(m.wss, "Save_Wall_Shear_Stress");
       ADD_PARAMETER(m.vorticity, "Save_Vorticity");
       ADD_PARAMETER(m.q_criterion, "Save_Q_Criterion");
@@ -974,6 +990,7 @@ bool MFEMSolver::Init()
          // immersed solid grid functions
          m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
          m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
+         m.a_gf = m.flowsolver->GetImmersedSolidAcceleration();
       }
       else if (m.solidsolvertype == SolidSolverType::FEBio)
       {
@@ -1050,6 +1067,7 @@ bool MFEMSolver::Init()
          // immersed solid grid functions
          m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
          m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
+         m.a_gf = m.flowsolver->GetImmersedSolidAcceleration();
       }
       else
       {
@@ -1111,9 +1129,14 @@ bool MFEMSolver::Init()
 
 	// setup output in paraview format
    std::string fname = "results_mfem_solver";
+   if (m.restarting)
+   {
+      fname += "_RESTART_STEP_" + std::to_string(m.restart_step);
+   }
    #ifdef MFEM_USE_MPI
    fname += "_np" + std::to_string(mfem::Mpi::WorldSize());
-   #endif
+   #endif   
+
    if (m.immersed_solid)
    {
       std::string fluid_filename = fname + "/fluid";
@@ -1185,6 +1208,7 @@ bool MFEMSolver::Init()
       m.sdc->SetCompressionLevel(m.compression_level);
       m.sdc->RegisterField("Displacement", m.d_gf);
       m.sdc->RegisterField("Velocity", m.vib_gf);
+      m.sdc->RegisterField("Acceleration", m.a_gf);
       m.sdc->SetCycle(0);
       m.sdc->SetTime(0);
       m.sdc->Save();
@@ -1244,6 +1268,33 @@ bool MFEMSolver::Init()
       }
       #endif
    }
+
+   // Setup restart files
+   if (m.write_restarts)
+   {
+      m.flowsolver->writeRestartFiles(m.restart_folder, m.restart_step_save);
+   }
+   if (m.restarting)
+   {
+      m.flowsolver->Restarting(m.restart_folder, m.restart_step, m.restart_dt, m.restart_t);
+      m.flowsolver->readRestarts(m.restart_step, m.restart_dt, m.restart_t);
+      if (m.immersed_febio_solid) m.immersed_febio_solid->UpdateFEBioDataFromRestart();
+
+      // save the restart state
+      if (m.wss) m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
+      if (m.vorticity) m.flowsolver->ComputeCurl3D(*m.u_gf, m.vorticity_gf);
+      if (m.q_criterion) ComputeQCriterion(*m.u_gf, m.q_criterion_gf);
+
+      m.pvdc->SetCycle(m.restart_step);
+      m.pvdc->SetTime(m.restart_t);
+      m.pvdc->Save();
+      if (m.immersed_solid)
+      {
+         m.sdc->SetCycle(m.restart_step);
+         m.sdc->SetTime(m.restart_t);
+         m.sdc->Save();
+      }
+   }
    
 	return true;
 }
@@ -1255,10 +1306,30 @@ bool MFEMSolver::SolveStep()
 	FEMesh& femesh = fem.GetMesh();
 
 	FEAnalysis* analysis = fem.GetCurrentStep();
-	int timeStep = analysis->m_ntimesteps + 1; // current time step number
+   double t, dt;
+   int timeStep;
+   if (m.restarting)
+   {
+      dt = m.restart_dt;
+      t = m.restart_t + dt; // t = t_n+1
+      timeStep = m.restart_step + 1;
 
-	double t = fem.GetTime().currentTime; // t = t_n+1
-	double dt = fem.GetTime().timeIncrement;
+      // update FEBio time step data
+      analysis->m_ntimesteps = m.restart_step; // time steps completed
+      analysis->m_dt = dt;
+
+      fem.GetTime().currentTime = t;
+      fem.GetTime().timeIncrement = dt;
+      fem.GetTime().timeStep = dt;
+
+      m.restarting = false; // only restart once
+   }
+   else
+   {
+      t = fem.GetTime().currentTime; // t = t_n+1
+      dt = fem.GetTime().timeIncrement;
+      timeStep = analysis->m_ntimesteps + 1; // current time step number
+   }
 
    // solve a time step
 	m.flowsolver->Step(t, dt, timeStep);
