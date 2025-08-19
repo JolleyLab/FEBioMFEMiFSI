@@ -36,6 +36,10 @@
 			<Subtract_viscous_stress>1</Subtract_viscous_stress>
 			<VMS_stabilization_scaling>1</VMS_stabilization_scaling>
 			<rho_inf>0.5</rho_inf>
+         <write_restart_files>0</write_restart_files>
+         <restart_step_save>1</restart_step_save>
+         <restart_simulation>0</restart_simulation>
+         <restart_step>8</restart_step>
 			<atol>1e-10</atol>
 			<rtol>1e-06</rtol>
 			<minIt>3</minIt>
