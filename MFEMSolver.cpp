@@ -19,6 +19,7 @@
 #include <Elasticity/Materials/materials.hpp>
 
 #include <typeinfo>
+#include <filesystem>
 
 using namespace ins_solver_serial;
 using namespace std;
@@ -143,6 +144,13 @@ public:
    double restart_t = 0.0;
    double restart_dt = 0.0;
 
+   // Pre-partitioning of the mesh
+   // Large meshes can be pre-partitioned, then only the local piece is read on each rank
+   // rather than the entire mesh read on each rank then performing the partitioning
+   bool pre_partition = false; // flag for pre-partitioning the mesh
+   int partition_opt = 0; // 0 = PartitionMesh, 1 = ReadParallelMesh
+   enum ParallelMesh { PartitionMesh = 0, ReadParallelMesh = 1 };
+
 public:
    // Material properties
    double fluid_density;
@@ -246,6 +254,9 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       // ADD_PARAMETER(m.stabilized_LSIC, "LSIC");
       ADD_PARAMETER(m.LaplaceForm, "Laplace_form");
       ADD_PARAMETER(m.zero_mean_pressure, "Zero_mean_pressure");
+      // pre-partitioning of the mesh
+      ADD_PARAMETER(m.pre_partition, "pre_partition_mesh");
+      ADD_PARAMETER(m.partition_opt, "pre_partition_opt")->setEnums("PartitionMesh\0ReadParallelMesh\0");
    END_PARAM_GROUP();
 
    // Immersed Solid Options
@@ -569,6 +580,15 @@ double MFEMSolver::DynamicViscosity() const
 	return m.dyn_viscosity;
 }
 
+#ifdef MFEM_USE_MPI
+void MFEMSolver::PartitionMesh()
+{
+   auto fluid_serial_mesh = m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh);
+   m.fluid_pmesh = new ParMesh(MPI_COMM_WORLD, *fluid_serial_mesh);
+   if (m.immersed_solid) m.solid_pmesh = new ParMesh(MPI_COMM_WORLD, *m.solid_mesh);
+}
+#endif
+
 bool MFEMSolver::Init()
 {
 	// create the mfem mesh from the FEBio mesh
@@ -655,17 +675,119 @@ bool MFEMSolver::Init()
    }
    
    #ifdef MFEM_USE_MPI
-   // Partition the meshes
-   auto fluid_serial_mesh = m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh);
-   m.fluid_pmesh = new ParMesh(MPI_COMM_WORLD, *fluid_serial_mesh);
-   if (m.immersed_solid) m.solid_pmesh = new ParMesh(MPI_COMM_WORLD, *m.solid_mesh);
-   
-   if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
+   if(m.pre_partition)
    {
-      // create ParFEModel
-      m.par_fem = new ParFEModel(fem, m.mesh);
-      m.par_fem->SetMFEMSubMesh(m.solid_mesh);
+      if (m.partition_opt == Imp::ParallelMesh::PartitionMesh)
+      {
+         // // partition the mesh then output each piece
+         // auto fluid_serial_mesh = m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh);
+         // m.fluid_pmesh = new ParMesh(MPI_COMM_WORLD, *fluid_serial_mesh);
+         // if (m.immersed_solid) m.solid_pmesh = new ParMesh(MPI_COMM_WORLD, *m.solid_mesh);
+         PartitionMesh();
+
+         // Print out the parallel mesh
+
+         // Create directory structure if it doesn't exist
+         #ifdef MFEM_USE_MPI
+         int myid = mfem::Mpi::WorldRank();
+         #else
+         int myid = 0;
+         #endif
+         std::string part_dir = "ParallelMesh/";
+         if (myid == 0)
+         {
+            try {
+               std::filesystem::create_directories(part_dir);
+            }
+            catch (const std::filesystem::filesystem_error& ex) {
+               MFEM_ABORT("Error creating directory for parallel mesh: " << ex.what());
+            }
+         }
+         #ifdef MFEM_USE_MPI
+         MPI_Barrier(MPI_COMM_WORLD);
+         #endif
+
+         std::ostringstream oss;
+         oss << std::setw(10) << std::setfill('0') << myid;
+         std::string fluid_mname = part_dir + "fluid_mesh_"+oss.str()+".msh";
+         std::ofstream out_mesh;
+         out_mesh.open(fluid_mname.c_str(), std::ios::out);
+         out_mesh.precision(20);
+         m.fluid_pmesh->ParPrint(out_mesh);
+         out_mesh.close();
+
+         if (m.immersed_solid)
+         {
+            MFEM_ABORT("TODO");
+            std::string solid_mname = part_dir + "solid_mesh_"+oss.str()+".msh";
+            out_mesh.open(solid_mname.c_str(), std::ios::out);
+            out_mesh.precision(20);
+            m.solid_pmesh->ParPrint(out_mesh);
+            out_mesh.close();
+         }
+
+         mfem::out << "-------------------------------\n";
+         mfem::out << "Pre-partitioning of the mesh complete" << std::endl;
+         mfem::out << "-------------------------------\n";
+         std::exit(EXIT_SUCCESS);
+      }
+      else if (m.partition_opt == Imp::ParallelMesh::ReadParallelMesh)
+      {
+         mfem::out << "Reading the parallel mesh..." << std::endl;
+         mfem::out << "-------------------------------\n";
+
+         // read a parallel mesh from output above
+         std::ostringstream oss;
+
+         #ifdef MFEM_USE_MPI
+         int myid = mfem::Mpi::WorldRank();
+         #else
+         int myid = 0;
+         #endif
+
+         std::string part_dir = "ParallelMesh/";
+         oss << std::setw(10) << std::setfill('0') << myid;
+         std::string fluid_mname = part_dir + "fluid_mesh_"+oss.str()+".msh";
+         std::ifstream in_mesh;
+         in_mesh.open(fluid_mname.c_str(), std::ios::in);
+         m.fluid_pmesh = new ParMesh(MPI_COMM_WORLD,in_mesh,0);
+         in_mesh.close();
+
+         // ensure attributes
+         m.fluid_pmesh->SetAttributes();
+
+         if (m.immersed_solid)
+         {
+            MFEM_ABORT("TODO");
+            std::string solid_mname = part_dir + "solid_mesh_"+oss.str()+".msh";
+            in_mesh.open(solid_mname.c_str(), std::ios::in);
+            m.solid_pmesh = new ParMesh(MPI_COMM_WORLD,in_mesh,0);
+            in_mesh.close();
+
+            // ensure attributes
+            m.solid_pmesh->SetAttributes();
+         }
+      }
+      else
+      {
+         MFEM_ABORT("Unknown option for handling parallel meshes");
+      }
    }
+   else
+   {
+      // Partition the meshes
+      // auto fluid_serial_mesh = m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh);
+      // m.fluid_pmesh = new ParMesh(MPI_COMM_WORLD, *fluid_serial_mesh);
+      // if (m.immersed_solid) m.solid_pmesh = new ParMesh(MPI_COMM_WORLD, *m.solid_mesh);
+      PartitionMesh();
+      
+      if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
+      {
+         // create ParFEModel
+         m.par_fem = new ParFEModel(fem, m.mesh);
+         m.par_fem->SetMFEMSubMesh(m.solid_mesh);
+      }
+   }   
    #endif
 
    // get fluid material

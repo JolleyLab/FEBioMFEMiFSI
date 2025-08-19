@@ -88,5 +88,9 @@ public:
 private:
 	Imp& m;
 
+   #ifdef MFEM_USE_MPI
+   void PartitionMesh();
+   #endif
+
 	DECLARE_FECORE_CLASS();
 };

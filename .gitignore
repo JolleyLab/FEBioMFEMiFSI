@@ -412,3 +412,7 @@ run_mpi_lldb.sh
 results_mfem_solver*/
 *.fs2
 *.fs
+*.gf
+*.mesh
+*.msh
+*.dat
