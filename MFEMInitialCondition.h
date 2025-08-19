@@ -9,6 +9,13 @@ class MFEMInitialCondition : public FEInitialCondition
 public:
 	MFEMInitialCondition(FEModel* fem) : FEInitialCondition(fem) {}
 
+   virtual void CopyFrom(FEInitialCondition& ic)
+   {
+      MFEMInitialCondition* mic = dynamic_cast<MFEMInitialCondition*>(&ic);
+      assert(mic);
+      CopyParameterListState(mic->GetParameterList());
+   };
+
 	virtual void Apply(MFEMSolver* solver) = 0;
 };
 
@@ -19,6 +26,14 @@ public:
 	MFEMInitialPressure(FEModel* fem) : MFEMInitialCondition(fem) {}
 
 	void Apply(MFEMSolver* solver) override;
+
+   void CopyFrom(FEInitialCondition& ic) override;
+
+   // set the pressure
+   void SetPressure(double p) { m_pressure = p; }
+
+   // get the pressure
+   double GetPressure() const;
 
 private:
 	FEParamDouble m_pressure;
@@ -33,6 +48,8 @@ public:
 	MFEMInitialVelocity(FEModel* fem) : MFEMInitialCondition(fem) {}
 
 	void Apply(MFEMSolver* solver) override;
+
+   void CopyFrom(FEInitialCondition& ic) override;
 
 private:
 	FEParamDouble m_vx;

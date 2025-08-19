@@ -1,12 +1,20 @@
 #pragma once
 #include <FECore/FESolver.h>
-#include "CustomStreamBuffer.h"
 
-#ifdef WIN32
-#include "ins_solver.hpp"
-#else
-#include <Navier-Stokes-Serial/ins_solver.hpp>
-#endif
+namespace mfem
+{  
+   class GridFunction;
+   class Mesh;
+   class VectorCoefficient;
+   template <typename T> class Array;
+   class Coefficient;
+   class Vector;
+   class VectorCoefficient;
+   #ifdef MFEM_USE_MPI
+   class ParGridFunction;
+   class ParMesh;
+   #endif
+}
 
 class MFEMSolver : public FESolver
 {
@@ -21,10 +29,29 @@ public:
 	bool SolveStep() override;
 
 public:
-	mfem::GridFunction* GetCurrentPressure();
+   #ifdef MFEM_USE_MPI
+   mfem::ParGridFunction* GetCurrentPressure();
+	mfem::ParGridFunction* GetCurrentVelocity();
+
+	mfem::ParMesh* GetMFEMMesh();
+   mfem::ParMesh* GetMFEMfluidmesh();
+   mfem::ParMesh* GetMFEMsolidmesh();
+   #else
+   mfem::GridFunction* GetCurrentPressure();
 	mfem::GridFunction* GetCurrentVelocity();
 
 	mfem::Mesh* GetMFEMMesh();
+   mfem::Mesh* GetMFEMfluidmesh();
+   mfem::Mesh* GetMFEMsolidmesh();
+   #endif
+
+   // flag for immersed solid
+   bool ImmersedSolid();
+   // solid solver type
+   int SolidSolverType();
+   enum SolidSolverType { MFEM = 0, FEBio = 1 };
+   // three field formulation
+   bool ThreeFieldFormulation();
 
    // velocity bcs
 	void AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);
@@ -48,6 +75,7 @@ public:
    void AddBackflowStabilizationBC(FEParamDouble beta, mfem::Array<int>& attr);
    void AddResistanceBC(FEParamDouble R, FEParamDouble p0, mfem::Array<int>& attr);
    void AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDouble C, FEParamDouble p0, FEParamDouble pd, mfem::Array<int>& attr);
+   void AddMappedInflowBC_FromFile(std::string flowfile, bool periodic, mfem::Array<int>& attr);
 
    // body forces
    void AddBodyForce(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);
@@ -60,8 +88,9 @@ public:
 private:
 	Imp& m;
 
-   // Custom stream buffer for writing to the log file
-   CustomStreamBuffer customBuffer;
+   #ifdef MFEM_USE_MPI
+   void PartitionMesh();
+   #endif
 
 	DECLARE_FECORE_CLASS();
 };

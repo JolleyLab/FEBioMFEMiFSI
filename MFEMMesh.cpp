@@ -4,7 +4,6 @@
 #include <FECore/FESurface.h>
 #include "mfem.hpp"
 #include <math.h>
-using namespace mfem;
 
 MFEMMesh::MFEMMesh(int nodes, int elems, int bndrelems) : mfem::Mesh(3, nodes, elems, bndrelems)
 {
@@ -36,12 +35,17 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 	}
 
 	int indices[FEElement::MAX_NODES] = { 0 };
+   int elem_counter = 0;
+   mfem::Vector elem_center(3);
+   std::vector<double> elem_center_std(3);
+   int new_elem_num = 0;
 	for (int n = 0; n < febioMesh.Domains(); ++n)
 	{
 		FEDomain& dom = febioMesh.Domain(n);
 		int elemsInDomain = dom.Elements();
       newMesh->AssignDomainAttribute(&dom, n + 1);
 		for (int i = 0; i < elemsInDomain; i++) {
+         std::fill(indices, indices + FEElement::MAX_NODES, 0); // reset indices to all 0
 			FEElement& el = dom.ElementRef(i);
 			for (int j = 0; j < el.Nodes(); j++) {
 				indices[j] = el.m_node[j];
@@ -51,17 +55,16 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 			{
          case ET_TET4: 
          case ET_TET10:
-            newMesh->AddTet(indices, n + 1); break;
+            new_elem_num = newMesh->AddTet(indices, n + 1); break;
          case ET_HEX8: 
          case ET_HEX27:
-            newMesh->AddHex(indices, n + 1); break;
+            new_elem_num = newMesh->AddHex(indices, n + 1); break;
          case ET_PENTA6: 
          // case ET_PENTA15: // 2nd order wedge TODO
-            newMesh->AddWedge(indices, n + 1); break;
+            new_elem_num = newMesh->AddWedge(indices, n + 1); break;
          case ET_PYRA5: 
          // case ET_PYRA13: // 2nd order pyramid TODO
-            newMesh->AddPyramid(indices, n + 1);
-            assert(false); // no routines for computing d2Ndxx in MFEM yet
+            new_elem_num = newMesh->AddPyramid(indices, n + 1);
             break;
 			default:
 				assert(false);
@@ -69,6 +72,8 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 		}
 	}
 
+   newMesh->SetNumSurfaces(febioMesh.FacetSets());
+   int mfem_glob_surf_id = 0;
 	for (int n = 0; n < febioMesh.FacetSets(); ++n)
 	{
 		FEFacetSet& surf = febioMesh.FacetSet(n);
@@ -76,10 +81,14 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 		newMesh->AssignSurfaceAttribute(&surf, n + 1);
 		for (int i = 0; i < faces; ++i)
 		{
+         std::fill(indices, indices + FEElement::MAX_NODES, 0); // reset indices to all 0
 			FEFacetSet::FACET& face = surf.Face(i);
 			for (int j = 0; j < face.Nodes(); j++) {
 				indices[j] = face.node[j];
 			}
+
+         newMesh->SetFEBioSurfaceElementID(n+1,mfem_glob_surf_id,i);
+         mfem_glob_surf_id++;
 
          switch (face.ntype)
          {

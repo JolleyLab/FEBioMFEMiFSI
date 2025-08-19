@@ -23,14 +23,18 @@
 			<pressure_order>1</pressure_order>
 			<VMS>1</VMS>
 			<Laplace_form>0</Laplace_form>
+         <pre_partition_mesh>0</pre_partition_mesh>
+         <pre_partition_opt>0</pre_partition_opt>
 			<rho_inf>0.5</rho_inf>
 			<atol>1e-06</atol>
 			<rtol>0.001</rtol>
 			<minIt>3</minIt>
 			<maxIt>10</maxIt>
+			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-06</lin_atol>
 			<lin_rtol>0.001</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
+			<inner_solver_type>Iterative</inner_solver_type>
 			<Ainv_atol>1e-06</Ainv_atol>
 			<Ainv_rtol>0.001</Ainv_rtol>
 			<Sinv_atol>1e-06</Sinv_atol>

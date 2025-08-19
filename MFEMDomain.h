@@ -16,15 +16,24 @@ public:
 
 	void SetMaterial(FEMaterial* pmat) override
 	{
-		mat = dynamic_cast<MFEMMaterial*>(pmat);
-		FEShellDomainOld::SetMaterial(pmat);
+      if (dynamic_cast<MFEMMaterial*>(pmat)) 
+      {
+         mat = dynamic_cast<MFEMMaterial*>(pmat);
+         FEShellDomainOld::SetMaterial(pmat);
+      }
+      else if (dynamic_cast<FEElasticMaterial*>(pmat)) 
+      {
+         mat = dynamic_cast<FEElasticMaterial*>(pmat);
+         FEShellDomainOld::SetMaterial(pmat);
+      }
+      else assert(false);
 	}
 
 	FEMaterial* GetMaterial() override { return mat; }
 
 private:
 	FEDofList dofs;
-	MFEMMaterial* mat;
+	FEMaterial* mat;
 };
 
 
@@ -40,15 +49,24 @@ public:
 
 	void SetMaterial(FEMaterial* pmat) override
 	{
-		mat = dynamic_cast<MFEMMaterial*>(pmat);
-		FESolidDomain::SetMaterial(pmat);
+      if (dynamic_cast<MFEMMaterial*>(pmat)) 
+      {
+         mat = dynamic_cast<MFEMMaterial*>(pmat);
+         FESolidDomain::SetMaterial(pmat);
+      }
+      else if (dynamic_cast<FEElasticMaterial*>(pmat)) 
+      {
+         mat = dynamic_cast<FEElasticMaterial*>(pmat);
+         FESolidDomain::SetMaterial(pmat);
+      }
+      else assert(false);
 	}
 
 	FEMaterial* GetMaterial() override { return mat; }
 
 private:
 	FEDofList dofs;
-	MFEMMaterial* mat;
+	FEMaterial* mat;
 };
 
 class MFEMDomainFactory : public FEDomainFactory

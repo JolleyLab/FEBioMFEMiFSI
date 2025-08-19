@@ -39,7 +39,8 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # Find FEBio Libs (from FEBioHeat plugin CMakeLists.txt)
-set(FEBio_SDK "/Applications/FEBioStudio/sdk")
+# set(FEBio_SDK "/Applications/FEBioStudio/sdk")
+set(FEBio_SDK "/Users/blackr1/Documents/Software/FEBio/")
 
 # Only update the include and lib directories if the FEBio_SDK path has been changed. 
 if(NOT OLD_SDK)
@@ -128,6 +129,7 @@ if(FEBio_LIB_DIR)
     findLib(FECore FEBio_LIB_DIR FECORE)
     findLib(FEBioMech FEBio_LIB_DIR FEBIOMECH)
 endif()
+message(STATUS "Found FEBio Include in: ${FEBio_INC}")
 
 ##### Find FSI and MFEM Libraries
 
@@ -151,6 +153,22 @@ message(STATUS "Found mfem config in: ${mfem_DIR} (version ${MFEM_VERSION})")
 #   set(CMAKE_CXX_COMPILER "${MFEM_CXX_COMPILER}")
 # endif()
 
+#set options based on mfem config
+if(MFEM_USE_MPI)
+   Option(iFSI_USE_MPI "Use MPI" ON)
+   add_definitions(-DMFEM_USE_MPI)
+   add_definitions(-DMFEM_USE_GSLIB)
+else()
+   Option(iFSI_USE_MPI "Use MPI" OFF)
+endif()
+if (MFEM_USE_GSLIB)
+   Option(iFSI_USE_GSLIB "Use GSLIB" ON)
+else()
+   Option(iFSI_USE_GSLIB "Use GSLIB" OFF)
+endif()
+add_definitions(-DiFSI_USE_MPI)
+add_definitions(-DiFSI_USE_GSLIB)
+
 # Import FSI_Solver
 message(STATUS "Looking for fsi_solver ...")
 set(FSI_Solver_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../FSI_Solver_v2.0/build/" CACHE PATH "Path to the FSI_Solver build or install prefix.")
@@ -170,13 +188,20 @@ elseif(APPLE)
     add_definitions(-D__APPLE__)
    #  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.13)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup")
+   #  add_compile_options(-frtti) # Enable RTTI for macOS
+   # add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+   # add_link_options(-fsanitize=address)
 else()
 	add_definitions(-DLINUX)
-    add_compile_options(-static-libstdc++ -static-libgcc -w -Wall)
+   #  add_compile_options(-static-libstdc++ -static-libgcc -w -Wall -frtti)
+   add_compile_options(-static-libstdc++ -static-libgcc -w -Wall)
     
     set(CMAKE_BUILD_RPATH_USE_LINK_PATH FALSE)
     set(CMAKE_BUILD_RPATH $ORIGIN/../lib/)
 endif()
+
+# Options file
+CONFIGURE_FILE(FEBioMFEMiFSIOptions.cmake.in FEBioMFEMiFSIOptions.cmake @ONLY)
 
 # Set include directory
 include_directories(${FEBio_INC} ${FSI_Source_DIR} ${MFEM_SOURCE_DIR})
@@ -195,3 +220,6 @@ target_link_libraries(FEBioMFEMiFSI mfem)
 
 # Link FSI Solver
 target_link_libraries(FEBioMFEMiFSI fsi_solver)
+
+# Output the build type
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
