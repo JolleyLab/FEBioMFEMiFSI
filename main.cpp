@@ -69,7 +69,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    // mfem::Mpi::Init(argc, argv);
 
    // works for most MPI implementations
-   mfem::Mpi::Init(nullptr, nullptr);   
+   mfem::Mpi::Init(nullptr, nullptr);
    
    mfem::Hypre::Init();
    #endif	

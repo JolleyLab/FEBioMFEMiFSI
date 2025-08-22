@@ -402,7 +402,7 @@ febio*-sdk
 
 # RB: VSCode and MacOS
 .vscode/
-build
+build/
 generate_cmake_path.sh
 after_git_pull.sh
 before_git_push.sh

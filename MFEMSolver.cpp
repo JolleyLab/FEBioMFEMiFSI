@@ -654,25 +654,6 @@ bool MFEMSolver::Init()
          if (m.solid_mesh == nullptr) return false;
       }
    }
-
-   // print mesh details
-   if (m.immersed_solid)
-   {
-      feLog("-------------------------------\nFluid Mesh\n");
-      m.fluid_mesh->PrintCharacteristics();
-      feLog("-------------------------------\nSolid Mesh\n");
-      m.solid_mesh->PrintCharacteristics();
-      feLog("-------------------------------\n");
-
-      // m.fluid_mesh->Save("fluid_mesh.mesh");
-      // m.solid_mesh->Save("solid_mesh.mesh");
-   }
-   else
-   {
-      feLog("-------------------------------\nFluid Mesh\n");
-      m.mesh->PrintCharacteristics();
-      feLog("-------------------------------\n");
-   }
    
    #ifdef MFEM_USE_MPI
    if(m.pre_partition)
@@ -789,6 +770,34 @@ bool MFEMSolver::Init()
       }
    }   
    #endif
+
+   // print mesh details
+   if (m.immersed_solid)
+   {
+      feLog("-------------------------------\nFluid Mesh\n");
+      #ifdef MFEM_USE_MPI
+      m.fluid_pmesh->PrintCharacteristics();
+      #else
+      m.fluid_mesh->PrintCharacteristics();
+      #endif
+      feLog("-------------------------------\nSolid Mesh\n");
+      #ifdef MFEM_USE_MPI
+      m.solid_pmesh->PrintCharacteristics();
+      #else
+      m.solid_mesh->PrintCharacteristics();
+      #endif
+      feLog("-------------------------------\n");
+   }
+   else
+   {
+      feLog("-------------------------------\nFluid Mesh\n");
+      #ifdef MFEM_USE_MPI
+      m.fluid_pmesh->PrintCharacteristics();
+      #else
+      m.mesh->PrintCharacteristics();
+      #endif
+      feLog("-------------------------------\n");
+   }
 
    // get fluid material
    for (int i=0; i<fem->Materials(); ++i)
