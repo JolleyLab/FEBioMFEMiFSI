@@ -686,28 +686,6 @@ bool MFEMSolver::CreateMesh()
             out_mesh.close();
          }
 
-         // // material to domain map         
-         // if (myid == 0)
-         // {
-         //    std::string domain_material_file = part_dir + "domain_materials.map";
-         //    std::ofstream dom_mat_file(domain_material_file);
-         //    if (!dom_mat_file.is_open())
-         //    {
-         //       MFEM_ABORT("Could not open domain material file: " << domain_material_file);
-         //    }
-         //    dom_mat_file << "# Domain Attribute, Material ID, Material Name, Material Type\n";
-         //    for (int i = 0; i < femesh.Domains(); ++i)
-         //    {
-         //       FEDomain& dom = femesh.Domain(i);
-         //       int dom_attr = m.mesh->GetDomainAttribute(&dom);
-         //       if (dom.IsActive())
-         //       {
-         //          dom_mat_file << dom_attr << ", " << dom.GetMaterial()->GetID() << ", " << dom.GetMaterial()->GetName() << ", " << dom.GetMaterial()->GetTypeStr() << "\n";
-         //       }
-         //    }
-         //    dom_mat_file.close();
-         // }
-
          // I need to setup local febio mesh - currently to do this I need to call SetupFluid and SetupSolid then the below function
          if (SetupFluid() == false) return false;
          if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
