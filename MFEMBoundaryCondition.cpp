@@ -33,6 +33,11 @@ void MFEMBoundaryCondition::CopyFrom(FEBoundaryCondition* pbc)
    (*this).m_bdr_attr = m_bc->m_bdr_attr;
 }
 
+bool MFEMBoundaryCondition::Init()
+{
+   return FEBoundaryCondition::Init();
+}
+
 BEGIN_FECORE_CLASS(MFEMVelDirichletBC, MFEMBoundaryCondition)
 	ADD_PARAMETER(m_vx, "vx");
 	ADD_PARAMETER(m_vy, "vy");

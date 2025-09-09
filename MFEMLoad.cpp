@@ -55,6 +55,11 @@ void MFEMSurfaceLoad::Apply(MFEMSolver* solver, int attr)
    }
 }
 
+bool MFEMSurfaceLoad::Init()
+{
+   return FEModelLoad::Init();
+}
+
 BEGIN_FECORE_CLASS(MFEMNeumannBC, MFEMSurfaceLoad)
 	ADD_PARAMETER(m_tx, "tx");
 	ADD_PARAMETER(m_ty, "ty");

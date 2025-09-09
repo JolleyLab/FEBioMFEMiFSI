@@ -31,6 +31,8 @@ public:
 
    double GetBoundaryID() { return m_bdr_attr; };
 
+   bool Init() override;
+
 private:
    int m_bdr_attr; // bdr attribute ID for the boundary condition
    bool m_backflow_stab; // flag for backflow stabilization
@@ -53,10 +55,15 @@ public:
 
    std::vector<int> &GetDomainIDList() { return m_dom_list; };
 
+   void SetDomainAttr(int attr) { mfem_dom_attr = attr; }
+   int GetDomainAttr() const { return mfem_dom_attr; }
+
    virtual void CopyFrom(FEModelLoad* pml);
 
 private:
    std::vector<int> m_dom_list; // domain IDs for the body load
+
+   int mfem_dom_attr = -1;
 };
 
 class MFEMNodalLoad : public FENodalLoad
