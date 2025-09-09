@@ -1,6 +1,9 @@
 #pragma once
 #include <FECore/FESolver.h>
 
+#include "MFEMParImport.h"
+#include "MFEMParExport.h"
+
 namespace mfem
 {  
    class GridFunction;
@@ -88,9 +91,23 @@ public:
 private:
 	Imp& m;
 
+   // Workflow functions
+   bool CreateMesh();
+   bool ExtractFluidAndSolidMeshes();
+   bool SetupFluid();
+   bool SetupSolid();
+   void SetupSolvers();
+   void PostProcessOutput();
+   void RestartFiles();
+
    #ifdef MFEM_USE_MPI
    void PartitionMesh();
+   void ClearSerialMeshData();
    #endif
+
+   // XML writing and reading for parallel meshes //
+   MFEMParImport par_import;
+   MFEMParExport par_export;
 
 	DECLARE_FECORE_CLASS();
 };

@@ -685,7 +685,8 @@ mfem::Operator &ImmersedFEBioSolid::FormLHS()
             if (sl && sl->IsActive())
             {
                int curr_bdr_attr = sl->GetBoundaryID();
-               if (curr_bdr_attr != bdr_attr-1) { continue; }
+               // if (curr_bdr_attr != bdr_attr-1) { continue; }
+               if (curr_bdr_attr-1 != bdr_attr-1) { continue; } // RB: 9-9-25
 
                // get the next element
                FESurfaceElement& el = surf.Element(b);

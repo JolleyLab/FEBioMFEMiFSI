@@ -27,6 +27,8 @@ public:
 
    double GetBoundaryID() { return m_bdr_attr; };
 
+   bool Init() override;
+
 private:
    int m_bdr_attr; // bdr attribute ID for the boundary condition
 };

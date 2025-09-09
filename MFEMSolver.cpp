@@ -3,6 +3,7 @@
 #include <FECore/FEModel.h>
 #include <FECore/FEAnalysis.h>
 #include <FECore/log.h>
+#include <FEBioLib/FEBioModel.h>
 
 #include "MFEMImmersedFEBioSolid.h"
 #include "MFEMMesh.h"
@@ -20,6 +21,8 @@
 
 #include <typeinfo>
 #include <filesystem>
+#include <sstream>
+#include <iomanip>
 
 using namespace ins_solver_serial;
 using namespace std;
@@ -132,6 +135,7 @@ public:
    #endif
 
    // Output
+   std::string fname = "results_mfem_solver";
    mfem::VTKFormat output_format = mfem::VTKFormat::BINARY32; // ASCII, BINARY, or BINARY32
    int compression_level = -1; // zlib compression -1 default, max 9
 
@@ -580,15 +584,6 @@ double MFEMSolver::DynamicViscosity() const
 	return m.dyn_viscosity;
 }
 
-#ifdef MFEM_USE_MPI
-void MFEMSolver::PartitionMesh()
-{
-   auto fluid_serial_mesh = m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh);
-   m.fluid_pmesh = new ParMesh(MPI_COMM_WORLD, *fluid_serial_mesh);
-   if (m.immersed_solid) m.solid_pmesh = new ParMesh(MPI_COMM_WORLD, *m.solid_mesh);
-}
-#endif
-
 bool MFEMSolver::Init()
 {
 	// create the mfem mesh from the FEBio mesh
@@ -601,69 +596,54 @@ bool MFEMSolver::Init()
    std::ostream customStream(&m.customBuffer);
    mfem::out.rdbuf(customStream.rdbuf());
 
+   // Initialize the MFEM solver
+   if (!CreateMesh()) return false;
+
+   if (!SetupFluid()) return false;
+
+   if(m.immersed_solid) if (!SetupSolid()) return false;
+
+   #ifdef MFEM_USE_MPI
+   if (!m.pre_partition)
+   {
+      ClearSerialMeshData();
+   }
+   #endif
+
+   SetupSolvers();
+
+   PostProcessOutput();
+
+   RestartFiles();
+
+	return true;
+}
+
+bool MFEMSolver::CreateMesh()
+{
+   FEModel* fem = GetFEModel();
+
    // create the mesh
 	FEMesh& femesh = fem->GetMesh();
 	m.mesh = CreateMFEMMesh3D(femesh);
    // m.mesh->EnsureNodes();
 	if (m.mesh == nullptr) return false;
-   if (m.immersed_solid)
-   {
-      // create fluid and solid submeshes from mfem version of FEBio mesh
-      bool mfem_solid_material = false;
-      bool febio_solid_material = false;
-      Array<int> fluid_domain_attr(m.mesh->attributes.Max());
-      fluid_domain_attr = 0;
-      Array<int> solid_domain_attr(m.mesh->attributes.Max());
-      solid_domain_attr = 0;
-      for (int i = 0; i < femesh.Domains(); ++i)
-      {
-         FEDomain& dom = femesh.Domain(i);
-         int dom_attr = m.mesh->GetDomainAttribute(&dom);
-         if (dom.IsActive() && dynamic_cast<MFEMSolidMaterial*>(dom.GetMaterial()))
-         {
-            solid_domain_attr[i] = dom_attr;
-            mfem_solid_material = true;
-         }
-         if (dom.IsActive() && dynamic_cast<FEElasticMaterial*>(dom.GetMaterial()))
-         {
-            solid_domain_attr[i] = dom_attr;
-            febio_solid_material = true;
-         }
-         if(dom.IsActive() && dynamic_cast<MFEMNewtonianFluid*>(dom.GetMaterial()))
-         {
-            fluid_domain_attr[i] = dom_attr;            
-         }
-      }
-
-      // create each mesh as sum of all domains (e.g. mfem solid mesh = sum of all febio solid domains), this will preserve domain numbering.
-      // This assumes each solid domain is deformable.
-      // RB: 6-4-25, fixes bug with mixed meshes and immersed fsi
-      // fluid 
-      m.fluid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,fluid_domain_attr));
-      if (m.fluid_mesh == nullptr) return false;
-
-      // solid
-      if (mfem_solid_material && febio_solid_material)
-      {
-         feLogError("Cannot have both FEBio and MFEM solid materials in the same mesh");
-         return false;
-      }
-      else
-      {
-         m.solid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,solid_domain_attr));
-         if (m.solid_mesh == nullptr) return false;
-      }
-   }
    
    #ifdef MFEM_USE_MPI
    if(m.pre_partition)
    {
       if (m.partition_opt == Imp::ParallelMesh::PartitionMesh)
       {
-         // // partition the mesh then output each piece
-         // auto fluid_serial_mesh = m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh);
-         // m.fluid_pmesh = new ParMesh(MPI_COMM_WORLD, *fluid_serial_mesh);
-         // if (m.immersed_solid) m.solid_pmesh = new ParMesh(MPI_COMM_WORLD, *m.solid_mesh);
+         // partition the mesh then output each piece
+         if (m.immersed_solid)
+         {
+            // extract fluid and solid meshes
+            if (!ExtractFluidAndSolidMeshes())
+            {
+               mfem::out << "Error extracting fluid and solid meshes" << std::endl;
+               return false;
+            }
+         }
          PartitionMesh();
 
          // Print out the parallel mesh
@@ -699,7 +679,6 @@ bool MFEMSolver::Init()
 
          if (m.immersed_solid)
          {
-            MFEM_ABORT("TODO");
             std::string solid_mname = part_dir + "solid_mesh_"+oss.str()+".msh";
             out_mesh.open(solid_mname.c_str(), std::ios::out);
             out_mesh.precision(20);
@@ -707,9 +686,28 @@ bool MFEMSolver::Init()
             out_mesh.close();
          }
 
-         mfem::out << "-------------------------------\n";
+         // I need to setup local febio mesh - currently to do this I need to call SetupFluid and SetupSolid then the below function
+         if (SetupFluid() == false) return false;
+         if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
+         {
+            if (SetupSolid() == false) return false;
+         }
+         ClearSerialMeshData();
+
+         // write main and local .feb files
+         std::string feb_filename = dynamic_cast<FEBioModel*>(fem)->GetFileTitle();
+         feb_filename = std::filesystem::path(feb_filename).stem().string(); // remove .feb
+         
+         par_export.SetFEModel(fem);
+         par_export.SetFESolver(this);
+         bool immersed_febio_solid_and_solver = false;
+         if (m.immersed_febio_solid && m.solidsolvertype == SolidSolverType::FEBio)
+            immersed_febio_solid_and_solver = true;
+         par_export.WriteFiles(feb_filename, part_dir, myid, immersed_febio_solid_and_solver);
+
+         mfem::out << "-------------------------------------\n";
          mfem::out << "Pre-partitioning of the mesh complete" << std::endl;
-         mfem::out << "-------------------------------\n";
+         mfem::out << "-------------------------------------\n";
          std::exit(EXIT_SUCCESS);
       }
       else if (m.partition_opt == Imp::ParallelMesh::ReadParallelMesh)
@@ -739,7 +737,6 @@ bool MFEMSolver::Init()
 
          if (m.immersed_solid)
          {
-            MFEM_ABORT("TODO");
             std::string solid_mname = part_dir + "solid_mesh_"+oss.str()+".msh";
             in_mesh.open(solid_mname.c_str(), std::ios::in);
             m.solid_pmesh = new ParMesh(MPI_COMM_WORLD,in_mesh,0);
@@ -748,6 +745,30 @@ bool MFEMSolver::Init()
             // ensure attributes
             m.solid_pmesh->SetAttributes();
          }
+
+         // Read local feb file
+         std::string feb_filename = dynamic_cast<FEBioModel*>(fem)->GetFileTitle();
+         feb_filename = std::filesystem::path(feb_filename).stem().string(); // remove .feb
+         std::string suffix = "_Main";
+         if (feb_filename.size() >= suffix.size() &&
+            feb_filename.compare(feb_filename.size() - suffix.size(), suffix.size(), suffix) == 0) {
+            feb_filename.erase(feb_filename.size() - suffix.size());
+         } // remove _Main
+         std::string local_feb_file = part_dir + feb_filename + "_Local_" + oss.str() + ".feb";
+
+         if (m.immersed_solid) par_import.SetSolidMesh(m.solid_pmesh);
+         if (par_import.Load(*fem, local_feb_file.c_str()) == false)
+         {
+            // Print the detailed import error captured by FEFileImport::errf
+            char err[1024];
+            par_import.GetErrorMessage(err);
+            mfem::out << "MFEMParImport error (rank " << myid << "): "
+                      << (err[0] ? err : "unknown error")
+                      << "\nWhile loading: " << local_feb_file << std::endl;
+         }
+
+         // reinit model
+         fem->Init();
       }
       else
       {
@@ -756,18 +777,18 @@ bool MFEMSolver::Init()
    }
    else
    {
-      // Partition the meshes
-      // auto fluid_serial_mesh = m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh);
-      // m.fluid_pmesh = new ParMesh(MPI_COMM_WORLD, *fluid_serial_mesh);
-      // if (m.immersed_solid) m.solid_pmesh = new ParMesh(MPI_COMM_WORLD, *m.solid_mesh);
-      PartitionMesh();
-      
-      if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
+      if (m.immersed_solid)
       {
-         // create ParFEModel
-         m.par_fem = new ParFEModel(fem, m.mesh);
-         m.par_fem->SetMFEMSubMesh(m.solid_mesh);
+         // extract fluid and solid meshes
+         if (!ExtractFluidAndSolidMeshes())
+         {
+            mfem::out << "Error extracting fluid and solid meshes" << std::endl;
+            return false;
+         }
       }
+
+      // Partition the meshes
+      PartitionMesh();
    }   
    #endif
 
@@ -799,6 +820,106 @@ bool MFEMSolver::Init()
       feLog("-------------------------------\n");
    }
 
+   return true;
+}
+
+bool MFEMSolver::ExtractFluidAndSolidMeshes()
+{
+   FEModel &fem = *GetFEModel();
+   FEMesh &femesh = fem.GetMesh();
+
+   // create fluid and solid submeshes from mfem version of FEBio mesh
+   bool mfem_solid_material = false;
+   bool febio_solid_material = false;
+   Array<int> fluid_domain_attr(m.mesh->attributes.Max());
+   fluid_domain_attr = 0;
+   Array<int> solid_domain_attr(m.mesh->attributes.Max());
+   solid_domain_attr = 0;
+   for (int i = 0; i < femesh.Domains(); ++i)
+   {
+      FEDomain& dom = femesh.Domain(i);
+      int dom_attr = m.mesh->GetDomainAttribute(&dom);
+      if (dom.IsActive() && dynamic_cast<MFEMSolidMaterial*>(dom.GetMaterial()))
+      {
+         solid_domain_attr[i] = dom_attr;
+         mfem_solid_material = true;
+      }
+      if (dom.IsActive() && dynamic_cast<FEElasticMaterial*>(dom.GetMaterial()))
+      {
+         solid_domain_attr[i] = dom_attr;
+         febio_solid_material = true;
+      }
+      if(dom.IsActive() && dynamic_cast<MFEMNewtonianFluid*>(dom.GetMaterial()))
+      {
+         fluid_domain_attr[i] = dom_attr;            
+      }
+   }
+
+   // create each mesh as sum of all domains (e.g. mfem solid mesh = sum of all febio solid domains), this will preserve domain numbering.
+   // This assumes each solid domain is deformable.
+   // RB: 6-4-25, fixes bug with mixed meshes and immersed fsi
+   // fluid 
+   m.fluid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,fluid_domain_attr));
+   if (m.fluid_mesh == nullptr) return false;
+
+   // solid
+   if (mfem_solid_material && febio_solid_material)
+   {
+      feLogError("Cannot have both FEBio and MFEM solid materials in the same mesh");
+      return false;
+   }
+   else
+   {
+      m.solid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,solid_domain_attr));
+      if (m.solid_mesh == nullptr) return false;
+   }
+
+   return true;
+}
+
+#ifdef MFEM_USE_MPI
+void MFEMSolver::PartitionMesh()
+{
+   auto fluid_serial_mesh = m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh);
+   m.fluid_pmesh = new ParMesh(MPI_COMM_WORLD, *fluid_serial_mesh);
+   if (m.immersed_solid) m.solid_pmesh = new ParMesh(MPI_COMM_WORLD, *m.solid_mesh);
+
+   if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
+   {
+      // create ParFEModel
+      FEModel& fem = *GetFEModel();
+      m.par_fem = new ParFEModel(&fem, m.mesh);
+      m.par_fem->SetMFEMSubMesh(m.solid_mesh);
+   }
+}
+
+void MFEMSolver::ClearSerialMeshData()
+{
+   FEModel* fem = GetFEModel();
+	FEMesh& femesh = fem->GetMesh();
+
+   // build local FEBio solid Mesh from mfem solid ParMesh
+   femesh.Clear(); // clear FEBio serial mesh
+
+   if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
+   {
+      ParFiniteElementSpace *dfes = m.flowsolver->GetImmersedSolidDisplacement()->ParFESpace();
+      m.par_fem->BuildLocalFEBioMesh(dfes);
+
+      // clear FEBio serial surface mesh data
+      m.par_fem->ClearSerialSurfaces();
+   }
+
+   // delete the serial MFEM meshes
+   delete m.mesh;
+   delete m.fluid_mesh;
+   delete m.solid_mesh;
+}
+#endif
+
+bool MFEMSolver::SetupFluid()
+{
+   FEModel* fem = GetFEModel();
    // get fluid material
    for (int i=0; i<fem->Materials(); ++i)
    {
@@ -957,10 +1078,11 @@ bool MFEMSolver::Init()
 		{
 			FESurface* surf = bc->GetSurface();
          int id = 0;
-         if (surf)
+         if (surf && surf->Elements() > 0)
          {
             FEFacetSet* set = surf->GetFacetSet();
             id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
+            bc->SetBoundaryID(id);
          }
          else
          {
@@ -985,10 +1107,11 @@ bool MFEMSolver::Init()
 		{
          FESurface* surf = &sl->GetSurface();
          int id = 0;
-         if (surf)
+         if (surf && surf->Elements() > 0)
          {
             FEFacetSet* set = surf->GetFacetSet();
             id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
+            sl->SetBoundaryID(id);
          }
          else
          {
@@ -1011,6 +1134,10 @@ bool MFEMSolver::Init()
                bl->Apply(this, id - 1);
             }
          }
+         else if (bl->GetDomainAttr() != -1)
+         {
+            bl->Apply(this, bl->GetDomainAttr() - 1);
+         }
          else
          {
             for (int j=0; j<bl->Domains(); ++j)
@@ -1030,247 +1157,240 @@ bool MFEMSolver::Init()
 	m.u_gf = m.flowsolver->GetCurrentVelocity();
 	m.p_gf = m.flowsolver->GetCurrentPressure();
 
-   // Add immersed solid
-   if (m.immersed_solid)
+   return true;
+}
+
+bool MFEMSolver::SetupSolid()
+{
+   FEModel *fem = GetFEModel();
+   MFEM_ASSERT(fem->Materials() < 3, "Immersed solid solver only supports one material at this time");
+
+   // create solid material
+   MFEMSolidMaterial* solid_mat = nullptr;
+   FEElasticMaterial* febio_elast_mat = nullptr;
+   for (int i=0; i<fem->Materials(); ++i)
    {
-      MFEM_ASSERT(fem->Materials() < 3, "Immersed solid solver only supports one material at this time");
+      FEMaterial* fe_mat = fem->GetMaterial(i);
+      
+      // MFEM material
+      solid_mat = dynamic_cast<MFEMSolidMaterial*>(fe_mat);
+      if (solid_mat) { break; }
+      
+      // FEBio material
+      febio_elast_mat = dynamic_cast<FEElasticMaterial*>(fe_mat);
+      if (febio_elast_mat)
+      {
+         MFEM_ASSERT(m.form_type == ImmersedSolid::form_type::UpdatedLagrangian, "FEBio materials only work with Updated Lagrangian");
+         break;          
+      }
+   }
+   if (!solid_mat && !febio_elast_mat)
+   {
+      feLogError("No or invalid immersed solid material found");
+      return false;
+   }
 
-      // create solid material
-      MFEMSolidMaterial* solid_mat = nullptr;
-      FEElasticMaterial* febio_elast_mat = nullptr;
-      for (int i=0; i<fem->Materials(); ++i)
+   // determine which material
+   FEScalarCoefficient *init_rho_coeff = nullptr;
+   if (solid_mat)
+   {
+      // MFEM Material
+      init_rho_coeff = solid_mat->GetDensityCoeff();
+      if (typeid(*solid_mat) == typeid(MFEMCompressibleNeoHookeanMaterial))
       {
-         FEMaterial* fe_mat = fem->GetMaterial(i);
-         
-         // MFEM material
-         solid_mat = dynamic_cast<MFEMSolidMaterial*>(fe_mat);
-         if (solid_mat) { break; }
-         
-         // FEBio material
-         febio_elast_mat = dynamic_cast<FEElasticMaterial*>(fe_mat);
-         if (febio_elast_mat)
-         {
-            MFEM_ASSERT(m.form_type == ImmersedSolid::form_type::UpdatedLagrangian, "FEBio materials only work with Updated Lagrangian");
-            break;          
-         }
+         MFEMCompressibleNeoHookeanMaterial* cnh_mat = static_cast<MFEMCompressibleNeoHookeanMaterial*>(solid_mat);
+         m.mat_type = new CompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),*cnh_mat->GetC1Coeff(),*cnh_mat->GetC0Coeff());
       }
-      if (!solid_mat && !febio_elast_mat)
+      else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleNeoHookeanMaterial))
       {
-         feLogError("No or invalid immersed solid material found");
-         return false;
+         MFEMNearlyIncompressibleNeoHookeanMaterial* nih_mat = static_cast<MFEMNearlyIncompressibleNeoHookeanMaterial*>(solid_mat);
+         m.mat_type = new NearlyIncompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*nih_mat->GetBulkModulus(),*nih_mat->GetC0Coeff());
       }
-
-      // determine which material
-      FEScalarCoefficient *init_rho_coeff = nullptr;
-      if (solid_mat)
+      else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleAnnularDisk))
       {
-         // MFEM Material
-         init_rho_coeff = solid_mat->GetDensityCoeff();
-         if (typeid(*solid_mat) == typeid(MFEMCompressibleNeoHookeanMaterial))
-         {
-            MFEMCompressibleNeoHookeanMaterial* cnh_mat = static_cast<MFEMCompressibleNeoHookeanMaterial*>(solid_mat);
-            m.mat_type = new CompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),*cnh_mat->GetC1Coeff(),*cnh_mat->GetC0Coeff());
-         }
-         else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleNeoHookeanMaterial))
-         {
-            MFEMNearlyIncompressibleNeoHookeanMaterial* nih_mat = static_cast<MFEMNearlyIncompressibleNeoHookeanMaterial*>(solid_mat);
-            m.mat_type = new NearlyIncompressibleNeoHookean(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*nih_mat->GetBulkModulus(),*nih_mat->GetC0Coeff());
-         }
-         else if (typeid(*solid_mat) == typeid(MFEMNearlyIncompressibleAnnularDisk))
-         {
-            MFEMNearlyIncompressibleAnnularDisk* niad_mat = static_cast<MFEMNearlyIncompressibleAnnularDisk*>(solid_mat);
-            double disk_w = niad_mat->GetRadialThickness(); // constant thickness
-            m.mat_type = new NearlyIncompressibleAnnularDisk(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*niad_mat->GetBulkModulus(),*niad_mat->GetC0Coeff(),disk_w);
-         }
-         else
-         {
-            feLogError("Unsupported solid material type");
-            return false;
-         }
-      }
-      else if (febio_elast_mat)
-      {
-         // FEBio material
-         m.febio_material = true;
-         
-         if (m.solidsolvertype == SolidSolverType::MFEM)
-         {
-            // MFEM Solver with FEBio elastic material
-            FEBioElasticMaterial* feb_mat = new FEBioElasticMaterial(febio_elast_mat);
-            init_rho_coeff = feb_mat->GetDensityCoeff();
-            m.mat_type = feb_mat;
-         }
+         MFEMNearlyIncompressibleAnnularDisk* niad_mat = static_cast<MFEMNearlyIncompressibleAnnularDisk*>(solid_mat);
+         double disk_w = niad_mat->GetRadialThickness(); // constant thickness
+         m.mat_type = new NearlyIncompressibleAnnularDisk(m.form_type,m.solid_mesh->Dimension(),m.vol_type,*niad_mat->GetBulkModulus(),*niad_mat->GetC0Coeff(),disk_w);
       }
       else
       {
-         feLogError("No immersed solid material found");
+         feLogError("Unsupported solid material type");
          return false;
-      }      
-
-      // add immersed solid to the flow solver
+      }
+   }
+   else if (febio_elast_mat)
+   {
+      // FEBio material
+      m.febio_material = true;
+      
       if (m.solidsolvertype == SolidSolverType::MFEM)
       {
-         MFEM_ASSERT(fem->Materials() < 3, "MFEM solid solver only supports one material");
-
-         #ifdef MFEM_USE_MPI
-         m.flowsolver->AddImmersedSolid(m.solid_pmesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
-         #else
-         m.flowsolver->AddImmersedSolid(m.solid_mesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
-         #endif
-
-         // immersed solid grid functions
-         m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
-         m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
-         m.a_gf = m.flowsolver->GetImmersedSolidAcceleration();
+         // MFEM Solver with FEBio elastic material
+         FEBioElasticMaterial* feb_mat = new FEBioElasticMaterial(febio_elast_mat);
+         init_rho_coeff = feb_mat->GetDensityCoeff();
+         m.mat_type = feb_mat;
       }
-      else if (m.solidsolvertype == SolidSolverType::FEBio)
+   }
+   else
+   {
+      feLogError("No immersed solid material found");
+      return false;
+   }      
+
+   // add immersed solid to the flow solver
+   if (m.solidsolvertype == SolidSolverType::MFEM)
+   {
+      MFEM_ASSERT(fem->Materials() < 3, "MFEM solid solver only supports one material");
+
+      #ifdef MFEM_USE_MPI
+      m.flowsolver->AddImmersedSolid(m.solid_pmesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
+      #else
+      m.flowsolver->AddImmersedSolid(m.solid_mesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
+      #endif
+
+      // immersed solid grid functions
+      m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
+      m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
+      m.a_gf = m.flowsolver->GetImmersedSolidAcceleration();
+   }
+   else if (m.solidsolvertype == SolidSolverType::FEBio)
+   {
+      MFEM_ASSERT(m.febio_material, "Immersed FEBio solid solver only supports FEBio materials");
+
+      auto body_force_terms = m.flowsolver->GetBodyForces();
+      #ifdef MFEM_USE_MPI
+      auto fluid_vfes = m.flowsolver->GetCurrentVelocity()->ParFESpace();
+      m.immersed_febio_solid = new ImmersedFEBioSolid(fem,m.solid_pmesh,m.orderd,init_rho_coeff,m.fluid_density,m.dyn_viscosity,body_force_terms,fluid_vfes,m.fluid_pmesh,m.mat_type,m.orderingtype,m.form_type,m.subtract_viscous_stress);
+      #else
+      auto fluid_vfes = m.flowsolver->GetCurrentVelocity()->FESpace();
+      m.immersed_febio_solid = new ImmersedFEBioSolid(fem,m.solid_mesh,m.orderd,init_rho_coeff,m.fluid_density,m.dyn_viscosity,body_force_terms,fluid_vfes,m.fluid_mesh,m.mat_type,m.orderingtype,m.form_type,m.subtract_viscous_stress);
+      #endif
+
+      // add immersed solid to the flow solver
+      m.flowsolver->AddImmersedSolid(m.immersed_febio_solid,m.stabs_scale);
+
+      // add any immersed solid BCs
+      for (int i = 0; i < fem->ModelLoads(); ++i)
       {
-         MFEM_ASSERT(m.febio_material, "Immersed FEBio solid solver only supports FEBio materials");
+         // // nodal loads
+         // MFEMNodalLoad* nl = dynamic_cast<MFEMNodalLoad*>(fem->ModelLoad(i));
+         // if (nl && nl->IsActive())
+         // {
+         //    nl->Apply(this);
+         // }
 
-         auto body_force_terms = m.flowsolver->GetBodyForces();
-         #ifdef MFEM_USE_MPI
-         auto fluid_vfes = m.flowsolver->GetCurrentVelocity()->ParFESpace();
-         m.immersed_febio_solid = new ImmersedFEBioSolid(fem,m.solid_pmesh,m.orderd,init_rho_coeff,m.fluid_density,m.dyn_viscosity,body_force_terms,fluid_vfes,m.fluid_pmesh,m.mat_type,m.orderingtype,m.form_type,m.subtract_viscous_stress);
-         #else
-         auto fluid_vfes = m.flowsolver->GetCurrentVelocity()->FESpace();
-         m.immersed_febio_solid = new ImmersedFEBioSolid(fem,m.solid_mesh,m.orderd,init_rho_coeff,m.fluid_density,m.dyn_viscosity,body_force_terms,fluid_vfes,m.fluid_mesh,m.mat_type,m.orderingtype,m.form_type,m.subtract_viscous_stress);
-         #endif
-
-         // add immersed solid to the flow solver
-         m.flowsolver->AddImmersedSolid(m.immersed_febio_solid,m.stabs_scale);
-
-         // add any immersed solid BCs
-         for (int i = 0; i < fem->ModelLoads(); ++i)
+         // surface loads
+         FEImmersedSurfaceLoad* im_sl = dynamic_cast<FEImmersedSurfaceLoad*>(fem->ModelLoad(i));
+         if (im_sl && im_sl->IsActive())
          {
-            // // nodal loads
-            // MFEMNodalLoad* nl = dynamic_cast<MFEMNodalLoad*>(fem->ModelLoad(i));
-            // if (nl && nl->IsActive())
-            // {
-            //    nl->Apply(this);
-            // }
-
-            // surface loads
-            FEImmersedSurfaceLoad* im_sl = dynamic_cast<FEImmersedSurfaceLoad*>(fem->ModelLoad(i));
-            if (im_sl && im_sl->IsActive())
+            FESurface* surf = &im_sl->GetSurface();
+            int id = 0;
+            if (surf)
             {
-               FESurface* surf = &im_sl->GetSurface();
-               int id = 0;
-               if (surf)
-               {
-                  FEFacetSet* set = surf->GetFacetSet();
-                  id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
-                  im_sl->SetBoundaryID(id-1); // store for later use
-               }
-               else
-               {
-                  id = im_sl->GetBoundaryID(); assert(id > 0);
-               }
-
-               im_sl->Apply(this, id - 1);
-               m.immersed_febio_solid->immersed_surface_loads = true;
+               FEFacetSet* set = surf->GetFacetSet();
+               id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
+               im_sl->SetBoundaryID(id); // store for later use
+            }
+            else
+            {
+               id = im_sl->GetBoundaryID(); assert(id > 0);
             }
 
-            // // body loads
-            // MFEMBodyLoad* bl = dynamic_cast<MFEMBodyLoad*>(fem->ModelLoad(i));
-            // if (bl && bl->IsActive())
-            // {
-            //    std::vector<int> &dom_id_list = bl->GetDomainIDList();
-            //    if (dom_id_list.size() != 0)
-            //    {
-            //       for (int j=0; j<dom_id_list.size(); ++j)
-            //       {
-            //          int id = dom_id_list[j]; assert(id > 0);
-            //          bl->Apply(this, id - 1);
-            //       }
-            //    }
-            //    else
-            //    {
-            //       for (int j=0; j<bl->Domains(); ++j)
-            //       {
-            //          FEDomain* dom = bl->Domain(j);
-            //          int id = m.mesh->GetDomainAttribute(dom); assert(id > 0);
-            //          bl->Apply(this, id - 1);
-            //       }
-            //    }                  
-            // }
+            im_sl->Apply(this, id - 1);
+            m.immersed_febio_solid->immersed_surface_loads = true;
          }
 
-         // immersed solid grid functions
-         m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
-         m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
-         m.a_gf = m.flowsolver->GetImmersedSolidAcceleration();
+         // // body loads
+         // MFEMBodyLoad* bl = dynamic_cast<MFEMBodyLoad*>(fem->ModelLoad(i));
+         // if (bl && bl->IsActive())
+         // {
+         //    std::vector<int> &dom_id_list = bl->GetDomainIDList();
+         //    if (dom_id_list.size() != 0)
+         //    {
+         //       for (int j=0; j<dom_id_list.size(); ++j)
+         //       {
+         //          int id = dom_id_list[j]; assert(id > 0);
+         //          bl->Apply(this, id - 1);
+         //       }
+         //    }
+         //    else
+         //    {
+         //       for (int j=0; j<bl->Domains(); ++j)
+         //       {
+         //          FEDomain* dom = bl->Domain(j);
+         //          int id = m.mesh->GetDomainAttribute(dom); assert(id > 0);
+         //          bl->Apply(this, id - 1);
+         //       }
+         //    }                  
+         // }
       }
-      else
-      {
-         feLogError("Invalid immersed solid solver type");
-         return false;
-      }         
-   }   
 
-   // create transfer maps and global functions
-   if(m.immersed_solid)
+      // immersed solid grid functions
+      m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
+      m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
+      m.a_gf = m.flowsolver->GetImmersedSolidAcceleration();
+   }
+   else
    {
-      #ifndef MFEM_USE_MPI
-      int vdim = m.flowsolver->GetCurrentVelocity()->FESpace()->GetVDim();
-      int ordering = m.flowsolver->GetCurrentVelocity()->FESpace()->GetOrdering();
-      auto vfec = m.flowsolver->GetCurrentVelocity()->FESpace()->FEColl();
-      auto pfec = m.flowsolver->GetCurrentPressure()->FESpace()->FEColl();
-      m.vfespace_global = new FiniteElementSpace(static_cast<Mesh*>(m.mesh),vfec,vdim,ordering);
-      m.pfespace_global = new FiniteElementSpace(static_cast<Mesh*>(m.mesh),pfec,1,ordering);
+      feLogError("Invalid immersed solid solver type");
+      return false;
+   }      
+
+   // Create transfer maps and global functions 
+   #ifndef MFEM_USE_MPI
+   int vdim = m.flowsolver->GetCurrentVelocity()->FESpace()->GetVDim();
+   int ordering = m.flowsolver->GetCurrentVelocity()->FESpace()->GetOrdering();
+   auto vfec = m.flowsolver->GetCurrentVelocity()->FESpace()->FEColl();
+   auto pfec = m.flowsolver->GetCurrentPressure()->FESpace()->FEColl();
+   m.vfespace_global = new FiniteElementSpace(static_cast<Mesh*>(m.mesh),vfec,vdim,ordering);
+   m.pfespace_global = new FiniteElementSpace(static_cast<Mesh*>(m.mesh),pfec,1,ordering);
+
+   m.u_gf_global.SetSpace(m.vfespace_global);
+   m.u_gf_global = 0.0;
+   m.p_gf_global.SetSpace(m.pfespace_global);
+   m.p_gf_global = 0.0;
+   m.d_gf_global.SetSpace(m.vfespace_global);
+   m.d_gf_global = 0.0;
+   m.vib_gf_global.SetSpace(m.vfespace_global);
+   m.vib_gf_global = 0.0;
+
+   m.submeshfluid_to_global_v = new TransferMap(*m.u_gf,m.u_gf_global);
+   m.submeshfluid_to_global_p = new TransferMap(*m.p_gf,m.p_gf_global);
+   m.submeshsolid_to_global_d = new TransferMap(*m.d_gf,m.d_gf_global);
+   m.global_to_submeshsolid_d = new TransferMap(m.d_gf_global,*m.d_gf);
    
-      m.u_gf_global.SetSpace(m.vfespace_global);
-      m.u_gf_global = 0.0;
-      m.p_gf_global.SetSpace(m.pfespace_global);
-      m.p_gf_global = 0.0;
-      m.d_gf_global.SetSpace(m.vfespace_global);
-      m.d_gf_global = 0.0;
-      m.vib_gf_global.SetSpace(m.vfespace_global);
-      m.vib_gf_global = 0.0;
-
-      m.submeshfluid_to_global_v = new TransferMap(*m.u_gf,m.u_gf_global);
-      m.submeshfluid_to_global_p = new TransferMap(*m.p_gf,m.p_gf_global);
-      m.submeshsolid_to_global_d = new TransferMap(*m.d_gf,m.d_gf_global);
-      m.global_to_submeshsolid_d = new TransferMap(m.d_gf_global,*m.d_gf);
-      
-      if (m.solidsolvertype == SolidSolverType::FEBio)
-      {
-         // set submesh mapping data
-         m.immersed_febio_solid->SetSubMeshMaps(m.submeshsolid_to_global_d,m.global_to_submeshsolid_d,&m.vib_gf_global);
-      }
-      #endif
-   }
-
-   #ifdef MFEM_USE_MPI
-   // build local FEBio solid Mesh from mfem solid ParMesh
-   femesh.Clear(); // clear FEBio serial mesh
-   if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
+   if (m.solidsolvertype == SolidSolverType::FEBio)
    {
-      ParFiniteElementSpace *dfes = m.flowsolver->GetImmersedSolidDisplacement()->ParFESpace();
-      m.par_fem->BuildLocalFEBioMesh(dfes);
-
-      // clear FEBio serial surface mesh data
-      m.par_fem->ClearSerialSurfaces();
+      // set submesh mapping data
+      m.immersed_febio_solid->SetSubMeshMaps(m.submeshsolid_to_global_d,m.global_to_submeshsolid_d,&m.vib_gf_global);
    }
-
-   // delete the serial MFEM meshes
-   delete m.mesh;
-   delete m.fluid_mesh;
-   delete m.solid_mesh;   
    #endif
 
-	// setup output in paraview format
-   std::string fname = "results_mfem_solver";
+   return true;
+}
+
+void MFEMSolver::SetupSolvers()
+{
+   FEModel *fem = GetFEModel();
+   double dt = fem->GetTime().timeIncrement;
+	m.flowsolver->Setup(dt);
+}
+
+void MFEMSolver::PostProcessOutput()
+{
+   // setup output in paraview format
+   m.fname = "results_mfem_solver";
    if (m.restarting)
    {
-      fname += "_RESTART_STEP_" + std::to_string(m.restart_step);
+      m.fname += "_RESTART_STEP_" + std::to_string(m.restart_step);
    }
    #ifdef MFEM_USE_MPI
-   fname += "_np" + std::to_string(mfem::Mpi::WorldSize());
-   #endif   
+   m.fname += "_np" + std::to_string(mfem::Mpi::WorldSize());
+   #endif
 
    if (m.immersed_solid)
    {
-      std::string fluid_filename = fname + "/fluid";
+      std::string fluid_filename = m.fname + "/fluid";
       #ifdef MFEM_USE_MPI
       m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
       #else
@@ -1280,9 +1400,9 @@ bool MFEMSolver::Init()
    else
    {
       #ifdef MFEM_USE_MPI
-      m.pvdc = new ParaViewDataCollection(fname, m.fluid_pmesh);
+      m.pvdc = new ParaViewDataCollection(m.fname, m.fluid_pmesh);
       #else
-      m.pvdc = new ParaViewDataCollection(fname, m.mesh);
+      m.pvdc = new ParaViewDataCollection(m.fname, m.mesh);
       #endif      
    }	
 	m.pvdc->SetDataFormat(m.output_format);
@@ -1326,7 +1446,7 @@ bool MFEMSolver::Init()
 
    if (m.immersed_solid)
    {
-      std::string solid_filename = fname + "/solid";
+      std::string solid_filename = m.fname + "/solid";
       #ifdef MFEM_USE_MPI
       m.sdc = new ParaViewDataCollection(solid_filename, m.solid_pmesh);
       #else
@@ -1345,12 +1465,9 @@ bool MFEMSolver::Init()
       m.sdc->Save();
    }
 
-	double dt = fem->GetTime().timeIncrement;
-	m.flowsolver->Setup(dt);
-
    if (m.immersed_solid && m.track_node)
    {
-      std::string node_filename = fname + "/node_pos.txt";
+      std::string node_filename = m.fname + "/node_pos.txt";
       
       m.coord.SetSize(3);
       m.coord = 0.0;
@@ -1381,7 +1498,7 @@ bool MFEMSolver::Init()
 
    if (m.immersed_solid && m.output_avg_velocity)
    {
-      std::string avg_velo_filename = fname + "/avg_solid_velocity.txt";
+      std::string avg_velo_filename = m.fname + "/avg_solid_velocity.txt";
       m.avg_velo.SetSize(3);
       m.avg_velo = 0.0;
 
@@ -1399,7 +1516,10 @@ bool MFEMSolver::Init()
       }
       #endif
    }
+}
 
+void MFEMSolver::RestartFiles()
+{
    // Setup restart files
    if (m.write_restarts)
    {
@@ -1426,8 +1546,6 @@ bool MFEMSolver::Init()
          m.sdc->Save();
       }
    }
-   
-	return true;
 }
 
 bool MFEMSolver::SolveStep()
