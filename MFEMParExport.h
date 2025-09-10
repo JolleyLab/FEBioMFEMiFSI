@@ -9,6 +9,8 @@
 
 #include <string>
 
+#include "mfem.hpp"
+
 class MFEMParExport
 {
 public:
@@ -63,4 +65,5 @@ private:
    void WriteParameterList(FECoreBase& base);
    void WriteParam(FEParam& p);   
    const char* ElementTypeString(int ntype);
+   mfem::Mesh* LoadMeshPart(const std::string &prefix);
 };

@@ -207,12 +207,7 @@ void MFEMParExport::WriteOutputSection()
 void MFEMParExport::WriteLocalFebFiles()
 {
    std::ostringstream oss;
-   #ifdef MFEM_USE_MPI
-   int my_rank = mfem::Mpi::WorldRank();
-   #else
-   int my_rank = 0;
-   #endif
-   oss << std::setw(10) << std::setfill('0') << my_rank;
+   oss << std::setw(10) << std::setfill('0') << myid;
 
    std::string local_feb_file = part_dir + feb_filename + "_Local_" + oss.str() + ".feb";
    xml_writer.open(local_feb_file.c_str());
@@ -354,22 +349,99 @@ void MFEMParExport::WriteMeshSection()
    xml_writer.close_branch(); // Mesh
 }
 
+// void MFEMParExport::WriteNodes()
+// {
+//    FEModel* fem = GetFEModel();
+//    FEMesh& mesh = fem->GetMesh();
+
+//    XMLElement tagNodes("Nodes");
+//    xml_writer.add_branch(tagNodes);
+//    {
+//       XMLElement el("node");
+//       int nid = el.add_attribute("id", 0);
+//       for (int j = 0; j < mesh.Nodes(); ++j)
+//       {
+//          FENode& node = mesh.Node(j);
+//          int m_nid = node.GetID();
+//          el.set_attribute(nid, m_nid);
+//          const vec3d r = node.m_r0;
+//          std::ostringstream ss;
+//          ss.setf(std::ios::scientific);
+//          ss << std::setprecision(16)
+//             << r.x << ", " << r.y << ", " << r.z;
+//          el.value(ss.str().c_str());
+//          xml_writer.add_leaf(el, false);
+//       }
+//    }
+//    xml_writer.close_branch();
+// }
+
+// void MFEMParExport::WriteElements()
+// {
+//    FEModel* fem = GetFEModel();
+//    FEMesh& mesh = fem->GetMesh();
+
+//    int nset = 0;
+//    int ncount = 0;
+//    int nn[FEElement::MAX_NODES];
+//    char szname[128] = { 0 };
+
+//    // Assumes one combined immersed solid domain
+//    bool immersed_solid_domain = false;
+//    for (int d=0; d < mesh.Domains(); ++d)
+//    {
+//       FEDomain& dom = mesh.Domain(d);
+//       MFEMImmersedElasticDomain* im_dom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+//       if (im_dom && im_dom->IsActive())
+//       {
+//          immersed_solid_domain = true;
+
+//          XMLElement xe("Elements");
+//          xe.add_attribute("name", im_dom->GetName().c_str());
+//          xml_writer.add_branch(xe);
+//          {
+//             for (int i=0; i<im_dom->Elements(); ++i)
+//             {
+//                FEElement& el = im_dom->ElementRef(i);            
+//                XMLElement xej("elem");
+//                xej.add_attribute("id", el.GetID());
+//                int ne = el.Nodes();
+//                for (int k = 0; k < ne; ++k) nn[k] = mesh.Node(el.m_node[k]).GetID();
+//                xej.value(nn, ne);
+//                xml_writer.add_leaf(xej, false);
+//             }
+//             nset++;
+//          }
+//          xml_writer.close_branch(); // Elements
+//          break;
+//       }
+//    }
+//    MFEM_ASSERT(immersed_solid_domain,"No immersed solid domain found!");
+// }
+
+mfem::Mesh* MFEMParExport::LoadMeshPart(const std::string &prefix)
+{
+   std::ifstream f(mfem::MakeParFilename(prefix + "_", myid, ".mesh", 10));
+   return new mfem::Mesh(f, 1, 0);
+}
+
 void MFEMParExport::WriteNodes()
 {
-   FEModel* fem = GetFEModel();
-   FEMesh& mesh = fem->GetMesh();
+   // read in parallel solid mesh for current rank
+   mfem::Mesh *mesh = LoadMeshPart(part_dir + "solid");
+   MFEM_ASSERT(mesh, "Error: failed to load parallel solid mesh for rank " << myid);
+   // here we assume a linear mesh
 
    XMLElement tagNodes("Nodes");
    xml_writer.add_branch(tagNodes);
    {
       XMLElement el("node");
       int nid = el.add_attribute("id", 0);
-      for (int j = 0; j < mesh.Nodes(); ++j)
+      for (int j = 0; j < mesh->GetNV(); ++j)
       {
-         FENode& node = mesh.Node(j);
-         int m_nid = node.GetID();
-         el.set_attribute(nid, m_nid);
-         const vec3d r = node.m_r0;
+         el.set_attribute(nid, j);
+         const double* vertices = mesh->GetVertex(j);
+         const vec3d r = vec3d(vertices[0], vertices[1], vertices[2]);
          std::ostringstream ss;
          ss.setf(std::ios::scientific);
          ss << std::setprecision(16)
@@ -379,12 +451,18 @@ void MFEMParExport::WriteNodes()
       }
    }
    xml_writer.close_branch();
+
+   delete mesh;
 }
 
 void MFEMParExport::WriteElements()
 {
    FEModel* fem = GetFEModel();
-   FEMesh& mesh = fem->GetMesh();
+   FEMesh& femesh = fem->GetMesh();
+
+   // read in parallel solid mesh for current rank
+   mfem::Mesh *mesh = LoadMeshPart(part_dir + "solid");
+   MFEM_ASSERT(mesh, "Error: failed to load parallel solid mesh for rank " << myid);
 
    int nset = 0;
    int ncount = 0;
@@ -393,9 +471,9 @@ void MFEMParExport::WriteElements()
 
    // Assumes one combined immersed solid domain
    bool immersed_solid_domain = false;
-   for (int d=0; d < mesh.Domains(); ++d)
+   for (int d=0; d < femesh.Domains(); ++d)
    {
-      FEDomain& dom = mesh.Domain(d);
+      FEDomain& dom = femesh.Domain(d);
       MFEMImmersedElasticDomain* im_dom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
       if (im_dom && im_dom->IsActive())
       {
@@ -405,13 +483,14 @@ void MFEMParExport::WriteElements()
          xe.add_attribute("name", im_dom->GetName().c_str());
          xml_writer.add_branch(xe);
          {
-            for (int i=0; i<im_dom->Elements(); ++i)
-            {
-               FEElement& el = im_dom->ElementRef(i);            
+            for (int i=0; i<mesh->GetNE(); ++i)
+            {          
                XMLElement xej("elem");
-               xej.add_attribute("id", el.GetID());
-               int ne = el.Nodes();
-               for (int k = 0; k < ne; ++k) nn[k] = mesh.Node(el.m_node[k]).GetID();
+               xej.add_attribute("id", i+1); // FEBio ID = MFEM ID + 1
+               auto element = mesh->GetElement(i);
+               const int *node_ids = element->GetVertices();
+               int ne = element->GetNVertices();
+               for (int k = 0; k < ne; ++k) nn[k] = node_ids[k];
                xej.value(nn, ne);
                xml_writer.add_leaf(xej, false);
             }
@@ -422,6 +501,8 @@ void MFEMParExport::WriteElements()
       }
    }
    MFEM_ASSERT(immersed_solid_domain,"No immersed solid domain found!");
+
+   delete mesh;
 }
 
 const char* MFEMParExport::ElementTypeString(int ntype)

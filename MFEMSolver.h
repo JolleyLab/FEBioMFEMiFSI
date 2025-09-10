@@ -103,11 +103,16 @@ private:
    #ifdef MFEM_USE_MPI
    void PartitionMesh();
    void ClearSerialMeshData();
+
+   // helper function for pre-partitioning of meshes
+   void SavePartitionedMesh(const std::string &prefix, mfem::Mesh &mesh, int np,
+                         int *partitioning = nullptr);
+   mfem::ParMesh* LoadParMesh(const std::string &prefix);
    #endif
 
    // XML writing and reading for parallel meshes //
    MFEMParImport par_import;
-   MFEMParExport par_export;
+   MFEMParExport par_export;   
 
 	DECLARE_FECORE_CLASS();
 };
