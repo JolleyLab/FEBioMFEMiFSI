@@ -17,6 +17,9 @@
 #include "MFEMBoundaryCondition.h"
 #include "MFEMLoad.h"
 
+#include <fstream>
+#include <sstream>
+
 MFEMParExport::MFEMParExport()
 {
 	// Constructor implementation
@@ -27,15 +30,42 @@ MFEMParExport::~MFEMParExport()
    // Destructor implementation
 }
 
-void MFEMParExport::WriteFiles(std::string &feb_filename_, std::string &part_dir_, int myid_, bool immersed_febio_solid_)
+void MFEMParExport::WriteFiles(std::string &feb_filename_, std::string &part_dir_, int np, bool immersed_febio_solid_)
 {
-   myid = myid_;
+   myid = 0;
    feb_filename = feb_filename_;
    part_dir = part_dir_;
    immersed_febio_solid = immersed_febio_solid_;
 
-   if (myid == 0) WriteMainFebFile();
-   WriteLocalFebFiles();
+   // initialize reader to open original feb file
+   std::string file_name = feb_filename + ".feb";
+   bool file_opened = xml_reader.Open(file_name.c_str());
+   MFEM_ASSERT(file_opened, "Error: could not open " + file_name);
+
+   WriteMainFebFile();
+
+   FEModel* fem = GetFEModel();
+   FEMesh& femesh = fem->GetMesh();
+
+   for (int i=0; i<np; ++i)
+   {
+      myid = i;
+      WriteLocalFebFiles();
+      
+      // Reactivate all domains for next partition
+      for (int d=0; d < femesh.Domains(); ++d)
+      {
+         FEDomain& dom = femesh.Domain(d);
+         MFEMImmersedElasticDomain* im_dom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+         if (im_dom)
+         {
+            im_dom->SetActive(true);
+         }
+      }
+   }
+
+   // close reader
+   xml_reader.Close();
 }
 
 void MFEMParExport::WriteMainFebFile()
@@ -478,16 +508,28 @@ void MFEMParExport::WriteElements()
       if (im_dom && im_dom->IsActive())
       {
          immersed_solid_domain = true;
+         int dom_attr = dom_attr_map->operator[](im_dom);
+
+         mfem::Array<int> mesh_attrs = mesh->attributes;
+         if (mesh_attrs.Find(dom_attr) == -1) 
+         {
+            // this mesh partition does not contain this domain
+            im_dom->SetActive(false);
+            continue; 
+         }
 
          XMLElement xe("Elements");
          xe.add_attribute("name", im_dom->GetName().c_str());
          xml_writer.add_branch(xe);
          {
             for (int i=0; i<mesh->GetNE(); ++i)
-            {          
+            {
+               auto element = mesh->GetElement(i);
+               if (element->GetAttribute() != dom_attr) continue;
+
                XMLElement xej("elem");
                xej.add_attribute("id", i+1); // FEBio ID = MFEM ID + 1
-               auto element = mesh->GetElement(i);
+
                const int *node_ids = element->GetVertices();
                int ne = element->GetNVertices();
                for (int k = 0; k < ne; ++k) nn[k] = node_ids[k];
@@ -497,7 +539,6 @@ void MFEMParExport::WriteElements()
             nset++;
          }
          xml_writer.close_branch(); // Elements
-         break;
       }
    }
    MFEM_ASSERT(immersed_solid_domain,"No immersed solid domain found!");
@@ -559,6 +600,35 @@ const char* MFEMParExport::ElementTypeString(int ntype)
 	return sztype;
 }
 
+// void MFEMParExport::WriteMeshDomainsSection()
+// {
+//    FEModel* fem = GetFEModel();
+//    FEMesh& mesh = fem->GetMesh();
+
+//    xml_writer.add_branch("MeshDomains");
+//    {
+//       for (int i = 0; i < mesh.Domains(); ++i)
+//       {
+//          FEDomain& dom = mesh.Domain(i);
+//          MFEMImmersedElasticDomain* im_dom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+//          assert(im_dom);
+//          XMLElement el;
+//          if (dom.Class() == FE_DOMAIN_SOLID)
+//          {
+//             el.name("SolidDomain");
+//             el.add_attribute("name", im_dom->GetName().c_str());
+//             el.add_attribute("mat", im_dom->GetMaterial()->GetName().c_str());
+//             xml_writer.add_empty(el);
+//          }
+//          else
+//          {
+//             MFEM_ABORT("Invalid domain type");
+//          }
+//       }
+//    }
+//    xml_writer.close_branch(); // MeshDomains
+// }
+
 void MFEMParExport::WriteMeshDomainsSection()
 {
    FEModel* fem = GetFEModel();
@@ -570,18 +640,20 @@ void MFEMParExport::WriteMeshDomainsSection()
       {
          FEDomain& dom = mesh.Domain(i);
          MFEMImmersedElasticDomain* im_dom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
-         assert(im_dom);
-         XMLElement el;
-         if (dom.Class() == FE_DOMAIN_SOLID)
-         {
-            el.name("SolidDomain");
-            el.add_attribute("name", im_dom->GetName().c_str());
-            el.add_attribute("mat", im_dom->GetMaterial()->GetName().c_str());
-            xml_writer.add_empty(el);
-         }
-         else
-         {
-            MFEM_ABORT("Invalid domain type");
+         if (im_dom && im_dom->IsActive())
+         {   
+            XMLElement el;
+            if (dom.Class() == FE_DOMAIN_SOLID)
+            {
+               el.name("SolidDomain");
+               el.add_attribute("name", im_dom->GetName().c_str());
+               el.add_attribute("mat", im_dom->GetMaterial()->GetName().c_str());
+               xml_writer.add_empty(el);
+            }
+            else
+            {
+               MFEM_ABORT("Invalid domain type");
+            }
          }
       }
    }
@@ -813,60 +885,298 @@ void MFEMParExport::WriteParam(FEParam &p)
    xml_writer.add_leaf(el);
 }
 
+// void MFEMParExport::WriteSectionComponent(const char* szname, XMLElement &el, FECoreBase &base)
+// {
+//    // look for the tag
+//    XMLTag tag;
+//    std::string path_name = std::string("febio_spec/") + szname;
+//    if (xml_reader.FindTag(path_name.c_str(), tag) == false)
+//    {
+//       MFEM_ABORT("Error: could not read " + path_name);
+//    }
+
+//    // make sure this tag has children
+//    if (tag.isleaf())
+//    {
+//       // xml_writer.add_empty(el);
+//       MFEM_ABORT("TODO: empty tag");
+//       return;
+//    } 
+
+//    // search for the correct tag
+//    ++tag;
+//    bool found_tag = false;
+//    std::ifstream *fs = xml_reader.GetFileStream();
+//    do
+//    {
+//       const char* tag_name = tag.AttributeValue("name", true);
+//       const char* sz_tag = tag.m_sztag.c_str();
+//       const char* base_name = base.GetName().c_str();
+//       if (tag_name && strcmp(tag_name, base_name) == 0)
+//       {
+//          found_tag = true;
+//          break;
+//       }
+//       else if (sz_tag && strcmp(sz_tag, base_name) == 0)
+//       {
+//          found_tag = true;
+//          break;
+//       }
+//       else 
+//       {
+//          xml_reader.SkipTag(tag);
+//          ++tag;
+//       }
+//    }
+//    while(found_tag == false && fs->eof() == false);
+//    MFEM_ASSERT(found_tag, "Error: could not find tag " + std::string(el.name()));
+
+//    ParseTag(tag, el, base);
+
+//    xml_reader.Close();
+// }
+
 void MFEMParExport::WriteSectionComponent(const char* szname, XMLElement &el, FECoreBase &base)
 {
-   XMLReader xml_reader;
-   std::string file_name = feb_filename + ".feb";
-   bool file_opened = xml_reader.Open(file_name.c_str());
-   MFEM_ASSERT(file_opened, "Error: could not open " + file_name);
+   // Build cache once (skips large Mesh section)
+   BuildTopLevelSectionCache();
 
-   // look for the tag
-   XMLTag tag;
-   std::string path_name = std::string("febio_spec/") + szname;
-   if (xml_reader.FindTag(path_name.c_str(), tag) == false)
+   std::string section_xml;
+   if (!GetCachedSection(szname, section_xml))
    {
-      MFEM_ABORT("Error: could not read " + path_name);
-   }
-
-   // make sure this tag has children
-   if (tag.isleaf())
-   {
-      // xml_writer.add_empty(el);
-      MFEM_ABORT("TODO: empty tag");
+      MFEM_ABORT("Section not cached (or Mesh) : " << szname);
       return;
-   } 
-
-   // search for the correct tag
-   ++tag;
-   bool found_tag = false;
-   std::ifstream *fs = xml_reader.GetFileStream();
-   do
-   {
-      const char* tag_name = tag.AttributeValue("name", true);
-      const char* sz_tag = tag.m_sztag.c_str();
-      const char* base_name = base.GetName().c_str();
-      if (tag_name && strcmp(tag_name, base_name) == 0)
-      {
-         found_tag = true;
-         break;
-      }
-      else if (sz_tag && strcmp(sz_tag, base_name) == 0)
-      {
-         found_tag = true;
-         break;
-      }
-      else 
-      {
-         xml_reader.SkipTag(tag);
-         ++tag;
-      }
    }
-   while(found_tag == false && fs->eof() == false);
-   MFEM_ASSERT(found_tag, "Error: could not find tag " + std::string(el.name()));
 
-   ParseTag(tag, el, base);
+   // Wrap in artificial root so we can reuse current parser logic safely.
+   std::string wrapped = "<root>\n" + section_xml + "\n</root>\n";
 
-   xml_reader.Close();
+   // Write wrapped to a temporary in-memory file substitute:
+   // Simplest approach: write to a std::stringstream then dump to a temp file.
+   std::string tmpFile = part_dir + "_tmp_cached_section.xml";
+   {
+      std::ofstream ofs(tmpFile, std::ios::binary);
+      ofs << "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n"
+          << wrapped;
+   }
+
+   XMLReader local;
+   if (!local.Open(tmpFile.c_str()))
+   {
+      MFEM_ABORT("Failed to open temp cached section file");
+      return;
+   }
+
+   XMLTag root;
+   if (!local.FindTag("root", root))
+   {
+      local.Close();
+      MFEM_ABORT("Temp root not found");
+      return;
+   }
+
+   // Iterate children (top-level: only one target section tag)
+   ++root;
+   bool sectionFound = false;
+   while (!root.isend())
+   {
+      if (strcmp(root.Name(), szname) == 0)
+      {
+         sectionFound = true;
+         break;
+      }
+      local.SkipTag(root);
+      ++root;
+   }
+   MFEM_ASSERT(sectionFound, "Cached section root mismatch");
+
+   // Now search for component inside that section
+   if (!root.isleaf())
+   {
+      ++root;
+      bool found_tag = false;
+      const char* base_name = base.GetName().c_str();
+      // MFEM_ASSERT(base_name && base_name[0], "Error: component has no name");
+      while (!root.isend())
+      {
+         const char* tag_attr_name = root.AttributeValue("name", true);
+         const char* tag_label     = root.m_sztag.c_str();
+         if ((tag_attr_name && strcmp(tag_attr_name, base_name) == 0))
+         {
+            found_tag = true;
+            break;
+         }
+         else if (tag_label && strcmp(tag_label, base_name) == 0)
+         {
+            found_tag = true;
+            break;
+         }
+         local.SkipTag(root);
+         ++root;
+      }
+      MFEM_ASSERT(found_tag, std::string("Component not found in cached section: ") + base_name);
+
+      // Parse into output XML
+      ParseTag(root, el, base);
+   }
+   else
+   {
+      // Leaf section (unlikely for sections used here)
+      xml_writer.add_empty(el);
+      MFEM_ABORT("Error: empty tag");
+   }
+
+   local.Close();
+
+   // remove temp file
+   std::remove(tmpFile.c_str());
+}
+
+void MFEMParExport::BuildTopLevelSectionCache()
+{
+   if (m_sectionCacheBuilt) return;
+   m_sectionCache.clear();
+
+   const std::string file_name = feb_filename + ".feb";
+   std::ifstream fs(file_name, std::ios::binary);
+   if(!fs) return;
+
+   // Read whole file once
+   std::string file;
+   fs.seekg(0, std::ios::end);
+   file.resize(static_cast<size_t>(fs.tellg()));
+   fs.seekg(0, std::ios::beg);
+   fs.read(file.data(), static_cast<std::streamsize>(file.size()));
+
+   // Find <febio_spec
+   size_t root_pos = file.find("<febio_spec");
+   if (root_pos == std::string::npos) { m_sectionCacheBuilt = true; return; }
+
+   // Move to end of root start tag '>'
+   size_t pos = file.find('>', root_pos);
+   if (pos == std::string::npos) { m_sectionCacheBuilt = true; return; }
+   ++pos;
+
+   // Simple top-level scan: depth relative to inside <febio_spec> content
+   while (pos < file.size())
+   {
+      // skip whitespace
+      while (pos < file.size() && isspace(static_cast<unsigned char>(file[pos]))) ++pos;
+      if (pos >= file.size()) break;
+
+      if (file.compare(pos, 11, "</febio_spec") == 0) break;
+      if (file[pos] != '<') { ++pos; continue; }
+      if (file.compare(pos, 4, "<!--") == 0) {
+         // skip comment
+         size_t cend = file.find("-->", pos+4);
+         if (cend == std::string::npos) break;
+         pos = cend + 3;
+         continue;
+      }
+      size_t tag_start = pos;
+      ++pos;
+      bool closing = false;
+      if (file[pos] == '/') { closing = true; }
+
+      if (closing) {
+         // unexpected closing at top-level -> done
+         size_t close_gt = file.find('>', pos);
+         if (close_gt == std::string::npos) break;
+         pos = close_gt + 1;
+         continue;
+      }
+
+      // Parse tag name
+      size_t name_begin = pos;
+      while (pos < file.size() && !isspace(static_cast<unsigned char>(file[pos])) &&
+             file[pos] != '>' && file[pos] != '/') ++pos;
+      std::string section_name = file.substr(name_begin, pos - name_begin);
+
+      // We are at start tag of a top-level child (<Section ...>)
+      // Find end of start tag
+      size_t start_tag_end = file.find('>', pos);
+      if (start_tag_end == std::string::npos) break;
+      bool self_closing = (file[start_tag_end-1] == '/');
+
+      if (section_name == "Mesh")
+      {
+         // Skip entire Mesh subtree by depth count
+         if (self_closing) { pos = start_tag_end + 1; continue; }
+         size_t scan = start_tag_end + 1;
+         int depth = 1;
+         while (scan < file.size() && depth > 0)
+         {
+            size_t lt = file.find('<', scan);
+            if (lt == std::string::npos) break;
+            if (file.compare(lt, 4, "<!--") == 0) {
+               size_t cend = file.find("-->", lt+4);
+               if (cend == std::string::npos) break;
+               scan = cend + 3;
+               continue;
+            }
+            bool closing2 = (lt + 1 < file.size() && file[lt+1] == '/');
+            size_t gt = file.find('>', lt+1);
+            if (gt == std::string::npos) break;
+            if (!closing2) {
+               // check self closing
+               if (file[gt-1] != '/') depth++;
+            } else {
+               depth--;
+            }
+            scan = gt + 1;
+         }
+         pos = scan;
+         continue;
+      }
+
+      // Capture non-Mesh section
+      size_t section_end_pos = start_tag_end + 1;
+      if (!self_closing)
+      {
+         // depth count just for this section
+         size_t scan = start_tag_end + 1;
+         int depth = 1;
+         while (scan < file.size() && depth > 0)
+         {
+            size_t lt = file.find('<', scan);
+            if (lt == std::string::npos) break;
+            if (file.compare(lt, 4, "<!--") == 0) {
+               size_t cend = file.find("-->", lt+4);
+               if (cend == std::string::npos) break;
+               scan = cend + 3;
+               continue;
+            }
+            bool closing2 = (lt + 1 < file.size() && file[lt+1] == '/');
+            size_t gt = file.find('>', lt+1);
+            if (gt == std::string::npos) break;
+            if (!closing2) {
+               if (file[gt-1] != '/') depth++;
+            } else {
+               depth--;
+            }
+            scan = gt + 1;
+            if (depth == 0) section_end_pos = scan;
+         }
+         pos = section_end_pos;
+      }
+      else
+      {
+         pos = start_tag_end + 1;
+      }
+
+      // Store raw substring of this section
+      m_sectionCache[section_name] = file.substr(tag_start, section_end_pos - tag_start);
+   }
+
+   m_sectionCacheBuilt = true;
+}
+
+bool MFEMParExport::GetCachedSection(const std::string& name, std::string& out) const
+{
+   auto it = m_sectionCache.find(name);
+   if (it == m_sectionCache.end()) return false;
+   out = it->second;
+   return true;
 }
 
 void MFEMParExport::ParseTag(XMLTag &tag, XMLElement &el, FECoreBase &base)

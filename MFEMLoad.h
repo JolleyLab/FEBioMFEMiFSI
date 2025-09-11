@@ -62,7 +62,6 @@ public:
 
 private:
    std::vector<int> m_dom_list; // domain IDs for the body load
-
    int mfem_dom_attr = -1;
 };
 
