@@ -7,7 +7,10 @@
 #include <FECore/FEModel.h>
 #include <FECore/FESolver.h>
 
+#include "MFEMImmersedElasticDomain.h"
+
 #include <string>
+#include <unordered_map>
 
 #include "mfem.hpp"
 
@@ -20,7 +23,9 @@ public:
    // destructor
    virtual ~MFEMParExport();
 
-   virtual void WriteFiles(std::string &feb_filename_, std::string &part_dir_, int myid, bool immersed_febio_solid_);
+   virtual void WriteFiles(std::string &feb_filename_, std::string &part_dir_, int np, bool immersed_febio_solid_);
+
+   void SetDomainAttributeMap(std::map<MFEMImmersedElasticDomain*, int> &map) { dom_attr_map = &map; };
 
    void SetFEModel(FEModel* fem){ m_fem = fem; };
    void SetFESolver(FESolver* solver){ m_solver = solver; };
@@ -36,7 +41,16 @@ private:
 
    FEModel* m_fem;
    FESolver* m_solver;
-   XMLWriter xml_writer;  
+   XMLWriter xml_writer;
+
+   // reading original feb file
+   XMLReader xml_reader;
+   bool m_sectionCacheBuilt = false;
+   std::unordered_map<std::string, std::string> m_sectionCache;
+   void BuildTopLevelSectionCache();
+   bool GetCachedSection(const std::string& name, std::string& out) const;
+
+   std::map<MFEMImmersedElasticDomain*, int>* dom_attr_map;
 
    // main file
    void WriteMainFebFile();

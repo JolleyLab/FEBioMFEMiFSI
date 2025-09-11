@@ -13,6 +13,7 @@
 #include "MFEMMaterial.h"
 #include "FEBioLinearSolver.h"
 #include "ParFEModel.h"
+#include "MFEMImmersedElasticDomain.h"
 
 #include <Navier-Stokes-Serial/ins_solver.hpp>
 #include <Navier-Stokes/ins_solver_enum.hpp>
@@ -133,6 +134,7 @@ public:
    #ifdef MFEM_USE_MPI
    ParMesh* solid_pmesh = nullptr;
    #endif
+   std::map<MFEMImmersedElasticDomain*, int> dom_attr_map; // map from immersed solid domain to mfem attribute
 
    // Output
    std::string fname = "results_mfem_solver";
@@ -634,6 +636,8 @@ bool MFEMSolver::CreateMesh()
    #ifdef MFEM_USE_MPI
    if(m.pre_partition)
    {
+      mfem::StopWatch timer_partitioning;
+      timer_partitioning.Start();
       if (m.partition_opt == Imp::ParallelMesh::PartitionMesh)
       {
          // partition the mesh then output each piece
@@ -647,6 +651,10 @@ bool MFEMSolver::CreateMesh()
             }
          }
 
+         mfem::out << "-------------------------------------\n";
+         mfem::out << "Writing mfem mesh partition data..." << std::endl;
+         mfem::out << "-------------------------------------\n";
+
          // Partition the serial mesh and save the parallel mesh on np ranks
          // Create directory structure if it doesn't exist
          MFEM_ASSERT(mfem::Mpi::WorldSize() == 1, "Pre-partitioning should be done on a single rank (mpirun -np 1 ...)");
@@ -655,7 +663,7 @@ bool MFEMSolver::CreateMesh()
          #else
          int myid = 0;
          #endif
-         std::string part_dir = "ParallelMesh/";
+         std::string part_dir = "ParallelMesh_np" + std::to_string(m.np) + "/";
          if (myid == 0)
          {
             try {
@@ -676,15 +684,13 @@ bool MFEMSolver::CreateMesh()
             }
          }        
 
-         // I need to setup local febio mesh - currently to do this I need to call SetupFluid and SetupSolid then the below function
-         // This also ensures that each BC has a MFEM attribute to write out
+         // This ensures that each BC has a MFEM attribute to write out
          PartitionMesh();
          if (SetupFluid() == false) return false;
          if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
          {
-            if (SetupSolid() == false) return false;
+            if (SetupSolid() == false) return false;            
          }
-         ClearSerialMeshData();
 
          // write main and local .feb files
          std::string feb_filename = dynamic_cast<FEBioModel*>(fem)->GetFileTitle();
@@ -694,13 +700,19 @@ bool MFEMSolver::CreateMesh()
          par_export.SetFESolver(this);
          bool immersed_febio_solid_and_solver = false;
          if (m.immersed_febio_solid && m.solidsolvertype == SolidSolverType::FEBio)
+         {
             immersed_febio_solid_and_solver = true;
+            par_export.SetDomainAttributeMap(m.dom_attr_map);
+         }
          
-         for (int i=0; i<m.np; ++i)
-            par_export.WriteFiles(feb_filename, part_dir, i, immersed_febio_solid_and_solver);
-
          mfem::out << "-------------------------------------\n";
+         mfem::out << "Writing parallel .feb files..." << std::endl;
+         par_export.WriteFiles(feb_filename, part_dir, m.np, immersed_febio_solid_and_solver);
+         
+         timer_partitioning.Stop();
+         mfem::out << "\n";
          mfem::out << "Pre-partitioning of the mesh complete" << std::endl;
+         mfem::out << "     Time to partition: " << timer_partitioning.RealTime() << "s\n";
          mfem::out << "-------------------------------------\n";
          std::exit(EXIT_SUCCESS);
       }
@@ -753,6 +765,7 @@ bool MFEMSolver::CreateMesh()
             mfem::out << "MFEMParImport error (rank " << myid << "): "
                       << (err[0] ? err : "unknown error")
                       << "\nWhile loading: " << local_feb_file << std::endl;
+            MFEM_ABORT("Error loading local .feb file");
          }
 
          // reinit model
@@ -836,6 +849,10 @@ bool MFEMSolver::ExtractFluidAndSolidMeshes()
       {
          solid_domain_attr[i] = dom_attr;
          febio_solid_material = true;
+
+         MFEMImmersedElasticDomain* imdom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+         MFEM_ASSERT(imdom, "FEBio solid domain must be of type MFEMImmersedElasticDomain");
+         m.dom_attr_map[imdom] = dom_attr;
       }
       if(dom.IsActive() && dynamic_cast<MFEMNewtonianFluid*>(dom.GetMaterial()))
       {
@@ -1154,7 +1171,7 @@ bool MFEMSolver::SetupFluid()
                int id = m.mesh->GetDomainAttribute(dom); assert(id > 0);
                bl->Apply(this, id - 1);
             }
-         }                  
+         }
       }
 	}
 
