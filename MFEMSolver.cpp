@@ -710,7 +710,7 @@ bool MFEMSolver::CreateMesh()
          par_export.WriteFiles(feb_filename, part_dir, m.np, immersed_febio_solid_and_solver);
          
          timer_partitioning.Stop();
-         mfem::out << "...SUCCESS!" << std::endl;
+         mfem::out << " ...SUCCESS!" << std::endl;
          mfem::out << "\nTime to partition: " << timer_partitioning.RealTime() << "s\n";
          mfem::out << "-------------------------------------\n";
          std::exit(EXIT_SUCCESS);
