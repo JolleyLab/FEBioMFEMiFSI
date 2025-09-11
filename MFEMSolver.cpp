@@ -706,13 +706,12 @@ bool MFEMSolver::CreateMesh()
          }
          
          mfem::out << "-------------------------------------\n";
-         mfem::out << "Writing parallel .feb files..." << std::endl;
+         mfem::out << "Writing parallel .feb files";
          par_export.WriteFiles(feb_filename, part_dir, m.np, immersed_febio_solid_and_solver);
          
          timer_partitioning.Stop();
-         mfem::out << "\n";
-         mfem::out << "Pre-partitioning of the mesh complete" << std::endl;
-         mfem::out << "     Time to partition: " << timer_partitioning.RealTime() << "s\n";
+         mfem::out << "...SUCCESS!" << std::endl;
+         mfem::out << "\nTime to partition: " << timer_partitioning.RealTime() << "s\n";
          mfem::out << "-------------------------------------\n";
          std::exit(EXIT_SUCCESS);
       }
@@ -727,7 +726,7 @@ bool MFEMSolver::CreateMesh()
          #else
          int myid = 0;
          #endif
-         std::string part_dir = "ParallelMesh/";
+         std::string part_dir = "ParallelMesh_np" + std::to_string(mfem::Mpi::WorldSize()) + "/";
 
          std::string fluid_mname = part_dir + "fluid";
          m.fluid_pmesh = LoadParMesh(fluid_mname);
