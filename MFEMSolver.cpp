@@ -651,9 +651,9 @@ bool MFEMSolver::CreateMesh()
             }
          }
 
-         mfem::out << "-------------------------------------\n";
-         mfem::out << "Writing mfem mesh partition data..." << std::endl;
-         mfem::out << "-------------------------------------\n";
+         mfem::out << "-----------------------------------------------------\n";
+         mfem::out << "Writing mfem mesh partition data for " << std::to_string(m.np) << " ranks ..." << std::endl;
+         mfem::out << "-----------------------------------------------------\n";
 
          // Partition the serial mesh and save the parallel mesh on np ranks
          // Create directory structure if it doesn't exist
@@ -1164,12 +1164,16 @@ bool MFEMSolver::SetupFluid()
          }
          else
          {
+            std::vector<int> dom_list;
             for (int j=0; j<bl->Domains(); ++j)
             {
                FEDomain* dom = bl->Domain(j);
                int id = m.mesh->GetDomainAttribute(dom); assert(id > 0);
                bl->Apply(this, id - 1);
+               dom_list.push_back(id);
             }
+            if (dom_list.size() == 1) bl->SetDomainAttr(dom_list[0]);
+            else bl->SetDomainIDList(dom_list);
          }
       }
 	}

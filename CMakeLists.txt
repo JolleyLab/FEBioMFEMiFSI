@@ -39,8 +39,10 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # Find FEBio Libs (from FEBioHeat plugin CMakeLists.txt)
-# set(FEBio_SDK "/Applications/FEBioStudio/sdk")
-set(FEBio_SDK "/Users/blackr1/Documents/Software/FEBio/")
+if(NOT DEFINED FEBio_SDK OR FEBio_SDK STREQUAL "")
+    set(FEBio_SDK "/Users/blackr1/Documents/Software/FEBio/" CACHE PATH "Path to FEBio SDK root" FORCE)
+endif()
+message(STATUS "Using FEBio_SDK = ${FEBio_SDK}")
 
 # Only update the include and lib directories if the FEBio_SDK path has been changed. 
 if(NOT OLD_SDK)
@@ -226,11 +228,13 @@ target_link_libraries(FEBioMFEMiFSI PRIVATE ${FEBio_LIBS})
 target_link_libraries(FEBioMFEMiFSI PRIVATE mfem fsi_solver)
 
 # macOS: ensure loader can find FEBio libs at runtime
-set_target_properties(FEBioMFEMiFSI PROPERTIES
-  BUILD_WITH_INSTALL_RPATH ON
-  BUILD_RPATH   "${FEBio_LIB_DIR}"
-  INSTALL_RPATH "${FEBio_LIB_DIR}"
-)
+if (APPLE)
+   set_target_properties(FEBioMFEMiFSI PROPERTIES
+   BUILD_WITH_INSTALL_RPATH ON
+   BUILD_RPATH   "${FEBio_LIB_DIR}"
+   INSTALL_RPATH "${FEBio_LIB_DIR}"
+   )
+endif()
 
 # Output the build type
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
