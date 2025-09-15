@@ -58,3 +58,18 @@ private:
 
 	DECLARE_FECORE_CLASS();
 };
+
+// Class that applies initial conditions from a folder
+// written in MFEM mesh format (see option write_final_state_as_IC)
+class MFEMInitialConditionFromFolder : public MFEMInitialCondition
+{
+public:
+   MFEMInitialConditionFromFolder(FEModel* fem) : MFEMInitialCondition(fem) {}
+
+   void Apply(MFEMSolver* solver) override;
+
+private:
+   std::string m_folder_path = "InitialConditions";
+
+   DECLARE_FECORE_CLASS();
+};

@@ -19,6 +19,11 @@ namespace mfem
    #endif
 }
 
+namespace ins_solver_serial
+{
+   class INS_Solver;
+}
+
 class MFEMSolver : public FESolver
 {
 	class Imp;
@@ -47,6 +52,8 @@ public:
    mfem::Mesh* GetMFEMfluidmesh();
    mfem::Mesh* GetMFEMsolidmesh();
    #endif
+
+   ins_solver_serial::INS_Solver* GetFlowSolver();
 
    // flag for immersed solid
    bool ImmersedSolid();

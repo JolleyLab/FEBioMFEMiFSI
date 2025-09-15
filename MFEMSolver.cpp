@@ -150,6 +150,10 @@ public:
    double restart_t = 0.0;
    double restart_dt = 0.0;
 
+   // Write final state as IC for next run
+   bool write_final_state_as_IC = false;
+   std::string final_state_folder = "InitialConditions";
+
    // Pre-partitioning of the mesh
    // Large meshes can be pre-partitioned, then only the local piece is read on each rank
    // rather than the entire mesh read on each rank then performing the partitioning
@@ -291,6 +295,8 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.restart_step_save, FE_RANGE_GREATER_OR_EQUAL(1), "restart_step_save");
       ADD_PARAMETER(m.restarting, "restart_simulation");
       ADD_PARAMETER(m.restart_step, FE_RANGE_GREATER_OR_EQUAL(1), "restart_step");
+      ADD_PARAMETER(m.write_final_state_as_IC, "write_final_state_as_IC");
+      ADD_PARAMETER(m.final_state_folder, "final_state_folder");
       ADD_PARAMETER(m.wss, "Save_Wall_Shear_Stress");
       ADD_PARAMETER(m.vorticity, "Save_Vorticity");
       ADD_PARAMETER(m.q_criterion, "Save_Q_Criterion");
@@ -422,6 +428,11 @@ mfem::Mesh* MFEMSolver::GetMFEMsolidmesh()
 	return m.solid_mesh;
 }
 #endif
+
+INS_Solver* MFEMSolver::GetFlowSolver()
+{
+   return m.flowsolver;
+}
 
 bool MFEMSolver::ThreeFieldFormulation()
 {
@@ -1749,7 +1760,14 @@ bool MFEMSolver::SolveStep()
 	// print out mfem timing data
 	if (timeStep == analysis->m_ntime)
 	{
+      // timing info
 		m.flowsolver->PrintTimingData();
+
+      // write final state as restart files for future use
+      if (m.write_final_state_as_IC)
+      {
+         m.flowsolver->writeRestartFiles(m.final_state_folder,1); // second arg not used here
+      }
 
       // // print out relative L2 error at final time step
       // double err_u = 0.0;

@@ -6,6 +6,7 @@
 #include "mfem.hpp"
 #endif
 #include "MFEMTools.h"
+#include <Navier-Stokes-Serial/ins_solver.hpp>
 
 BEGIN_FECORE_CLASS(MFEMInitialPressure, MFEMInitialCondition)
 	ADD_PARAMETER(m_pressure, "pressure");
@@ -72,3 +73,16 @@ void MFEMInitialVelocity::CopyFrom(FEInitialCondition& ic)
    (*this).m_vy = v.m_vy;
    (*this).m_vz = v.m_vz;
 }
+
+BEGIN_FECORE_CLASS(MFEMInitialConditionFromFolder, MFEMInitialCondition)
+   ADD_PARAMETER(m_folder_path, "folder_path");
+END_FECORE_CLASS();
+
+void MFEMInitialConditionFromFolder::Apply(MFEMSolver* solver)
+{
+   auto flowsolver = solver->GetFlowSolver();
+   int step; // not used
+   double time, dt; // not used
+   flowsolver->Restarting(m_folder_path, step, dt, time);
+   flowsolver->readRestarts(step,dt,time);
+}  

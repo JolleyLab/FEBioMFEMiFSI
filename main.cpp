@@ -100,8 +100,10 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 	REGISTER_FECORE_CLASS(MFEMSolver, "mfem");
    REGISTER_FECORE_CLASS(MFEMNewtonianFluid, "mfem newtonian fluid");
 
+   // initial conditions
 	REGISTER_FECORE_CLASS(MFEMInitialPressure, "initial pressure");
 	REGISTER_FECORE_CLASS(MFEMInitialVelocity, "initial velocity");
+   REGISTER_FECORE_CLASS(MFEMInitialConditionFromFolder, "initial conditions from folder");
 
    // velocity bcs
 	REGISTER_FECORE_CLASS(MFEMVelDirichletBC, "prescribed velocity");
