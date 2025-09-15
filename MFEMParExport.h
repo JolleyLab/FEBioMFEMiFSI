@@ -65,6 +65,7 @@ private:
    void WriteInitialConditionsSection();
    void WriteBoundaryConditionsSection();
    void WriteLoadsSection();
+   void WriteLoadDataSection();
    void WriteMeshSection();
    void WriteNodes();
    void WriteElements();

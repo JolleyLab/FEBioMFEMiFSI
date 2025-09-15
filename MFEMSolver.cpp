@@ -705,14 +705,14 @@ bool MFEMSolver::CreateMesh()
             par_export.SetDomainAttributeMap(m.dom_attr_map);
          }
          
-         mfem::out << "-------------------------------------\n";
+         mfem::out << "-----------------------------------------------------\n";
          mfem::out << "Writing parallel .feb files";
          par_export.WriteFiles(feb_filename, part_dir, m.np, immersed_febio_solid_and_solver);
          
          timer_partitioning.Stop();
          mfem::out << " ...SUCCESS!" << std::endl;
          mfem::out << "\nTime to partition: " << timer_partitioning.RealTime() << "s\n";
-         mfem::out << "-------------------------------------\n";
+         mfem::out << "-----------------------------------------------------\n";
          std::exit(EXIT_SUCCESS);
       }
       else if (m.partition_opt == Imp::ParallelMesh::ReadParallelMesh)
@@ -797,15 +797,15 @@ bool MFEMSolver::CreateMesh()
    {
       feLog("-------------------------------\nFluid Mesh\n");
       #ifdef MFEM_USE_MPI
-      m.fluid_pmesh->PrintCharacteristics();
+      m.fluid_pmesh->PrintInfo();
       #else
-      m.fluid_mesh->PrintCharacteristics();
+      m.fluid_mesh->PrintInfo();
       #endif
       feLog("-------------------------------\nSolid Mesh\n");
       #ifdef MFEM_USE_MPI
-      m.solid_pmesh->PrintCharacteristics();
+      m.solid_pmesh->PrintInfo();
       #else
-      m.solid_mesh->PrintCharacteristics();
+      m.solid_mesh->PrintInfo();
       #endif
       feLog("-------------------------------\n");
    }
@@ -813,9 +813,9 @@ bool MFEMSolver::CreateMesh()
    {
       feLog("-------------------------------\nFluid Mesh\n");
       #ifdef MFEM_USE_MPI
-      m.fluid_pmesh->PrintCharacteristics();
+      m.fluid_pmesh->PrintInfo();
       #else
-      m.mesh->PrintCharacteristics();
+      m.mesh->PrintInfo();
       #endif
       feLog("-------------------------------\n");
    }

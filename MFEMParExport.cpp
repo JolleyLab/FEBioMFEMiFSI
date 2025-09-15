@@ -9,6 +9,7 @@
 #include <FECore/FEMaterial.h>
 #include <FECore/FEInitialCondition.h>
 #include <FECore/log.h>
+#include <FECore/FELoadController.h>
 #include <XML/XMLReader.h>
 
 // MFEM Headers
@@ -19,6 +20,9 @@
 
 #include <fstream>
 #include <sstream>
+#include <list>
+#include <cstring>
+#include <iomanip>
 
 MFEMParExport::MFEMParExport()
 {
@@ -262,6 +266,9 @@ void MFEMParExport::WriteLocalFebFiles()
       // loads
       WriteLoadsSection();
 
+      // load data
+      WriteLoadDataSection();
+
       if (immersed_febio_solid)
       {
          // mesh
@@ -368,6 +375,25 @@ void MFEMParExport::WriteLoadsSection()
    xml_writer.close_branch(); // Loads
 }
 
+void MFEMParExport::WriteLoadDataSection()
+{
+   FEModel *fem = GetFEModel();
+   XMLElement el;
+   el.name("LoadData");
+   xml_writer.add_branch(el);
+   {
+      // add load data
+      int num_LDs = fem->LoadControllers();
+      for (int i = 0; i < num_LDs; ++i)
+      {
+         FELoadController* ld = fem->GetLoadController(i);
+         XMLElement ld_el("load_controller");
+         WriteSectionComponent("LoadData", ld_el, *ld);
+      }
+   }
+   xml_writer.close_branch(); // LoadData
+}
+
 void MFEMParExport::WriteMeshSection()
 {
    xml_writer.add_branch("Mesh");
@@ -378,76 +404,6 @@ void MFEMParExport::WriteMeshSection()
    }
    xml_writer.close_branch(); // Mesh
 }
-
-// void MFEMParExport::WriteNodes()
-// {
-//    FEModel* fem = GetFEModel();
-//    FEMesh& mesh = fem->GetMesh();
-
-//    XMLElement tagNodes("Nodes");
-//    xml_writer.add_branch(tagNodes);
-//    {
-//       XMLElement el("node");
-//       int nid = el.add_attribute("id", 0);
-//       for (int j = 0; j < mesh.Nodes(); ++j)
-//       {
-//          FENode& node = mesh.Node(j);
-//          int m_nid = node.GetID();
-//          el.set_attribute(nid, m_nid);
-//          const vec3d r = node.m_r0;
-//          std::ostringstream ss;
-//          ss.setf(std::ios::scientific);
-//          ss << std::setprecision(16)
-//             << r.x << ", " << r.y << ", " << r.z;
-//          el.value(ss.str().c_str());
-//          xml_writer.add_leaf(el, false);
-//       }
-//    }
-//    xml_writer.close_branch();
-// }
-
-// void MFEMParExport::WriteElements()
-// {
-//    FEModel* fem = GetFEModel();
-//    FEMesh& mesh = fem->GetMesh();
-
-//    int nset = 0;
-//    int ncount = 0;
-//    int nn[FEElement::MAX_NODES];
-//    char szname[128] = { 0 };
-
-//    // Assumes one combined immersed solid domain
-//    bool immersed_solid_domain = false;
-//    for (int d=0; d < mesh.Domains(); ++d)
-//    {
-//       FEDomain& dom = mesh.Domain(d);
-//       MFEMImmersedElasticDomain* im_dom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
-//       if (im_dom && im_dom->IsActive())
-//       {
-//          immersed_solid_domain = true;
-
-//          XMLElement xe("Elements");
-//          xe.add_attribute("name", im_dom->GetName().c_str());
-//          xml_writer.add_branch(xe);
-//          {
-//             for (int i=0; i<im_dom->Elements(); ++i)
-//             {
-//                FEElement& el = im_dom->ElementRef(i);            
-//                XMLElement xej("elem");
-//                xej.add_attribute("id", el.GetID());
-//                int ne = el.Nodes();
-//                for (int k = 0; k < ne; ++k) nn[k] = mesh.Node(el.m_node[k]).GetID();
-//                xej.value(nn, ne);
-//                xml_writer.add_leaf(xej, false);
-//             }
-//             nset++;
-//          }
-//          xml_writer.close_branch(); // Elements
-//          break;
-//       }
-//    }
-//    MFEM_ASSERT(immersed_solid_domain,"No immersed solid domain found!");
-// }
 
 mfem::Mesh* MFEMParExport::LoadMeshPart(const std::string &prefix)
 {
@@ -599,35 +555,6 @@ const char* MFEMParExport::ElementTypeString(int ntype)
 	}
 	return sztype;
 }
-
-// void MFEMParExport::WriteMeshDomainsSection()
-// {
-//    FEModel* fem = GetFEModel();
-//    FEMesh& mesh = fem->GetMesh();
-
-//    xml_writer.add_branch("MeshDomains");
-//    {
-//       for (int i = 0; i < mesh.Domains(); ++i)
-//       {
-//          FEDomain& dom = mesh.Domain(i);
-//          MFEMImmersedElasticDomain* im_dom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
-//          assert(im_dom);
-//          XMLElement el;
-//          if (dom.Class() == FE_DOMAIN_SOLID)
-//          {
-//             el.name("SolidDomain");
-//             el.add_attribute("name", im_dom->GetName().c_str());
-//             el.add_attribute("mat", im_dom->GetMaterial()->GetName().c_str());
-//             xml_writer.add_empty(el);
-//          }
-//          else
-//          {
-//             MFEM_ABORT("Invalid domain type");
-//          }
-//       }
-//    }
-//    xml_writer.close_branch(); // MeshDomains
-// }
 
 void MFEMParExport::WriteMeshDomainsSection()
 {
@@ -885,57 +812,6 @@ void MFEMParExport::WriteParam(FEParam &p)
    xml_writer.add_leaf(el);
 }
 
-// void MFEMParExport::WriteSectionComponent(const char* szname, XMLElement &el, FECoreBase &base)
-// {
-//    // look for the tag
-//    XMLTag tag;
-//    std::string path_name = std::string("febio_spec/") + szname;
-//    if (xml_reader.FindTag(path_name.c_str(), tag) == false)
-//    {
-//       MFEM_ABORT("Error: could not read " + path_name);
-//    }
-
-//    // make sure this tag has children
-//    if (tag.isleaf())
-//    {
-//       // xml_writer.add_empty(el);
-//       MFEM_ABORT("TODO: empty tag");
-//       return;
-//    } 
-
-//    // search for the correct tag
-//    ++tag;
-//    bool found_tag = false;
-//    std::ifstream *fs = xml_reader.GetFileStream();
-//    do
-//    {
-//       const char* tag_name = tag.AttributeValue("name", true);
-//       const char* sz_tag = tag.m_sztag.c_str();
-//       const char* base_name = base.GetName().c_str();
-//       if (tag_name && strcmp(tag_name, base_name) == 0)
-//       {
-//          found_tag = true;
-//          break;
-//       }
-//       else if (sz_tag && strcmp(sz_tag, base_name) == 0)
-//       {
-//          found_tag = true;
-//          break;
-//       }
-//       else 
-//       {
-//          xml_reader.SkipTag(tag);
-//          ++tag;
-//       }
-//    }
-//    while(found_tag == false && fs->eof() == false);
-//    MFEM_ASSERT(found_tag, "Error: could not find tag " + std::string(el.name()));
-
-//    ParseTag(tag, el, base);
-
-//    xml_reader.Close();
-// }
-
 void MFEMParExport::WriteSectionComponent(const char* szname, XMLElement &el, FECoreBase &base)
 {
    // Build cache once (skips large Mesh section)
@@ -944,15 +820,11 @@ void MFEMParExport::WriteSectionComponent(const char* szname, XMLElement &el, FE
    std::string section_xml;
    if (!GetCachedSection(szname, section_xml))
    {
-      MFEM_ABORT("Section not cached (or Mesh) : " << szname);
+      MFEM_ABORT("Section not cached: " << szname);
       return;
    }
 
-   // Wrap in artificial root so we can reuse current parser logic safely.
    std::string wrapped = "<root>\n" + section_xml + "\n</root>\n";
-
-   // Write wrapped to a temporary in-memory file substitute:
-   // Simplest approach: write to a std::stringstream then dump to a temp file.
    std::string tmpFile = part_dir + "_tmp_cached_section.xml";
    {
       std::ofstream ofs(tmpFile, std::ios::binary);
@@ -975,12 +847,11 @@ void MFEMParExport::WriteSectionComponent(const char* szname, XMLElement &el, FE
       return;
    }
 
-   // Iterate children (top-level: only one target section tag)
    ++root;
    bool sectionFound = false;
    while (!root.isend())
    {
-      if (strcmp(root.Name(), szname) == 0)
+      if (std::strcmp(root.Name(), szname) == 0)
       {
          sectionFound = true;
          break;
@@ -990,45 +861,45 @@ void MFEMParExport::WriteSectionComponent(const char* szname, XMLElement &el, FE
    }
    MFEM_ASSERT(sectionFound, "Cached section root mismatch");
 
-   // Now search for component inside that section
    if (!root.isleaf())
    {
       ++root;
       bool found_tag = false;
       const char* base_name = base.GetName().c_str();
-      // MFEM_ASSERT(base_name && base_name[0], "Error: component has no name");
+
       while (!root.isend())
       {
-         const char* tag_attr_name = root.AttributeValue("name", true);
+         const char* tag_attr_name = root.AttributeValue("name", true); // not required
          const char* tag_label     = root.m_sztag.c_str();
-         if ((tag_attr_name && strcmp(tag_attr_name, base_name) == 0))
+         if (tag_attr_name && std::strcmp(tag_attr_name, base_name) == 0)
          {
             found_tag = true;
             break;
          }
-         else if (tag_label && strcmp(tag_label, base_name) == 0)
+         else if (tag_label && std::strcmp(tag_label, base_name) == 0)
          {
             found_tag = true;
             break;
          }
+         else if (tag_label && std::strcmp(tag_label, "body_load") == 0 && (!tag_attr_name || tag_attr_name[0] == 0))
+         {
+            MFEM_ABORT("Error: body_load component must have a name; please add one to the original feb file");
+         }
+
          local.SkipTag(root);
          ++root;
       }
-      MFEM_ASSERT(found_tag, std::string("Component not found in cached section: ") + base_name);
 
-      // Parse into output XML
+      MFEM_ASSERT(found_tag, std::string("Component not found in cached section: ") + base_name);
       ParseTag(root, el, base);
    }
    else
    {
-      // Leaf section (unlikely for sections used here)
       xml_writer.add_empty(el);
       MFEM_ABORT("Error: empty tag");
    }
 
    local.Close();
-
-   // remove temp file
    std::remove(tmpFile.c_str());
 }
 
@@ -1194,10 +1065,11 @@ void MFEMParExport::ParseTag(XMLTag &tag, XMLElement &el, FECoreBase &base)
          ++tag;
          do
          {
+            eli.name(tag.Name());
+
             if (tag.isleaf())
             {
                // write the leaf
-               eli.name(tag.Name());
                WriteAttributes(tag,eli,base);
                WriteParameters(tag,eli,base);
 
