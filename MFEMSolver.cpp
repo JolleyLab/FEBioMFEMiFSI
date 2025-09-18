@@ -208,7 +208,7 @@ public:
    int linsolvertype = LinearSolverType::FGMRES;
 
    // Preconditioner Options
-   int prec_type = ins_solver::PreconditionerType::SIMPLE; // enum PreconditionerType {SIMPLE = 0, SCR = 1, aSCR = 2, ILU = 3};
+   int prec_type = ins_solver::PreconditionerType::SIMPLE; // enum PreconditionerType {SIMPLE = 0, SCR = 1, aSCR = 2, ILU = 3, Jacobi = 4};
    enum PrecInnerSolverType {Iterative = 0, Direct = 1}; // direct using UMFPACK
    int prec_inner_solver_type = PrecInnerSolverType::Iterative;
    bool direct_solver_prec = false;
@@ -322,7 +322,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
 
    // Preconditioner Options
    BEGIN_PARAM_GROUP("Preconditioner");
-      ADD_PARAMETER(m.prec_type, "prec_type")->setEnums("SIMPLE\0SCR\0aSCR\0ILU\0");
+      ADD_PARAMETER(m.prec_type, "prec_type")->setEnums("SIMPLE\0SCR\0aSCR\0ILU\0JACOBI\0");
       ADD_PARAMETER(m.prec_inner_solver_type, "inner_solver_type")->setEnums("Iterative\0Direct\0");
       ADD_PARAMETER(m.prec_Ainv_atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_atol");
       ADD_PARAMETER(m.prec_Ainv_rtol, FE_RANGE_GREATER_OR_EQUAL(0.0), "Ainv_rtol");
