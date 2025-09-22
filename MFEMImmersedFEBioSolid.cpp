@@ -86,6 +86,8 @@ void ImmersedFEBioSolid::Setup(double dt, double alpha_m_, double alpha_f_, doub
    nodes->GetTrueDofs(true_interp_points_in_solid);
    #endif
 
+   CheckMeshIntersection(true_interp_points_in_solid);
+
    beta = beta_;
    gamma = gamma_;
    alpha_m = alpha_m_;
@@ -593,8 +595,6 @@ void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambd
 
    // TODO: contact
 
-   sw_res->Stop();
-
    ////////////////////////////////////////////////////////
    // Get pointer to mfem::Vector version of m_R
    mfem::Vector &residual_vector = m_R->GetMfemVector();
@@ -607,6 +607,17 @@ void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambd
    #else
    mfem::Vector &res_vec = residual_vector;
    #endif
+
+   // if (disp_ess_tdof_list.Size() > 0)
+   // {
+   //    // zero essential displacement dofs
+   //    const int N = disp_ess_tdof_list.Size();
+   //    const auto idx = disp_ess_tdof_list.Read();
+   //    auto r_RW = res_vec.ReadWrite();
+   //    MFEM_FORALL(i, N, r_RW[idx[i]] = 0.0;);
+   // }
+
+   sw_res->Stop();
 
    sw_fsires->Start();
 
@@ -810,6 +821,16 @@ mfem::Operator &ImmersedFEBioSolid::FormLHS()
    pK.MakePtAP(dK,Ph);
    mfem::HypreParMatrix *parmfemK = pK.As<mfem::HypreParMatrix>();
    #endif
+
+   // if (disp_ess_tdof_list.Size() > 0)
+   // {
+   //    // eliminate essential displacement dofs
+   //    #ifdef MFEM_USE_MPI
+   //    parmfemK->EliminateBC(disp_ess_tdof_list,mfem::AbstractSparseMatrix::DIAG_ONE);
+   //    #else
+   //    MFEM_ABORT("TODO in serial");
+   //    #endif
+   // }
 
    sw_tan->Stop();
 

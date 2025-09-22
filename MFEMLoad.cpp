@@ -109,7 +109,7 @@ void MFEMTractionFreeBC::CopyFrom(FEModelLoad* pml)
 }
 
 BEGIN_FECORE_CLASS(MFEMPressureBC, MFEMSurfaceLoad)
-	ADD_PARAMETER(m_p, "p")->setLongName("Pressure (Sets t = p*nor)");
+	ADD_PARAMETER(m_p, "p")->setLongName("Pressure (Sets t = -p*nor)");
 END_FECORE_CLASS();
 
 void MFEMPressureBC::Apply(MFEMSolver* solver, int attr)
