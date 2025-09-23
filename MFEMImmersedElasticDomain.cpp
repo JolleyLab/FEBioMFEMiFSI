@@ -115,6 +115,7 @@ void MFEMImmersedElasticDomain::Update(const FETimeInfo& tp)
 		{
 			// #pragma omp critical
 			{
+            MFEM_ABORT("Negative jacobian detected in immersed solid domain");
 				// reset the logfile mode
 				berr = true;
 				if (e.DoOutput()) feLogError(e.what());
