@@ -84,7 +84,7 @@ public:
    // cardiovascular bcs
    void AddBackflowStabilizationBC(FEParamDouble beta, mfem::Array<int>& attr);
    void AddResistanceBC(FEParamDouble R, FEParamDouble p0, mfem::Array<int>& attr);
-   void AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDouble C, FEParamDouble p0, FEParamDouble pd, mfem::Array<int>& attr);
+   void AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDouble C, FEParamDouble p0, FEParamDouble pd, mfem::Array<int>& attr, bool compute_initial_pressure = false);
    void AddMappedInflowBC_FromFile(std::string flowfile, bool periodic, mfem::Array<int>& attr);
 
    // body forces

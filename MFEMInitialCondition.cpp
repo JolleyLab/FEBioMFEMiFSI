@@ -81,8 +81,8 @@ END_FECORE_CLASS();
 void MFEMInitialConditionFromFolder::Apply(MFEMSolver* solver)
 {
    auto flowsolver = solver->GetFlowSolver();
-   int step; // not used
-   double time, dt; // not used
-   flowsolver->Restarting(m_folder_path, step, dt, time);
-   flowsolver->readRestarts(step,dt,time);
+   int step = 0; // not used
+   double time = 0.0, dt = 0.0; // not used
+   flowsolver->Restarting(m_folder_path, step, dt, time, true);
+   flowsolver->readRestarts(step,dt,time,false);
 }  

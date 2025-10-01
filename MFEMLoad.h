@@ -182,8 +182,9 @@ private:
 	FEParamDouble m_Rd; // distal resistance
    FEParamDouble m_C; // vascular compliance
    FEParamDouble m_p0; // initial pressure // TODO make this spatially dependent thru a coeff
+   bool m_compute_initial_pressure; // flag to compute initial pressure
    FEParamDouble m_pd; // distal pressure
-   FEParamDouble m_Q0; // initial flow rate
+   FEParamDouble m_Q0; // initial flow rate   
 
 	DECLARE_FECORE_CLASS();
 };

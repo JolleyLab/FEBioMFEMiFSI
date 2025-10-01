@@ -188,6 +188,7 @@ BEGIN_FECORE_CLASS(MFEMWindkesselBC, MFEMSurfaceLoad)
 	ADD_PARAMETER(m_Rd, "Rd");
    ADD_PARAMETER(m_C, "C");
    ADD_PARAMETER(m_p0, "p_0");
+   ADD_PARAMETER(m_compute_initial_pressure, "compute_initial_pressure");
    ADD_PARAMETER(m_pd, "p_d");
 END_FECORE_CLASS();
 
@@ -197,7 +198,7 @@ void MFEMWindkesselBC::Apply(MFEMSolver* solver, int attr)
 	mfem::Array<int> load_attr(mesh->bdr_attributes.Max());
 	load_attr = 0;
 	load_attr[attr] = 1;
-	solver->AddWindkesselBC(m_R, m_Rd, m_C, m_p0, m_pd, load_attr);
+	solver->AddWindkesselBC(m_R, m_Rd, m_C, m_p0, m_pd, load_attr, m_compute_initial_pressure);
    MFEMSurfaceLoad::Apply(solver, attr);
 }
 

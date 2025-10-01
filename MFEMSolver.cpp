@@ -528,7 +528,7 @@ void MFEMSolver::AddResistanceBC(FEParamDouble R, FEParamDouble p0, mfem::Array<
    m.flowsolver->AddResistanceBC(attr,R_val,p0_val);
 }
 
-void MFEMSolver::AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDouble C, FEParamDouble p0, FEParamDouble pd, mfem::Array<int>& attr)
+void MFEMSolver::AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDouble C, FEParamDouble p0, FEParamDouble pd, mfem::Array<int>& attr, bool compute_initial_pressure)
 {
    if (R.isConst() == false)
    {
@@ -562,12 +562,14 @@ void MFEMSolver::AddWindkesselBC(FEParamDouble R, FEParamDouble Rd, FEParamDoubl
    double pd_val = pd.constValue();
 
    // compute initial flow rate
-   #ifdef MFEM_USE_MPI
-   ParGridFunction *u_ic = m.flowsolver->GetCurrentVelocity();
-   #else
-   GridFunction *u_ic = m.flowsolver->GetCurrentVelocity();
-   #endif
-   double Q0 = m.flowsolver->ComputeMassFlowThruSurf(*u_ic, attr, false, m.fluid_density, false);
+   double Q0 = m.flowsolver->ComputeMassFlowThruSurf(*m.flowsolver->GetCurrentVelocity(), attr, false, m.fluid_density, false);
+
+   // compute initial pressure
+   if (compute_initial_pressure)
+   {
+      double area;
+      p0_val = m.flowsolver->ComputeAvgPressureOnSurf(*m.flowsolver->GetCurrentPressure(), attr, area);
+   }   
 
    m.flowsolver->AddWindkesselBC(attr,R_val,Rd_val,C_val,p0_val,pd_val,Q0);
 }
@@ -1474,11 +1476,13 @@ void MFEMSolver::PostProcessOutput()
    if (m.vorticity)
    {
       m.vorticity_gf.SetSpace(m.u_gf->FESpace());
+      m.vorticity_gf = 0.0;
       m.pvdc->RegisterField("Vorticity", &m.vorticity_gf);
    }
    if (m.q_criterion)
    {
       m.q_criterion_gf.SetSpace(m.u_gf->FESpace());
+      m.q_criterion_gf = 0.0;
       m.pvdc->RegisterField("Q-Criterion", &m.q_criterion_gf);
    }
 	m.pvdc->Save();
@@ -1767,6 +1771,7 @@ bool MFEMSolver::SolveStep()
       if (m.write_final_state_as_IC)
       {
          m.flowsolver->writeRestartFiles(m.final_state_folder,1); // second arg not used here
+         m.flowsolver->writeRestarts(0,0,0);
       }
 
       // // print out relative L2 error at final time step
