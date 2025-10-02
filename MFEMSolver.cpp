@@ -1635,6 +1635,10 @@ bool MFEMSolver::SolveStep()
       t = m.start_sim_time + dt; // t = t_n+1
       timeStep = m.start_sim_step + 1; // current time step number
 
+      fem.GetTime().currentTime = t;
+      fem.GetTime().timeIncrement = dt;
+      fem.GetTime().timeStep = dt;
+
       m.start_from_specific_time = false; // only start from specific time once
    }
    else
