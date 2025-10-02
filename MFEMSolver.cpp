@@ -150,6 +150,11 @@ public:
    double restart_t = 0.0;
    double restart_dt = 0.0;
 
+   // Starting at a specific time and step
+   bool start_from_specific_time = false;
+   double start_sim_time = 0.0;
+   int start_sim_step = 0;
+
    // Write final state as IC for next run
    bool write_final_state_as_IC = false;
    std::string final_state_folder = "InitialConditions";
@@ -297,6 +302,9 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.restart_step, FE_RANGE_GREATER_OR_EQUAL(1), "restart_step");
       ADD_PARAMETER(m.write_final_state_as_IC, "write_final_state_as_IC");
       ADD_PARAMETER(m.final_state_folder, "final_state_folder");
+      ADD_PARAMETER(m.start_from_specific_time, "start_from_specific_time");
+      ADD_PARAMETER(m.start_sim_time, FE_RANGE_GREATER_OR_EQUAL(0.0), "start_sim_time");
+      ADD_PARAMETER(m.start_sim_step, FE_RANGE_GREATER_OR_EQUAL(0.0), "start_sim_step");
       ADD_PARAMETER(m.wss, "Save_Wall_Shear_Stress");
       ADD_PARAMETER(m.vorticity, "Save_Vorticity");
       ADD_PARAMETER(m.q_criterion, "Save_Q_Criterion");
@@ -1615,6 +1623,19 @@ bool MFEMSolver::SolveStep()
       fem.GetTime().timeStep = dt;
 
       m.restarting = false; // only restart once
+   }
+   else if (m.start_from_specific_time)
+   {
+      dt = fem.GetTime().timeIncrement;
+
+      // check that start time and start step are compatible with dt
+      double start_time = dt * (double) m.start_sim_step;
+      MFEM_ASSERT(start_time == m.start_sim_time, "Error: start time and start step are not compatible with dt");
+
+      t = m.start_sim_time + dt; // t = t_n+1
+      timeStep = m.start_sim_step + 1; // current time step number
+
+      m.start_from_specific_time = false; // only start from specific time once
    }
    else
    {
