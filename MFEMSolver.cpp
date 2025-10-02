@@ -1635,6 +1635,10 @@ bool MFEMSolver::SolveStep()
       t = m.start_sim_time + dt; // t = t_n+1
       timeStep = m.start_sim_step + 1; // current time step number
 
+      // update FEBio time step data
+      analysis->m_ntimesteps = m.start_sim_step; // time steps completed
+      analysis->m_dt = dt;
+
       fem.GetTime().currentTime = t;
       fem.GetTime().timeIncrement = dt;
       fem.GetTime().timeStep = dt;
