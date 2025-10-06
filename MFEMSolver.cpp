@@ -1109,6 +1109,7 @@ bool MFEMSolver::SetupFluid()
 	for (int i = 0; i < fem->InitialConditions(); ++i)
 	{
 		MFEMInitialCondition* ic = dynamic_cast<MFEMInitialCondition*>(fem->InitialCondition(i));
+      if (dynamic_cast<MFEMInitialConditionFromFolder*>(ic)) continue; // skip ICs from folder, applied later on
 		if (ic && ic->IsActive())
 		{
 			ic->Apply(this);
@@ -1429,9 +1430,24 @@ void MFEMSolver::PostProcessOutput()
 {
    // setup output in paraview format
    m.fname = "results_mfem_solver";
+   int curr_step;
+   double curr_time;
    if (m.restarting)
    {
       m.fname += "_RESTART_STEP_" + std::to_string(m.restart_step);
+      curr_step = m.restart_step;
+      curr_time = m.restart_t;
+   }
+   else if (m.start_from_specific_time)
+   {
+      m.fname += "_START_STEP_" + std::to_string(m.start_sim_step);
+      curr_step = m.start_sim_step;
+      curr_time = m.start_sim_time;
+   }
+   else
+   {
+      curr_step = 0;
+      curr_time = 0.0;
    }
    #ifdef MFEM_USE_MPI
    m.fname += "_np" + std::to_string(mfem::Mpi::WorldSize());
@@ -1459,8 +1475,8 @@ void MFEMSolver::PostProcessOutput()
 	m.pvdc->SetLevelsOfDetail(m.orderv);
    m.pvdc->SetCompression(true);
    m.pvdc->SetCompressionLevel(m.compression_level);
-	m.pvdc->SetCycle(0);
-	m.pvdc->SetTime(0);
+	m.pvdc->SetCycle(curr_step);
+	m.pvdc->SetTime(curr_time);
 	m.pvdc->RegisterField("Velocity", m.u_gf);
 	m.pvdc->RegisterField("Pressure", m.p_gf);
    if(m.immersed_solid)
@@ -1485,12 +1501,14 @@ void MFEMSolver::PostProcessOutput()
    {
       m.vorticity_gf.SetSpace(m.u_gf->FESpace());
       m.vorticity_gf = 0.0;
+      m.flowsolver->ComputeCurl3D(*m.u_gf,m.vorticity_gf);
       m.pvdc->RegisterField("Vorticity", &m.vorticity_gf);
    }
    if (m.q_criterion)
    {
       m.q_criterion_gf.SetSpace(m.u_gf->FESpace());
       m.q_criterion_gf = 0.0;
+      ComputeQCriterion(*m.u_gf,m.q_criterion_gf);
       m.pvdc->RegisterField("Q-Criterion", &m.q_criterion_gf);
    }
 	m.pvdc->Save();
@@ -1511,8 +1529,9 @@ void MFEMSolver::PostProcessOutput()
       m.sdc->RegisterField("Displacement", m.d_gf);
       m.sdc->RegisterField("Velocity", m.vib_gf);
       m.sdc->RegisterField("Acceleration", m.a_gf);
-      m.sdc->SetCycle(0);
-      m.sdc->SetTime(0);
+
+      m.sdc->SetCycle(curr_step);
+      m.sdc->SetTime(curr_time);
       m.sdc->Save();
    }
 
@@ -1539,7 +1558,7 @@ void MFEMSolver::PostProcessOutput()
       m.f = fopen(node_filename.c_str(), "w");
       fprintf(m.f, "====================================================================================================================================\n");
       fprintf(m.f, "        Time              Node Displacement X         Node Displacement Y         Node Displacement Z        |Node Displacement|\n");
-      fprintf(m.f, "%20.16e     %20.16e      %20.16e      %20.16e     %20.16e\n",0.0,m.disp(0),m.disp(1),m.disp(2),m.disp.Norml2());
+      fprintf(m.f, "%20.16e     %20.16e      %20.16e      %20.16e     %20.16e\n",curr_time,m.disp(0),m.disp(1),m.disp(2),m.disp.Norml2());
       fflush(m.f);
       fflush(stdout);
       #ifdef MFEM_USE_MPI
@@ -1560,7 +1579,7 @@ void MFEMSolver::PostProcessOutput()
       #endif
       m.avg_velo_file = fopen(avg_velo_filename.c_str(), "w");
       fprintf(m.avg_velo_file, "        Time                  Average Velocity X         Average Velocity Y         Average Velocity Z               Volume\n");
-      fprintf(m.avg_velo_file, "%20.16e     %20.16e     %20.16e     %20.16e     %20.16e\n",0.0,m.avg_velo(0),m.avg_velo(1),m.avg_velo(2),m.volume);  
+      fprintf(m.avg_velo_file, "%20.16e     %20.16e     %20.16e     %20.16e     %20.16e\n",curr_time,m.avg_velo(0),m.avg_velo(1),m.avg_velo(2),m.volume);
       fflush(m.avg_velo_file);
       fflush(stdout);
       #ifdef MFEM_USE_MPI
@@ -1580,7 +1599,7 @@ void MFEMSolver::RestartFiles()
    {
       m.flowsolver->Restarting(m.restart_folder, m.restart_step, m.restart_dt, m.restart_t);
       m.flowsolver->readRestarts(m.restart_step, m.restart_dt, m.restart_t);
-      if (m.immersed_febio_solid) m.immersed_febio_solid->UpdateFEBioDataFromRestart();
+      // if (m.immersed_febio_solid) m.immersed_febio_solid->UpdateFEBioDataFromRestart();
 
       // save the restart state
       if (m.wss) m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
@@ -1594,6 +1613,35 @@ void MFEMSolver::RestartFiles()
       {
          m.sdc->SetCycle(m.restart_step);
          m.sdc->SetTime(m.restart_t);
+         m.sdc->Save();
+      }
+   }
+   if (m.start_from_specific_time)
+   {
+      MFEM_ASSERT(!m.restarting, "Cannot restart and start from specific time");
+      FEModel *fem = GetFEModel();
+
+      for (int i = 0; i < fem->InitialConditions(); ++i)
+      {
+         MFEMInitialCondition* ic = dynamic_cast<MFEMInitialCondition*>(fem->InitialCondition(i));
+         if (dynamic_cast<MFEMInitialConditionFromFolder*>(ic) && ic->IsActive())
+         {
+            ic->Apply(this);
+         }
+      }
+
+      // save the state
+      if (m.wss) m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
+      if (m.vorticity) m.flowsolver->ComputeCurl3D(*m.u_gf, m.vorticity_gf);
+      if (m.q_criterion) ComputeQCriterion(*m.u_gf, m.q_criterion_gf);
+
+      m.pvdc->SetCycle(m.start_sim_step);
+      m.pvdc->SetTime(m.start_sim_time);
+      m.pvdc->Save();
+      if (m.immersed_solid)
+      {
+         m.sdc->SetCycle(m.start_sim_step);
+         m.sdc->SetTime(m.start_sim_time);
          m.sdc->Save();
       }
    }

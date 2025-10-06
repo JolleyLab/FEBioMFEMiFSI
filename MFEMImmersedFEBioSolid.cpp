@@ -1,7 +1,9 @@
 #include "MFEMImmersedFEBioSolid.h"
+
 #include <FECore/FEDomain.h>
 #include <FECore/FEModelLoad.h>
 #include <FEBioMech/FEElasticDomain.h>
+
 #include "MFEMImmersedElasticDomain.h"
 #include "mfem.hpp"
 #include <general/forall.hpp>
@@ -58,35 +60,35 @@ void ImmersedFEBioSolid::Setup(double dt, double alpha_m_, double alpha_f_, doub
 
    this->dt = dt;
    
-   // setup point search
-   #ifdef MFEM_USE_GSLIB   
+   // // setup point search
+   // #ifdef MFEM_USE_GSLIB   
 
-   #ifdef MFEM_USE_MPI
-   finder_fluid = new ImmersedFSI_FindPts(vfes->GetComm());
-   #else
-   finder_fluid = new ImmersedFSI_FindPts();
-   #endif
+   // #ifdef MFEM_USE_MPI
+   // finder_fluid = new ImmersedFSI_FindPts(vfes->GetComm());
+   // #else
+   // finder_fluid = new ImmersedFSI_FindPts();
+   // #endif
 
-   finder_fluid->Setup(*fluid_pmesh);
+   // finder_fluid->Setup(*fluid_pmesh);
 
-   #ifdef MFEM_USE_MPI
-   finder_fluid->SetupLocalDofToMasterRankMap(vfes);
-   finder_fluid->SetupLocalTDofToLDofSolidMap(dfes);
-   #endif
-   #endif
+   // #ifdef MFEM_USE_MPI
+   // finder_fluid->SetupLocalDofToMasterRankMap(vfes);
+   // finder_fluid->SetupLocalTDofToLDofSolidMap(dfes);
+   // #endif
+   // #endif
 
-   true_interp_points_in_solid.SetSize(dfes->GetTrueVSize());
-   true_interp_points_in_solid = 0.0;
+   // true_interp_points_in_solid.SetSize(dfes->GetTrueVSize());
+   // true_interp_points_in_solid = 0.0;
 
-   interp_points_in_solid = *pmesh->GetNodes();
-   mfem::GridFunction *nodes = pmesh->GetNodes();
-   #ifdef MFEM_USE_MPI
-   dynamic_cast<mfem::ParGridFunction *>(nodes)->ParallelProject(true_interp_points_in_solid);
-   #else
-   nodes->GetTrueDofs(true_interp_points_in_solid);
-   #endif
+   // interp_points_in_solid = *pmesh->GetNodes();
+   // mfem::GridFunction *nodes = pmesh->GetNodes();
+   // #ifdef MFEM_USE_MPI
+   // dynamic_cast<mfem::ParGridFunction *>(nodes)->ParallelProject(true_interp_points_in_solid);
+   // #else
+   // nodes->GetTrueDofs(true_interp_points_in_solid);
+   // #endif
 
-   CheckMeshIntersection(true_interp_points_in_solid);
+   // CheckMeshIntersection(true_interp_points_in_solid);
 
    beta = beta_;
    gamma = gamma_;
@@ -137,21 +139,21 @@ void ImmersedFEBioSolid::Setup(double dt, double alpha_m_, double alpha_f_, doub
    dn_gf.GetTrueDofs(dn);
    #endif
 
-   // setup VMS stab scaling
-   if (stabs_scaling)
-   {
-      // setup interpolation points (only boundary dofs of the solid)
-      mfem::Array<int> bdr_attr(pmesh->bdr_attributes.Max());
-      bdr_attr = 1;
-      dfes->GetEssentialTrueDofs(bdr_attr,solid_bdr_tdofs);
-      solid_bdr_nodes.SetSize(solid_bdr_tdofs.Size());
+   // // setup VMS stab scaling
+   // if (stabs_scaling)
+   // {
+   //    // setup interpolation points (only boundary dofs of the solid)
+   //    mfem::Array<int> bdr_attr(pmesh->bdr_attributes.Max());
+   //    bdr_attr = 1;
+   //    dfes->GetEssentialTrueDofs(bdr_attr,solid_bdr_tdofs);
+   //    solid_bdr_nodes.SetSize(solid_bdr_tdofs.Size());
 
-      const int Ndofs = solid_bdr_tdofs.Size();
-      const auto id = solid_bdr_tdofs.Read();
-      auto FV_nodes = true_interp_points_in_solid.Read();
-      auto FV = solid_bdr_nodes.ReadWrite();
-      mfem::forall(Ndofs, [=] MFEM_HOST_DEVICE (int i) { FV[i] = FV_nodes[id[i]]; });
-   }
+   //    const int Ndofs = solid_bdr_tdofs.Size();
+   //    const auto id = solid_bdr_tdofs.Read();
+   //    auto FV_nodes = true_interp_points_in_solid.Read();
+   //    auto FV = solid_bdr_nodes.ReadWrite();
+   //    mfem::forall(Ndofs, [=] MFEM_HOST_DEVICE (int i) { FV[i] = FV_nodes[id[i]]; });
+   // }
 }
 
 void ImmersedFEBioSolid::SetSubMeshMaps(mfem::TransferMap *submeshsolid_to_global_d_, mfem::TransferMap* global_to_submeshsolid_d_, mfem::GridFunction *ddot_global_gf_)
@@ -911,6 +913,12 @@ void ImmersedFEBioSolid::ReformStiffness()
 
    mfem::SparseMatrix *mfemK = m_K->GetMfemMatrix();
    *mfemK = 0.0;
+}
+
+void ImmersedFEBioSolid::UpdateSolidStateFromRestart()
+{
+   ImmersedSolid::UpdateSolidStateFromRestart();
+   UpdateFEBioDataFromRestart();
 }
 
 void ImmersedFEBioSolid::UpdateFEBioDataFromRestart()

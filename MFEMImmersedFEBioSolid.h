@@ -41,8 +41,9 @@ public:
    void SetSubMeshMaps(mfem::TransferMap *submeshsolid_to_global_d_, mfem::TransferMap* global_to_submeshsolid_d_, mfem::GridFunction *ddot_global_gf_);
 
    // restart functions
+   void UpdateSolidStateFromRestart() override;
    void UpdateFEBioDataFromRestart();
-   
+
    // destructor
    virtual ~ImmersedFEBioSolid();
 
