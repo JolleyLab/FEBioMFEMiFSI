@@ -25,6 +25,7 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 
 	int nodes = febioMesh.Nodes();
 	int elems = febioMesh.Elements();
+   int new_node_num = 0;
 	MFEMMesh* newMesh = new MFEMMesh(nodes, elems, nbndrElems);
 	for (int i = 0; i < nodes; ++i)
 	{
@@ -32,6 +33,9 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 		vec3d& pos = node.m_r0;
 		double coords[3] = { pos.x, pos.y, pos.z };
 		newMesh->AddVertex(coords);
+
+      newMesh->SetFEBioNodeID(new_node_num, node.GetID());
+      new_node_num++;
 	}
 
 	int indices[FEElement::MAX_NODES] = { 0 };
@@ -69,6 +73,8 @@ MFEMMesh* CreateMFEMMesh3D(FEMesh& febioMesh)
 			default:
 				assert(false);
 			}
+
+         newMesh->SetFEBioElementID(new_elem_num, el.GetID());
 		}
 	}
 

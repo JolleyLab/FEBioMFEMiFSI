@@ -34,6 +34,17 @@ public:
       return m_domMap[dom];
    }
 
+   void SetFEBioNodeID(int mfem_id, int febio_id)
+   {
+      m_mfem_2_febio_nodeMap[mfem_id] = febio_id;
+   };
+
+   int GetFEBioNodeID(int mfem_id)
+   {
+      if (m_mfem_2_febio_nodeMap.find(mfem_id) == m_mfem_2_febio_nodeMap.end()) return -1;
+      return m_mfem_2_febio_nodeMap[mfem_id];
+   };
+
    void SetFEBioElementID(int mfem_id, int febio_id)
    {
       m_mfem_2_febio_elemMap[mfem_id] = febio_id;
@@ -67,6 +78,8 @@ private:
    std::map<FEDomain*, int> m_domMap;
    std::map<int,int> m_mfem_2_febio_elemMap;
    std::vector<std::map<int,int>> m_mfem_surfelem_to_febio_surfelemMap;
+   std::map<int,int> m_mfem_2_febio_nodeMap;
+
 };
 
 MFEMMesh* CreateMFEMMesh3D(FEMesh& mesh);

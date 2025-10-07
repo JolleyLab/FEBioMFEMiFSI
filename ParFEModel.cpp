@@ -163,6 +163,9 @@ void ParFEModel::BuildLocalFEBioMesh(mfem::ParFiniteElementSpace* dfes)
    {
       // need to map submesh vertex id back to parent mesh
       fe_node_ids_gf(i) = array_submesh_to_parent_vertices[i];
+
+      // fe_node_ids_gf(i) = m_serial_mesh->GetFEBioNodeID(i);
+      // std::cout << "Map = " << m_serial_mesh->GetFEBioNodeID(i) << ", Submesh = " << array_submesh_to_parent_vertices[i] << "\n";
    }
 
    mfem::FiniteElementSpace mfes(sourceMesh, &h1_coll, 1);
@@ -287,7 +290,12 @@ void ParFEModel::ParCopyDomain(FEDomain &dom, FEDomain &par_dom, mfem::ParFinite
    mfem::GridFunction fe_elem_ids_gf(&fes);
    for (int i=0; i<m_submesh->GetNE(); ++i)
    {
-      fe_elem_ids_gf(i) = submesh_to_parent_elem_map[i] + 1; // febio element ids are 1-based, mfem is 0-based
+      // fe_elem_ids_gf(i) = submesh_to_parent_elem_map[i] + 1; // febio element ids are 1-based, mfem is 0-based      
+      // std::cout << "FE elem id = " << fe_elem_ids_gf(i) << "\n";      
+      // std::cout << "mfem 2 febio elem map: mfem elem id = " << i << ", febio elem id = " << m_serial_mesh->GetFEBioElementID(submesh_to_parent_elem_map[i]) << "\n";     
+
+      int parent_elem_id = submesh_to_parent_elem_map[i];
+      fe_elem_ids_gf(i) = m_serial_mesh->GetFEBioElementID(parent_elem_id);
    }
 
    mfem::FiniteElementSpace mfes(sourceMesh, &l2_coll, 1);
@@ -358,7 +366,12 @@ void ParFEModel::ParCopyDomain(FEDomain &dom, FEDomain &par_dom, mfem::ParFinite
             break;
          }
       }
-      MFEM_ASSERT(el != nullptr, "Error: Could not find element in immersed domain, elem number = " + std::to_string(glob_febio_elem_id));
+
+      if (el == nullptr)
+      {
+         MFEM_ABORT("Error: Could not find element in immersed domain, elem number = " + std::to_string(glob_febio_elem_id));
+      }
+      // MFEM_ASSERT(el != nullptr, "Error: Could not find element in immersed domain, elem number = " + std::to_string(glob_febio_elem_id));
 
       // copy the element data to new domain element
       FESolidElement* pel = &dynamic_cast<FESolidDomain*>(&par_dom)->Element(i);
