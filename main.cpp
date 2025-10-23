@@ -5,6 +5,7 @@
 #include <FEBioMech/FENeoHookean.h>
 #include <FEBioMech/FEStVenantKirchhoff.h>
 #include <FEBioMech/FEFungOrthotropic.h>
+#include <FEBioMech/FEOgdenMaterial.h>
 
 #include "MFEMAnalysis.h"
 #include "MFEMDomain.h"
@@ -141,6 +142,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
    REGISTER_FECORE_CLASS(FENeoHookean, "neo-hookean");
    REGISTER_FECORE_CLASS(FEStVenantKirchhoff, "st. venant-kirchhoff");
    REGISTER_FECORE_CLASS(FEFungOrthotropic, "fung orthotropic");
+   REGISTER_FECORE_CLASS(FEOgdenMaterial, "Ogden");
 
    // Immersed solid bcs
    // Surface Loads
