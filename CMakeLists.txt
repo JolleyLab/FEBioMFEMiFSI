@@ -178,18 +178,6 @@ endif()
 add_definitions(-DiFSI_USE_MPI)
 add_definitions(-DiFSI_USE_GSLIB)
 
-# Import FSI_Solver
-message(STATUS "Looking for fsi_solver ...")
-set(FSI_Solver_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../FSI_Solver_v2.0/build/" CACHE PATH "Path to the FSI_Solver build or install prefix.")
-set(FSI_Source_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../FSI_Solver_v2.0/Source/" CACHE PATH "Path to the FSI_Solver source prefix.")
-if (FSI_Solver_DIR)
-   find_package(fsi_solver REQUIRED NAMES FSI_Solver HINTS "${FSI_Solver_DIR}" NO_DEFAULT_PATH)
-else()
-   # TODO
-endif()
-message(STATUS "Found fsi_solver config in: ${FSI_Solver_DIR}")
-
-
 ##### Set definitions and compile options #####
 if(WIN32)
     add_definitions(-DWIN32  -DFECORE_DLL /MP /openmp /wd4251 /wd4275)
@@ -213,19 +201,29 @@ endif()
 CONFIGURE_FILE(FEBioMFEMiFSIOptions.cmake.in FEBioMFEMiFSIOptions.cmake @ONLY)
 
 # Set include directory
-include_directories(${FEBio_INC} ${FSI_Source_DIR} ${MFEM_SOURCE_DIR})
+include_directories(${FEBio_INC} ${MFEM_SOURCE_DIR})
 
-# Add library
-file(GLOB HDR_FEBioMFEMiFSI "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
-file(GLOB SRC_FEBioMFEMiFSI "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+# Add library (include sources from subfolders)
+file(GLOB_RECURSE HDR_FEBioMFEMiFSI CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
+)
+file(GLOB_RECURSE SRC_FEBioMFEMiFSI CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
+)
+
+# Organize files by folder in IDEs
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
+    ${HDR_FEBioMFEMiFSI} ${SRC_FEBioMFEMiFSI}
+)
 
 add_library(FEBioMFEMiFSI SHARED ${HDR_FEBioMFEMiFSI} ${SRC_FEBioMFEMiFSI})
 
 # Link FEBio Libraries (now actual paths)
 target_link_libraries(FEBioMFEMiFSI PRIVATE ${FEBio_LIBS})
 
-# Link MFEM and FSI Solver
-target_link_libraries(FEBioMFEMiFSI PRIVATE mfem fsi_solver)
+# Link MFEM
+target_link_libraries(FEBioMFEMiFSI PRIVATE mfem)
 
 # macOS: ensure loader can find FEBio libs at runtime
 if (APPLE)

@@ -7,16 +7,16 @@
 #include <FEBioMech/FEFungOrthotropic.h>
 #include <FEBioMech/FEOgdenMaterial.h>
 
-#include "MFEMAnalysis.h"
-#include "MFEMDomain.h"
-#include "MFEMSolver.h"
-#include "MFEMMaterial.h"
-#include "MFEMPlotVariables.h"
-#include "MFEMInitialCondition.h"
-#include "MFEMBoundaryCondition.h"
-#include "MFEMLoad.h"
-#include "MFEMImmersedElasticDomain.h"
-#include "MFEMImmersed3FieldElasticDomain.h"
+#include "MFEMCore/MFEMAnalysis.h"
+#include "MFEMCore/MFEMDomain.h"
+#include "MFEMCore/MFEMSolver.h"
+#include "MFEMCore/MFEMMaterial.h"
+#include "MFEMUtilities/MFEMPlotVariables.h"
+#include "MFEMCore/MFEMInitialCondition.h"
+#include "MFEMCore/MFEMBoundaryCondition.h"
+#include "MFEMCore/MFEMLoad.h"
+#include "MFEMImSolid/MFEMImmersedElasticDomain.h"
+#include "MFEMImSolid/MFEMImmersed3FieldElasticDomain.h"
 #include "mfem.hpp"
 
 class FEMFEMiFSI : public FEModule
