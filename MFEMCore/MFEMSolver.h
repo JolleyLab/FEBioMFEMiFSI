@@ -19,7 +19,7 @@ namespace mfem
    #endif
 }
 
-namespace ins_solver_serial
+namespace ins_solver
 {
    class INS_Solver;
 }
@@ -53,7 +53,7 @@ public:
    mfem::Mesh* GetMFEMsolidmesh();
    #endif
 
-   ins_solver_serial::INS_Solver* GetFlowSolver();
+   ins_solver::INS_Solver* GetFlowSolver();
 
    // flag for immersed solid
    bool ImmersedSolid();
@@ -105,6 +105,7 @@ private:
    bool SetupSolid();
    void SetupSolvers();
    void PostProcessOutput();
+   void FinalizeSolid();
    void RestartFiles();
 
    #ifdef MFEM_USE_MPI

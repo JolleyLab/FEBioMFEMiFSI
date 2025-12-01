@@ -11,7 +11,7 @@
 
 
 using namespace mfem;
-using namespace immersed_solid_serial;
+using namespace immersed_solid;
 
 #ifdef MFEM_USE_MPI
 ImmersedFEBioSolid::ImmersedFEBioSolid(FEModel* fem_, mfem::ParMesh *solid_mesh, int order_, mfem::Coefficient *init_rho_s_, double fluid_density_, double mu_f_, std::vector<AccelTerm_T> *accel_,
@@ -115,22 +115,23 @@ void ImmersedFEBioSolid::Setup(double dt, double alpha_m_, double alpha_f_, doub
 	}
 
    // setup FEBio domain
-   FEMesh &mesh = fem->GetMesh();
-   for (int nd = 0; nd<mesh.Domains(); ++nd)
-   {
-      FEDomain& dom = mesh.Domain(nd);
-      MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
-      if (mfd)
-      {
-         mfd->SetFESpace(dfes);
-         mfd->SetFluidProperties(fluid_density,mu_f);
-         #ifdef MFEM_USE_MPI
-         mfd->SetAdditionalData(subtract_fluid_visc);
-         #else
-         mfd->SetAdditionalData(subtract_fluid_visc,dynamic_cast<mfem::SubMesh*>(pmesh),ddot_global_gf->FESpace());
-         #endif
-      }			
-   }
+   // FEMesh &mesh = fem->GetMesh();
+   // for (int nd = 0; nd<mesh.Domains(); ++nd)
+   // {
+   //    FEDomain& dom = mesh.Domain(nd);
+   //    MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+   //    if (mfd)
+   //    {
+   //       mfd->SetFESpace(dfes);
+   //       mfd->SetFluidProperties(fluid_density,mu_f);
+   //       #ifdef MFEM_USE_MPI
+   //       mfd->SetAdditionalData(subtract_fluid_visc);
+   //       #else
+   //       mfd->SetAdditionalData(subtract_fluid_visc,dynamic_cast<mfem::SubMesh*>(pmesh),ddot_global_gf->FESpace());
+   //       #endif
+   //    }			
+   // }
+   SetupFEDomains();
 
    // set initial conditions
    #ifdef MFEM_USE_MPI
@@ -154,6 +155,27 @@ void ImmersedFEBioSolid::Setup(double dt, double alpha_m_, double alpha_f_, doub
    //    auto FV = solid_bdr_nodes.ReadWrite();
    //    mfem::forall(Ndofs, [=] MFEM_HOST_DEVICE (int i) { FV[i] = FV_nodes[id[i]]; });
    // }
+}
+
+void ImmersedFEBioSolid::SetupFEDomains()
+{
+   // setup FEBio domain
+   FEMesh &mesh = fem->GetMesh();
+   for (int nd = 0; nd<mesh.Domains(); ++nd)
+   {
+      FEDomain& dom = mesh.Domain(nd);
+      MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+      if (mfd)
+      {
+         mfd->SetFESpace(dfes);
+         mfd->SetFluidProperties(fluid_density,mu_f);
+         #ifdef MFEM_USE_MPI
+         mfd->SetAdditionalData(subtract_fluid_visc);
+         #else
+         mfd->SetAdditionalData(subtract_fluid_visc,dynamic_cast<mfem::SubMesh*>(pmesh),ddot_global_gf->FESpace());
+         #endif
+      }			
+   }
 }
 
 void ImmersedFEBioSolid::SetSubMeshMaps(mfem::TransferMap *submeshsolid_to_global_d_, mfem::TransferMap* global_to_submeshsolid_d_, mfem::GridFunction *ddot_global_gf_)
@@ -475,6 +497,7 @@ void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambd
 	// calculate residual
 
    // domain residual and body forces
+   auto copy_fes = dfes;
    FEMesh& mesh = fem->GetMesh();
    for (int i=0; i<mesh.Domains(); ++i) 
 	{
@@ -1007,6 +1030,65 @@ void ImmersedFEBioSolid::UpdateFEBioDataFromRestart()
    //       }
    //    }      
    // }
+}
+
+GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedVonMisesStress(GridFunction &d_gf)
+{
+   if (nodal_stress_fec == nullptr)
+   {
+      // create a linear fes for stress output
+      int dim = pmesh->Dimension();
+      nodal_stress_fec = new H1_FECollection(orderd, dim);
+      #ifdef MFEM_USE_MPI
+      nodal_stress_fes = new ParFiniteElementSpace(pmesh, nodal_stress_fec);
+      #else
+      nodal_stress_fes = new FiniteElementSpace(pmesh, nodal_stress_fec);
+      #endif
+      nodal_stress_gf.SetSpace(nodal_stress_fes);
+   }
+   nodal_stress_gf = 0.0;
+
+   // AccumulateAndCountZones.
+   Array<int> zones_per_vdof;
+   zones_per_vdof.SetSize(nodal_stress_gf.FESpace()->GetVSize());
+   zones_per_vdof = 0;
+
+   FEMesh& mesh = fem->GetMesh();
+   for (int i=0; i<mesh.Domains(); ++i) 
+	{
+		FEDomain& dom = mesh.Domain(i);
+      MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+      if (mfd)
+      {
+         mfd->ComputeNodallyAveragedVonMisesStress(nodal_stress_gf, zones_per_vdof);
+      }	
+	}
+
+   #ifdef MFEM_USE_MPI
+   // average across processors
+   // Count the zones globally
+   auto par_nodal_stress_gf = dynamic_cast<ParGridFunction*>(&nodal_stress_gf);
+   MFEM_ASSERT(par_nodal_stress_gf != nullptr, "Expected a ParGridFunction.");
+   GroupCommunicator &gcomm = par_nodal_stress_gf->ParFESpace()->GroupComm();
+   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+   gcomm.Bcast(zones_per_vdof);
+
+   // Accumulate for all vdofs
+   gcomm.Reduce<double>(nodal_stress_gf.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(nodal_stress_gf.GetData());
+   #endif
+
+   // Compute means
+   for (int i = 0; i < nodal_stress_gf.Size(); i++)
+   {
+      const int nz = zones_per_vdof[i];
+      if (nz)
+      {
+         nodal_stress_gf(i) /= nz;
+      }
+   }
+
+   return &nodal_stress_gf;
 }
 
 ImmersedFEBioSolid::~ImmersedFEBioSolid()

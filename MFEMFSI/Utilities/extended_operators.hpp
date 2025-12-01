@@ -1,9 +1,9 @@
 #pragma once
 
 #include "mfem.hpp"
-#include "../Navier-Stokes-Serial/CardiovascularBCs/CV_Op.hpp"
+#include "../Navier-Stokes/CardiovascularBCs/CV_Op.hpp"
 
-using namespace ins_solver_serial;
+using namespace ins_solver;
 
 // sum operator for tangent stiffness matrix A block with CV bcs
 class SumOp : public mfem::Operator

@@ -30,22 +30,47 @@
 			<pressure_order>1</pressure_order>
 			<VMS>1</VMS>
 			<Laplace_form>0</Laplace_form>
-         <pre_partition_mesh>0</pre_partition_mesh>
-         <pre_partition_opt>0</pre_partition_opt>
-         <pre_partition_num_ranks>10</pre_partition_num_ranks>
 			<Zero_mean_pressure>1</Zero_mean_pressure>
+			<pre_partition_mesh>0</pre_partition_mesh>
+			<pre_partition_opt>PartitionMesh</pre_partition_opt>
+			<pre_partition_num_ranks>10</pre_partition_num_ranks>
 			<Immersed_solid>1</Immersed_solid>
-         <Solid_solver_type>FEBio</Solid_solver_type>
+			<Solid_solver_type>FEBio</Solid_solver_type>
 			<Subtract_viscous_stress>0</Subtract_viscous_stress>
+			<Three_field_formulation>0</Three_field_formulation>
+			<VMS_stabilization_scaling>1</VMS_stabilization_scaling>
+			<Track_node>0</Track_node>
+			<Track_node_position>0,0,0</Track_node_position>
+			<Output_avg_velocity>0</Output_avg_velocity>
+			<Save_Von_Mises_Stress>1</Save_Von_Mises_Stress>
+			<time_stepping_method>GenAlpha</time_stepping_method>
 			<rho_inf>0.5</rho_inf>
+			<step_save>1</step_save>
+			<steady_state_save>0</steady_state_save>
+			<steady_state_step_save>1</steady_state_step_save>
+			<steady_state_time>0</steady_state_time>
+			<write_restart_files>0</write_restart_files>
+			<restart_step_save>1</restart_step_save>
+			<restart_simulation>0</restart_simulation>
+			<restart_step>1</restart_step>
+			<write_final_state_as_IC>0</write_final_state_as_IC>
+			<final_state_folder>InitialConditions</final_state_folder>
+			<start_from_specific_time>0</start_from_specific_time>
+			<start_sim_time>0</start_sim_time>
+			<start_sim_step>0</start_sim_step>
+			<Save_Wall_Shear_Stress>0</Save_Wall_Shear_Stress>
+			<Save_Vorticity>0</Save_Vorticity>
+			<Save_Q_Criterion>0</Save_Q_Criterion>
+			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-10</atol>
-			<rtol>1e-6</rtol>
+			<rtol>1e-06</rtol>
 			<minIt>3</minIt>
 			<maxIt>10</maxIt>
 			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-10</lin_atol>
-			<lin_rtol>1e-6</lin_rtol>
+			<lin_rtol>1e-06</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
+			<prec_type>SIMPLE</prec_type>
 			<inner_solver_type>Iterative</inner_solver_type>
 			<Ainv_atol>1e-06</Ainv_atol>
 			<Ainv_rtol>0.001</Ainv_rtol>
@@ -66,20 +91,22 @@
 			<rho>1</rho>
 			<mu>1</mu>
 		</material>
-		<!-- <material id="2" name="Material2" type="mfem nearly-incompressible annular disk">
+<!--
+<material id="2" name="Material2" type="mfem nearly-incompressible annular disk">
 			<rho>1</rho>
 			<mu>1</mu>
 			<kappa>0</kappa>
 			<thickness>0.0625</thickness>
-		</material> -->
-      <material id="2" name="Material2" type="annular disk">
+		</material>
+-->
+		<material id="2" name="Material2" type="annular disk">
 			<density>1</density>
 			<mu>1</mu>
 			<thickness>0.0625</thickness>
 		</material>
 	</Material>
 	<Mesh>
-		<Nodes name="Object1">
+		<Nodes name="Object4">
 			<node id="1">0,0,0</node>
 			<node id="2">1,0,0</node>
 			<node id="3">1,1,0</node>
@@ -8530,8 +8557,6 @@
 			<node id="8448">0.953125,0.984375,0.015625</node>
 			<node id="8449">0.96875,0.984375,0.015625</node>
 			<node id="8450">0.984375,0.984375,0.015625</node>
-		</Nodes>
-		<Nodes name="Object4">
 			<node id="8451">0.8125,0.5,0</node>
 			<node id="8452">0.5,0.8125,0</node>
 			<node id="8453">0.1875,0.5,0</node>

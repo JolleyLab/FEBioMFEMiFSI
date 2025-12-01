@@ -5,7 +5,7 @@
 #include <FEBioMech/FEElasticMaterialPoint.h>
 #include <FECore/tens4d.h>
 #include "../MFEMUtilities/MFEMTools.h"
-#include "../MFEMFSI/Elasticity/Materials/nearly_incompressible_material.hpp"
+#include "../MFEMFSI/ImmersedFSI/Materials/nearly_incompressible_material.hpp"
 
 class MFEMMaterial : public FEMaterial
 {

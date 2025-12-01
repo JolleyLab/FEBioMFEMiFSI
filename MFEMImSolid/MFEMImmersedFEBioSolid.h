@@ -1,5 +1,5 @@
 #pragma once
-#include "../MFEMFSI/ImmersedFSI-Serial/immersed_solid.hpp"
+#include "../MFEMFSI/ImmersedFSI/immersed_solid.hpp"
 #include "../MFEMUtilities/MFEMTools.h"
 #include "../MFEMLinAlg/MFEMGlobalTypes.h"
 #include "../MFEMCore/MFEMLoad.h"
@@ -7,7 +7,7 @@
 #include <vector>
 
 
-using namespace immersed_solid_serial;
+using namespace immersed_solid;
 
 class ImmersedFEBioSolid : public ImmersedSolid
 {
@@ -24,6 +24,7 @@ public:
 
    // driving functions
    void Setup(double dt, double alpha_m_, double alpha_f_, double gamma_, double beta_) override;
+   void SetupFEDomains();
    void Predictors(mfem::Vector &vf, mfem::Vector &vdotf) override;
    void SetWeakBCs(const double &time) override {}; // handled by FEBio
    void Initiator() override;
@@ -43,6 +44,9 @@ public:
    // restart functions
    void UpdateSolidStateFromRestart() override;
    void UpdateFEBioDataFromRestart();
+
+   // output
+   mfem::GridFunction *ComputeNodallyAveragedVonMisesStress(mfem::GridFunction &d_gf) override;
 
    // destructor
    virtual ~ImmersedFEBioSolid();

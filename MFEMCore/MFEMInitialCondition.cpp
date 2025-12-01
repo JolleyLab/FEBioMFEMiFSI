@@ -6,7 +6,7 @@
 #include "mfem.hpp"
 #endif
 #include "../MFEMUtilities/MFEMTools.h"
-#include "../MFEMFSI/Navier-Stokes-Serial/ins_solver.hpp"
+#include "../MFEMFSI/Navier-Stokes/ins_solver.hpp"
 
 BEGIN_FECORE_CLASS(MFEMInitialPressure, MFEMInitialCondition)
 	ADD_PARAMETER(m_pressure, "pressure");

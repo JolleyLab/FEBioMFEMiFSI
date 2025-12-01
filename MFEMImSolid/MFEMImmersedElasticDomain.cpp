@@ -2,9 +2,12 @@
 #include <FEBioMech/FEBodyForce.h>
 #include <FECore/FEModel.h>
 #include "../MFEMLinAlg/MFEMGlobalTypes.h"
+#include "../MFEMUtilities/MFEMWriteGridFunctionData.h"
 
 #include <fstream>
 #include <iomanip>
+
+using namespace mfem;
 
 MFEMImmersedElasticDomain::MFEMImmersedElasticDomain(FEModel* pfem) : FESolidDomain(pfem), m_dof(pfem)
 {
@@ -386,15 +389,15 @@ void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std:
          // // }
          // // mfem::out << std::endl;
 
-         // mfem::out << "Element Vector = " << std::endl;
-         // mfem::Vector fe_temp(fe.data(),fe.size());
-         // for (int ii=0; ii<el.Nodes(); ++ii)
-         // {
-         //    mfem::out << fe_temp(3*ii) << " ";
-         //    mfem::out << fe_temp(3*ii + 1) << " ";
-         //    mfem::out << fe_temp(3*ii + 2) << " ";
-         //    mfem::out << std::endl;
-         // }
+         // // mfem::out << "Element Vector = " << std::endl;
+         // // mfem::Vector fe_temp(fe.data(),fe.size());
+         // // for (int ii=0; ii<el.Nodes(); ++ii)
+         // // {
+         // //    mfem::out << fe_temp(3*ii) << " ";
+         // //    mfem::out << fe_temp(3*ii + 1) << " ";
+         // //    mfem::out << fe_temp(3*ii + 2) << " ";
+         // //    mfem::out << std::endl;
+         // // }
          // // mfem::Vector& fe_mfem = TransformElemVec(fe,ndof);
          // // mfem::out << "Element Vector MFEM = " << std::endl;
          // // for (int ii=0; ii<el.Nodes(); ++ii)
@@ -407,12 +410,12 @@ void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std:
 
          // // mfem::Vector& fe_mfem = TransformElemVec(fe,el.Nodes());
 
-         // // mfem::out << "VDOFS = " << std::endl;
-         // // vdofs.Print();
-         // // for (int ii=0; ii<el.Nodes(); ++ii)
-         // // {
-         // //    mfem::out << "Node " << ii << " = (" << vdofs[ii] << ", " << vdofs[ii + el.Nodes()] << ", " << vdofs[ii + 2*el.Nodes()] << ")" << std::endl;
-         // // }
+         // mfem::out << "VDOFS = " << std::endl;
+         // vdofs.Print();
+         // for (int ii=0; ii<el.Nodes(); ++ii)
+         // {
+         //    mfem::out << "Node " << ii << " = (" << vdofs[ii] << ", " << vdofs[ii + el.Nodes()] << ", " << vdofs[ii + 2*el.Nodes()] << ")" << std::endl;
+         // }
 
          // // mfem::out << "VDOFS_FEBIO = " << std::endl;
          // // vdofs_febio.Print();
@@ -1070,4 +1073,41 @@ void MFEMImmersedElasticDomain::BuildMatrixProfile(FEGlobalMatrix& M)
       elm.assign(vdofs.GetData(), vdofs.GetData() + vdofs.Size()); // check this
 		M.build_add(elm);
 	}
+}
+
+void MFEMImmersedElasticDomain::ComputeNodallyAveragedVonMisesStress(GridFunction &stress_gf, Array<int> &zones_per_vdof)
+{
+   auto sfes = stress_gf.FESpace();
+
+   // loop over elements
+   int NE = Elements();
+   for (int iel=0; iel<NE; ++iel)
+   {
+      FESolidElement& el = m_Elem[iel];
+
+      // get mfem submesh element id
+      int submesh_id = -1;
+      if (solid_submesh)
+      {
+         // serial
+         submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
+      }         
+      else
+      {
+         // parallel
+         submesh_id = el.GetID()-1;
+         // submesh_id = el.GetID();
+      }
+
+      mfem::Array<int> vdofs;
+      sfes->GetElementVDofs(submesh_id,vdofs);
+
+      computeNodalProjectedValues<double>(el, stress_gf, zones_per_vdof, vdofs,
+         [=](const FEMaterialPoint& mp)
+         {
+            const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+            mat3ds s = pt.m_s;
+            return s.effective_norm();
+         });
+   }
 }

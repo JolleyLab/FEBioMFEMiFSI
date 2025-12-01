@@ -14,21 +14,22 @@
 #include "../MFEMLinAlg/FEBioLinearSolver.h"
 #include "ParFEModel.h"
 #include "../MFEMImSolid/MFEMImmersedElasticDomain.h"
+#include "../MFEMUtilities/MFEMOutputTimeSeries.h"
 
-#include "../MFEMFSI/Navier-Stokes-Serial/ins_solver.hpp"
+#include "../MFEMFSI/Navier-Stokes/ins_solver.hpp"
 #include "../MFEMFSI/Navier-Stokes/ins_solver_enum.hpp"
-#include "../MFEMFSI/ImmersedFSI-Serial/immersed_solid.hpp"
-#include "../MFEMFSI/Elasticity/Materials/materials.hpp"
+#include "../MFEMFSI/ImmersedFSI/immersed_solid.hpp"
+#include "../MFEMFSI/ImmersedFSI/Materials/materials.hpp"
 
 #include <typeinfo>
 #include <filesystem>
 #include <sstream>
 #include <iomanip>
 
-using namespace ins_solver_serial;
+using namespace ins_solver;
 using namespace std;
 using namespace std::placeholders;
-using namespace immersed_solid_serial;
+using namespace immersed_solid;
 using namespace mat;
 using namespace mfem;
 
@@ -70,7 +71,7 @@ private:
 };
 #endif
 
-class MFEMSolver::Imp
+class MFEMSolver::Imp 
 {
 public:
 	static Imp* This;
@@ -98,7 +99,7 @@ public:
 	GridFunction* p_gf = nullptr; // velocity grid function
 	GridFunction* u_gf = nullptr; // pressure grid function
    #endif
-	ParaViewDataCollection* pvdc = nullptr; // paraview data collection
+	ParaViewDataCollectionBase* pvdc = nullptr; // paraview data collection
    #ifdef MFEM_USE_MPI
    ParMesh* fluid_pmesh = nullptr;
    #endif
@@ -106,6 +107,10 @@ public:
    bool wss = false;
    bool vorticity = false;
    bool q_criterion = false;
+   bool output_surface_pressures = false;
+   std::unique_ptr<SurfacePressureTimeSeries> surf_press_ts;
+   bool output_surface_flowrates = false;
+   std::unique_ptr<SurfaceFlowRateTimeSeries> surf_flow_ts;
    #ifdef MFEM_USE_MPI
    ParGridFunction* wss_gf = nullptr; // wall shear stress grid function
    ParGridFunction vorticity_gf; // vorticity grid function
@@ -127,7 +132,7 @@ public:
    GridFunction *vib_gf = nullptr; // immersed solid velocity grid function
    GridFunction *a_gf = nullptr; // immersed solid acceleration grid function
    #endif
-   ParaViewDataCollection *sdc = nullptr; // immersed solid paraview data collection
+   ParaViewDataCollectionBase *sdc = nullptr; // immersed solid paraview data collection
    int solidsolvertype = 1; // 0 = MFEM, 1 = FEBio (default is MFEM)
    ImmersedFEBioSolid *immersed_febio_solid = nullptr; // not owned
    bool three_field = false; // flag for 3-field formulation
@@ -135,6 +140,7 @@ public:
    ParMesh* solid_pmesh = nullptr;
    #endif
    std::map<MFEMImmersedElasticDomain*, int> dom_attr_map; // map from immersed solid domain to mfem attribute
+   GridFunction *vonMisesStress_gf = nullptr; // von Mises stress grid function
 
    // Output
    std::string fname = "results_mfem_solver";
@@ -247,6 +253,9 @@ public:
    FILE *avg_velo_file = nullptr;
    Vector avg_velo;
    double volume = 0.0;
+
+   // output additional immersed solid fields
+   bool vonMisesStress = false;
 public:
    // Custom stream buffer for writing to the log file
    CustomStreamBuffer customBuffer;
@@ -286,6 +295,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.track_node, "Track_node");
       ADD_PARAMETER(m.m_track_node_pos, "Track_node_position");
       ADD_PARAMETER(m.output_avg_velocity, "Output_avg_velocity");
+      ADD_PARAMETER(m.vonMisesStress, "Save_Von_Mises_Stress");
    END_PARAM_GROUP();
 
    // Time Stepping Options
@@ -308,6 +318,8 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.wss, "Save_Wall_Shear_Stress");
       ADD_PARAMETER(m.vorticity, "Save_Vorticity");
       ADD_PARAMETER(m.q_criterion, "Save_Q_Criterion");
+      ADD_PARAMETER(m.output_surface_pressures, "Output_avg_surface_pressures");
+      ADD_PARAMETER(m.output_surface_flowrates, "Output_surface_flow_rates");
    END_PARAM_GROUP();
 
    // // Nonlinear Solver Options
@@ -628,6 +640,12 @@ bool MFEMSolver::Init()
 
    if(m.immersed_solid) if (!SetupSolid()) return false;
 
+   SetupSolvers();
+
+   PostProcessOutput();
+
+   RestartFiles();
+
    #ifdef MFEM_USE_MPI
    if (!m.pre_partition)
    {
@@ -635,11 +653,8 @@ bool MFEMSolver::Init()
    }
    #endif
 
-   SetupSolvers();
-
-   PostProcessOutput();
-
-   RestartFiles();
+   // solid post processing depends on parallel solid mesh
+   if (m.immersed_solid) FinalizeSolid();
 
 	return true;
 }
@@ -720,7 +735,7 @@ bool MFEMSolver::CreateMesh()
          par_export.SetFEModel(fem);
          par_export.SetFESolver(this);
          bool immersed_febio_solid_and_solver = false;
-         if (m.immersed_febio_solid && m.solidsolvertype == SolidSolverType::FEBio)
+         if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
          {
             immersed_febio_solid_and_solver = true;
             par_export.SetDomainAttributeMap(m.dom_attr_map);
@@ -1455,7 +1470,14 @@ void MFEMSolver::PostProcessOutput()
 
    std::string fluid_filename = m.fname + "/fluid";
    #ifdef MFEM_USE_MPI
+
+   // m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
+   #ifdef MFEM_USE_HDF5
+   m.pvdc = new ParaViewHDFDataCollection(fluid_filename, m.fluid_pmesh);
+   #else
    m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
+   #endif
+
    #else
    m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_mesh);
    #endif   
@@ -1506,7 +1528,14 @@ void MFEMSolver::PostProcessOutput()
    {
       std::string solid_filename = m.fname + "/solid";
       #ifdef MFEM_USE_MPI
+
+      // m.sdc = new ParaViewDataCollection(solid_filename, m.solid_pmesh);
+      #ifdef MFEM_USE_HDF5
+      m.sdc = new ParaViewHDFDataCollection(solid_filename, m.solid_pmesh);
+      #else
       m.sdc = new ParaViewDataCollection(solid_filename, m.solid_pmesh);
+      #endif
+
       #else
       m.sdc = new ParaViewDataCollection(solid_filename, m.solid_mesh);  
       #endif
@@ -1521,59 +1550,67 @@ void MFEMSolver::PostProcessOutput()
 
       m.sdc->SetCycle(curr_step);
       m.sdc->SetTime(curr_time);
-      m.sdc->Save();
+      // m.sdc->Save();
    }
 
-   if (m.immersed_solid && m.track_node)
+   if (m.output_surface_pressures)
    {
-      std::string node_filename = m.fname + "/node_pos.txt";
-      
-      m.coord.SetSize(3);
-      m.coord = 0.0;
-      m.disp.SetSize(3);
-      m.disp = 0.0;
+      m.surf_press_ts = std::make_unique<SurfacePressureTimeSeries>(
+         m.mesh, m.p_gf, m.flowsolver);
 
-      auto immersed_solidsolver = m.flowsolver->GetImmersedSolid();
-      MFEM_ASSERT(m.m_track_node_pos.isConst(), "Node position must be a constant");
-      vec3d &node_pos = m.m_track_node_pos.constValue();
-      m.coord(0) = node_pos.x;
-      m.coord(1) = node_pos.y;
-      m.coord(2) = node_pos.z;
-
-      immersed_solidsolver->TrackNodalDisplacement(m.coord,m.disp);
-      #ifdef MFEM_USE_MPI
-      if(Mpi::Root()) {
-      #endif
-      m.f = fopen(node_filename.c_str(), "w");
-      fprintf(m.f, "====================================================================================================================================\n");
-      fprintf(m.f, "        Time              Node Displacement X         Node Displacement Y         Node Displacement Z        |Node Displacement|\n");
-      fprintf(m.f, "%20.16e     %20.16e      %20.16e      %20.16e     %20.16e\n",curr_time,m.disp(0),m.disp(1),m.disp(2),m.disp.Norml2());
-      fflush(m.f);
-      fflush(stdout);
-      #ifdef MFEM_USE_MPI
+      FEModel* fem = GetFEModel();
+      FEMesh &mesh = fem->GetMesh();
+      for (int i = 0; i < mesh.Surfaces(); ++i)
+      {
+         FESurface& surf = mesh.Surface(i);
+         if (surf.IsActive())
+         {
+            int attr = m.mesh->GetSurfaceAttribute(surf.GetFacetSet());
+            std::string sname = surf.GetName().empty()
+                                ? ("Surface_" + std::to_string(attr))
+                                : surf.GetName();
+            m.surf_press_ts->AddSurface(sname, attr);
+         }
       }
-      #endif
+
+      if (m.surf_press_ts->Initialize(m.fname, "surface_pressures.txt"))
+      {
+         double start_time = m.restarting ? m.restart_t :
+                            (m.start_from_specific_time ? m.start_sim_time : 0.0);
+         #ifdef MFEM_USE_MPI
+         if (mfem::Mpi::Root())
+         #endif
+         {
+            m.surf_press_ts->Append(start_time);
+         }
+      }
    }
+   if (m.output_surface_flowrates) {
+      m.surf_flow_ts = std::make_unique<SurfaceFlowRateTimeSeries>(
+         m.mesh, m.u_gf, m.flowsolver, m.fluid_density);
 
-   if (m.immersed_solid && m.output_avg_velocity)
-   {
-      std::string avg_velo_filename = m.fname + "/avg_solid_velocity.txt";
-      m.avg_velo.SetSize(3);
-      m.avg_velo = 0.0;
-
-      ComputeAverageVelocity(m.form_type,*m.d_gf,*m.vib_gf,m.avg_velo,m.volume);
-
-      #ifdef MFEM_USE_MPI
-      if(Mpi::Root()) {
-      #endif
-      m.avg_velo_file = fopen(avg_velo_filename.c_str(), "w");
-      fprintf(m.avg_velo_file, "        Time                  Average Velocity X         Average Velocity Y         Average Velocity Z               Volume\n");
-      fprintf(m.avg_velo_file, "%20.16e     %20.16e     %20.16e     %20.16e     %20.16e\n",curr_time,m.avg_velo(0),m.avg_velo(1),m.avg_velo(2),m.volume);
-      fflush(m.avg_velo_file);
-      fflush(stdout);
-      #ifdef MFEM_USE_MPI
+      FEModel* fem = GetFEModel();
+      FEMesh &mesh = fem->GetMesh();
+      for (int i = 0; i < mesh.Surfaces(); ++i) {
+          FESurface& surf = mesh.Surface(i);
+          if (surf.IsActive()) {
+              int attr = m.mesh->GetSurfaceAttribute(surf.GetFacetSet());
+              std::string sname = surf.GetName().empty()
+                                  ? ("Surface_" + std::to_string(attr))
+                                  : surf.GetName();
+              m.surf_flow_ts->AddSurface(sname, attr);
+          }
       }
-      #endif
+      if (m.surf_flow_ts->Initialize(m.fname, "surface_flow_rates.txt")) {
+          double start_time = m.restarting ? m.restart_t :
+                             (m.start_from_specific_time ? m.start_sim_time : 0.0);
+          #ifdef MFEM_USE_MPI
+          if (mfem::Mpi::Root())
+          #endif
+          {
+              m.surf_flow_ts->Append(start_time);
+          }
+      }
    }
 }
 
@@ -1600,9 +1637,15 @@ void MFEMSolver::RestartFiles()
       m.pvdc->Save();
       if (m.immersed_solid)
       {
+         // if (m.vonMisesStress)
+         // {
+         //    auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
+         //    m.vonMisesStress_gf = immersed_solid_solver->ComputeNodallyAveragedVonMisesStress(*m.d_gf);
+         // }
+
          m.sdc->SetCycle(m.restart_step);
          m.sdc->SetTime(m.restart_t);
-         m.sdc->Save();
+         // m.sdc->Save();
       }
    }
    if (m.start_from_specific_time)
@@ -1631,9 +1674,25 @@ void MFEMSolver::RestartFiles()
       {
          m.sdc->SetCycle(m.start_sim_step);
          m.sdc->SetTime(m.start_sim_time);
-         m.sdc->Save();
+         // m.sdc->Save();
       }
    }
+}
+
+void MFEMSolver::FinalizeSolid()
+{
+   // ensure new febio solid domain has proper data after building parallel mesh
+   if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio) m.immersed_febio_solid->SetupFEDomains();
+
+   // additional solid post processing output
+   if (m.vonMisesStress)
+   {
+      auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
+      m.vonMisesStress_gf = immersed_solid_solver->ComputeNodallyAveragedVonMisesStress(*m.d_gf);
+      m.sdc->RegisterField("VonMisesStress", m.vonMisesStress_gf);
+   }
+
+   m.sdc->Save();
 }
 
 bool MFEMSolver::SolveStep()
@@ -1700,6 +1759,7 @@ bool MFEMSolver::SolveStep()
    }   
    if ((timeStep) % curr_step_save == 0)
    {
+      m.flowsolver->sw_io.Start();
       if (m.wss) m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
       if (m.vorticity) m.flowsolver->ComputeCurl3D(*m.u_gf, m.vorticity_gf);
       if (m.q_criterion) ComputeQCriterion(*m.u_gf, m.q_criterion_gf);
@@ -1709,16 +1769,47 @@ bool MFEMSolver::SolveStep()
       m.pvdc->Save();
       if (m.immersed_solid)
       {
+         if (m.vonMisesStress)
+         {
+            auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
+            m.vonMisesStress_gf = immersed_solid_solver->ComputeNodallyAveragedVonMisesStress(*m.d_gf);
+         }
+
          m.sdc->SetCycle(timeStep);
          m.sdc->SetTime(t);
          m.sdc->Save();
       }
+      m.flowsolver->sw_io.Stop();
    }	
+
+   if (m.output_surface_pressures && m.surf_press_ts)
+   {
+      m.flowsolver->sw_io.Start();
+      #ifdef MFEM_USE_MPI
+      if (mfem::Mpi::Root())
+      #endif
+      {
+         m.surf_press_ts->Append(t);
+      }
+      m.flowsolver->sw_io.Stop();
+   }
+   if (m.output_surface_flowrates && m.surf_flow_ts) 
+   {
+      m.flowsolver->sw_io.Start();
+      #ifdef MFEM_USE_MPI
+      if (mfem::Mpi::Root())
+      #endif
+      {
+         m.surf_flow_ts->Append(t);
+      }
+      m.flowsolver->sw_io.Stop();
+   }
 
    // TODO how to store in parallel?
    #ifndef MFEM_USE_MPI
 
 	// copy data to FEBio mesh
+
    if(m.immersed_solid)
    {
       // transfer grid functions from submesh to parent febio mesh
@@ -1799,6 +1890,7 @@ bool MFEMSolver::SolveStep()
    // store data in txt files
    if (m.immersed_solid && m.track_node)
    {
+      m.flowsolver->sw_io.Start();
       auto immersed_solidsolver = m.flowsolver->GetImmersedSolid();
       immersed_solidsolver->TrackNodalDisplacement(m.coord,m.disp);
 
@@ -1811,9 +1903,11 @@ bool MFEMSolver::SolveStep()
       #ifdef MFEM_USE_MPI
       }
       #endif
+      m.flowsolver->sw_io.Stop();
    }
    if (m.immersed_solid && m.output_avg_velocity)
    {
+      m.flowsolver->sw_io.Start();
       ComputeAverageVelocity(m.form_type,*m.d_gf,*m.vib_gf,m.avg_velo,m.volume);
 
       #ifdef MFEM_USE_MPI
@@ -1825,6 +1919,7 @@ bool MFEMSolver::SolveStep()
       #ifdef MFEM_USE_MPI
       }
       #endif
+      m.flowsolver->sw_io.Stop();
    }
 
 	// print out mfem timing data

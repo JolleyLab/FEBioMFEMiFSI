@@ -2,7 +2,7 @@
 #include "FECore/log.h"
 #include <FECore/tens4d.h>
 #include <FECore/mat3d.h>
-#include "../MFEMFSI/Elasticity/Materials/material_type.hpp"
+#include "../MFEMFSI/ImmersedFSI/Materials/material_type.hpp"
 #include <FECore/FEModel.h>
 
 // using namespace mfem;

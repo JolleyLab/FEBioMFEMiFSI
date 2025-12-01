@@ -108,6 +108,10 @@ public:
    //! build the matrix profile only for the solid domain in the mesh
 	void BuildMatrixProfile(FEGlobalMatrix& M) override;
 
+public:
+   // output
+   virtual void ComputeNodallyAveragedVonMisesStress(mfem::GridFunction &stress_gf, mfem::Array<int> &zones_per_vdof);
+
 protected:
    FEDofList	m_dof;		// total dof list
 

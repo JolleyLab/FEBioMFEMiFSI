@@ -43,6 +43,8 @@
          <Save_Wall_Shear_Stress>1</Save_Wall_Shear_Stress>
 			<Save_Vorticity>1</Save_Vorticity>
 			<Save_Q_Criterion>1</Save_Q_Criterion>
+         <Output_avg_surface_pressures>1</Output_avg_surface_pressures>
+         <Output_surface_flow_rates>1</Output_surface_flow_rates>
 			<atol>1e-06</atol>
 			<rtol>0.001</rtol>
 			<minIt>3</minIt>
