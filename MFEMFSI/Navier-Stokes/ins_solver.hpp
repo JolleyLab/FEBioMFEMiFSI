@@ -901,7 +901,7 @@ protected:
 
    // Post-Process
    // timing
-   void RegisterDefaultTimers();
+   void RegisterTimers();
    TimerRegistry timer_reg;
    mfem::StopWatch sw_step, sw_solve, sw_setup, sw_tan, sw_res, sw_linsolve, sw_initiators, sw_correctors;
    mfem::StopWatch sw_fluidtan, sw_fluidres, sw_solidtan, sw_solidres, sw_fsires, sw_fsitan, sw_fsicmat;

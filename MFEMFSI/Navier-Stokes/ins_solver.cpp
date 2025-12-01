@@ -756,9 +756,6 @@ void INS_Solver::Setup(double dt)
    pn_gf.GetTrueDofs(pn);
    #endif
 
-   // Register timers
-   RegisterDefaultTimers();
-
    sw_setup.Stop();
 }
 
@@ -1069,7 +1066,7 @@ void INS_Solver::PrintInfo()
    }
 }
 
-void INS_Solver::RegisterDefaultTimers()
+void INS_Solver::RegisterTimers()
 {
    timer_reg.Clear();
 
@@ -1124,13 +1121,15 @@ void INS_Solver::RegisterDefaultTimers()
       timer_reg.Add("correctors","CORRECTORS",&sw_correctors,"timestep", "newton", 2);
    }
 
-   if(extended_timing) timer_reg.Add("updates","UPDATES", &sw_updates,"timestep","",1);
+   if (extended_timing) timer_reg.Add("updates","UPDATES", &sw_updates,"timestep","",1);
    if (write_restarts) timer_reg.Add("restarts","RESTARTS",&sw_restarts,"timestep","",1);
    timer_reg.Add("io","I/O",&sw_io,"timestep","",0,false);
 }
 
 void INS_Solver::PrintTimingData()
 {
+   RegisterTimers();
+
    // Collect raw times in seconds
    std::vector<double> times = timer_reg.CollectSeconds();
 
