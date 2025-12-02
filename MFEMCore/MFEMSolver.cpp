@@ -1567,8 +1567,8 @@ void MFEMSolver::PostProcessOutput()
          {
             int attr = m.mesh->GetSurfaceAttribute(surf.GetFacetSet());
             std::string sname = surf.GetName().empty()
-                                ? ("Surface_" + std::to_string(attr))
-                                : surf.GetName();
+                              ? ("Surface_" + std::to_string(attr))
+                              : surf.GetName();
             m.surf_press_ts->AddSurface(sname, attr);
          }
       }
@@ -1576,40 +1576,34 @@ void MFEMSolver::PostProcessOutput()
       if (m.surf_press_ts->Initialize(m.fname, "surface_pressures.txt"))
       {
          double start_time = m.restarting ? m.restart_t :
-                            (m.start_from_specific_time ? m.start_sim_time : 0.0);
-         #ifdef MFEM_USE_MPI
-         if (mfem::Mpi::Root())
-         #endif
-         {
-            m.surf_press_ts->Append(start_time);
-         }
+                           (m.start_from_specific_time ? m.start_sim_time : 0.0);
+         m.surf_press_ts->Append(start_time);
       }
    }
-   if (m.output_surface_flowrates) {
+   if (m.output_surface_flowrates) 
+   {
       m.surf_flow_ts = std::make_unique<SurfaceFlowRateTimeSeries>(
          m.mesh, m.u_gf, m.flowsolver, m.fluid_density);
 
       FEModel* fem = GetFEModel();
       FEMesh &mesh = fem->GetMesh();
-      for (int i = 0; i < mesh.Surfaces(); ++i) {
-          FESurface& surf = mesh.Surface(i);
-          if (surf.IsActive()) {
-              int attr = m.mesh->GetSurfaceAttribute(surf.GetFacetSet());
-              std::string sname = surf.GetName().empty()
-                                  ? ("Surface_" + std::to_string(attr))
-                                  : surf.GetName();
-              m.surf_flow_ts->AddSurface(sname, attr);
-          }
+      for (int i = 0; i < mesh.Surfaces(); ++i) 
+      {
+         FESurface& surf = mesh.Surface(i);
+         if (surf.IsActive()) 
+         {
+            int attr = m.mesh->GetSurfaceAttribute(surf.GetFacetSet());
+            std::string sname = surf.GetName().empty()
+                                 ? ("Surface_" + std::to_string(attr))
+                                 : surf.GetName();
+            m.surf_flow_ts->AddSurface(sname, attr);
+         }
       }
-      if (m.surf_flow_ts->Initialize(m.fname, "surface_flow_rates.txt")) {
-          double start_time = m.restarting ? m.restart_t :
-                             (m.start_from_specific_time ? m.start_sim_time : 0.0);
-          #ifdef MFEM_USE_MPI
-          if (mfem::Mpi::Root())
-          #endif
-          {
-              m.surf_flow_ts->Append(start_time);
-          }
+      if (m.surf_flow_ts->Initialize(m.fname, "surface_flow_rates.txt")) 
+      {
+         double start_time = m.restarting ? m.restart_t :
+                           (m.start_from_specific_time ? m.start_sim_time : 0.0);
+         m.surf_flow_ts->Append(start_time);
       }
    }
 }
@@ -1785,23 +1779,13 @@ bool MFEMSolver::SolveStep()
    if (m.output_surface_pressures && m.surf_press_ts)
    {
       m.flowsolver->sw_io.Start();
-      #ifdef MFEM_USE_MPI
-      if (mfem::Mpi::Root())
-      #endif
-      {
-         m.surf_press_ts->Append(t);
-      }
+      m.surf_press_ts->Append(t);
       m.flowsolver->sw_io.Stop();
    }
    if (m.output_surface_flowrates && m.surf_flow_ts) 
    {
       m.flowsolver->sw_io.Start();
-      #ifdef MFEM_USE_MPI
-      if (mfem::Mpi::Root())
-      #endif
-      {
-         m.surf_flow_ts->Append(t);
-      }
+      m.surf_flow_ts->Append(t);
       m.flowsolver->sw_io.Stop();
    }
 
