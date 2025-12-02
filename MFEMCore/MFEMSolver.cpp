@@ -139,7 +139,7 @@ public:
    #ifdef MFEM_USE_MPI
    ParMesh* solid_pmesh = nullptr;
    #endif
-   std::map<MFEMImmersedElasticDomain*, int> dom_attr_map; // map from immersed solid domain to mfem attribute
+   std::map<FESolidDomain*, int> dom_attr_map; // map from immersed solid domain to mfem attribute
    GridFunction *vonMisesStress_gf = nullptr; // von Mises stress grid function
 
    // Output
@@ -885,9 +885,9 @@ bool MFEMSolver::ExtractFluidAndSolidMeshes()
          solid_domain_attr[i] = dom_attr;
          febio_solid_material = true;
 
-         MFEMImmersedElasticDomain* imdom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
-         MFEM_ASSERT(imdom, "FEBio solid domain must be of type MFEMImmersedElasticDomain");
-         m.dom_attr_map[imdom] = dom_attr;
+         FESolidDomain* solid_dom = dynamic_cast<FESolidDomain*>(&dom);
+         MFEM_ASSERT(solid_dom != nullptr, "Expected solid domain");
+         m.dom_attr_map[solid_dom] = dom_attr;
       }
       if(dom.IsActive() && dynamic_cast<MFEMNewtonianFluid*>(dom.GetMaterial()))
       {

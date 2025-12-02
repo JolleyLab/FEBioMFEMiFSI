@@ -25,7 +25,7 @@ public:
 
    virtual void WriteFiles(std::string &feb_filename_, std::string &part_dir_, int np, bool immersed_febio_solid_);
 
-   void SetDomainAttributeMap(std::map<MFEMImmersedElasticDomain*, int> &map) { dom_attr_map = &map; };
+   void SetDomainAttributeMap(std::map<FESolidDomain*, int> &map) { dom_attr_map = &map; };
 
    void SetFEModel(FEModel* fem){ m_fem = fem; };
    void SetFESolver(FESolver* solver){ m_solver = solver; };
@@ -50,7 +50,7 @@ private:
    void BuildTopLevelSectionCache();
    bool GetCachedSection(const std::string& name, std::string& out) const;
 
-   std::map<MFEMImmersedElasticDomain*, int>* dom_attr_map;
+   std::map<FESolidDomain*, int>* dom_attr_map;
 
    // main file
    void WriteMainFebFile();
