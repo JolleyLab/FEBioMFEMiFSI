@@ -37,8 +37,6 @@ public:
     * field_in = solid nodal forces
     * field_out = fluid nodal forces 
     * point_pos = solid nodes
-    * 
-    * the output field will need a group summation to work in parallel
    */
    void SpreadForces(const mfem::Vector &point_pos, const mfem::Vector &field_in, mfem::GridFunction &field_out, int point_pos_ordering = mfem::Ordering::byNODES);
    void Spread(const mfem::Vector &field_in, mfem::GridFunction &field_out);

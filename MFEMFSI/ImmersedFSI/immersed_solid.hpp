@@ -271,7 +271,7 @@ protected:
    mfem::GridFunction *s_gf_fluid = nullptr; // not owned
    bool stabs_scaling = false;
    mfem::SubMesh *solid_bdr_mesh = nullptr;
-   mfem::Vector solid_bdr_nodes;
+   mfem::Vector solid_bdr_nodes, solid_bdr_nodes_tn;
    mfem::Array<int> solid_bdr_tdofs;
 
    // timers

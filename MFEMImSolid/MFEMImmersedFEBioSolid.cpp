@@ -305,6 +305,7 @@ void ImmersedFEBioSolid::Predictors(mfem::Vector &vf, mfem::Vector &vdotf)
 
    // store tn position of solid
    interp_points_in_solid_tn = interp_points_in_solid;
+   if (stabs_scaling) solid_bdr_nodes_tn = solid_bdr_nodes;
 }
 
 void ImmersedFEBioSolid::Initiator()
@@ -314,50 +315,53 @@ void ImmersedFEBioSolid::Initiator()
 	fem->Update();
 
    // update surface data
-   FEMesh &mesh = fem->GetMesh();
-   FETimeInfo &tp = fem->GetTime();
-   for (int i=0; i<mesh.Surfaces(); ++i)
+   if (immersed_surface_loads)
    {
-      FESurface* ps = &mesh.Surface(i);
-      // ps->Update(tp);
-      for (int e=0; e<ps->Elements(); ++e) 
+      FEMesh &mesh = fem->GetMesh();
+      FETimeInfo &tp = fem->GetTime();
+      for (int i=0; i<mesh.Surfaces(); ++i)
       {
-         FESurfaceElement& el = ps->Element(e);
-
-         // check if active
-         if (el.GetID() == -1) continue;         
-
-         int nint = el.GaussPoints();
-         int neln = el.Nodes();
-
-         vec3d rt[FEElement::MAX_NODES];
-         // ps->NodalCoordinates(el, rt);
-         for (int ii = 0; ii < neln; ++ii) rt[ii] = mesh.Node(el.m_lnode[ii]).m_rt;  
-
-         // // ps->GetNodalCoordinates(el, alpha_f, rt);
-         // for (int j = 0; j<neln; ++j) 
-         // {
-         //    FENode& node = mesh.Node(el.m_lnode[j]);
-         //    rt[j] = node.m_rt*alpha_f + node.m_rp*(1.0 - alpha_f);
-         // }
-                
-
-         for (int n = 0; n < nint; ++n)
+         FESurface* ps = &mesh.Surface(i);
+         // ps->Update(tp);
+         for (int e=0; e<ps->Elements(); ++e) 
          {
-            FESurfaceMaterialPoint& mp = static_cast<FESurfaceMaterialPoint&>(*el.GetMaterialPoint(n));
+            FESurfaceElement& el = ps->Element(e);
 
-            // material point coordinates
-		      mp.m_rt = el.Evaluate(rt, n); // sets current position at int point to midpoint value
+            // check if active
+            if (el.GetID() == -1) continue;         
 
-            double* Gr = el.Gr(n);
-            double* Gs = el.Gs(n);
+            int nint = el.GaussPoints();
+            int neln = el.Nodes();
 
-            mp.dxr = vec3d(0, 0, 0);
-            mp.dxs = vec3d(0, 0, 0);
-            for (int a = 0; a < neln; ++a)
+            vec3d rt[FEElement::MAX_NODES];
+            // ps->NodalCoordinates(el, rt);
+            for (int ii = 0; ii < neln; ++ii) rt[ii] = mesh.Node(el.m_lnode[ii]).m_rt;  
+
+            // // ps->GetNodalCoordinates(el, alpha_f, rt);
+            // for (int j = 0; j<neln; ++j) 
+            // {
+            //    FENode& node = mesh.Node(el.m_lnode[j]);
+            //    rt[j] = node.m_rt*alpha_f + node.m_rp*(1.0 - alpha_f);
+            // }
+                  
+
+            for (int n = 0; n < nint; ++n)
             {
-               mp.dxr += rt[a] * Gr[a];
-               mp.dxs += rt[a] * Gs[a];
+               FESurfaceMaterialPoint& mp = static_cast<FESurfaceMaterialPoint&>(*el.GetMaterialPoint(n));
+
+               // material point coordinates
+               mp.m_rt = el.Evaluate(rt, n); // sets current position at int point to midpoint value
+
+               double* Gr = el.Gr(n);
+               double* Gs = el.Gs(n);
+
+               mp.dxr = vec3d(0, 0, 0);
+               mp.dxs = vec3d(0, 0, 0);
+               for (int a = 0; a < neln; ++a)
+               {
+                  mp.dxr += rt[a] * Gr[a];
+                  mp.dxs += rt[a] * Gs[a];
+               }
             }
          }
       }
@@ -374,14 +378,15 @@ void ImmersedFEBioSolid::Initiator()
    add((1.0 - alpha_f),dn,alpha_f,dnp1,dg);
    dtemp_gf.SetFromTrueDofs(dg);
    MoveMesh(dtemp_gf); // contains current displacements
-   UpdatePointSearch(dtemp_gf,dg);
+   // UpdatePointSearch(dtemp_gf,dg); // not needed since motion map for lambda terms fixed at tn
 
    if (stabs_scaling)
    {
       #ifdef MFEM_USE_GSLIB
       MFEM_ASSERT(dfes->GetOrdering() == s_gf_fluid->FESpace()->GetOrdering(),"Ordering of solid and fluid gridfunctions must match for special VMS stabs scaling");
       
-      finder_fluid->TransferIndicator(solid_bdr_nodes,*s_gf_fluid,dfes->GetOrdering());
+      // finder_fluid->TransferIndicator(solid_bdr_nodes,*s_gf_fluid,dfes->GetOrdering());
+      finder_fluid->TransferIndicator(solid_bdr_nodes_tn,*s_gf_fluid,dfes->GetOrdering());
       // note internally s_gf_fluid is zeroed prior to interpolation of s_gf to its fluid counterpart
       #endif
    }

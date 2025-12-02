@@ -168,6 +168,9 @@ void ImmersedSolid::StabsScaling(mfem::GridFunction *s_gf_fluid_)
       bdr_attr = 1;
       dfes->GetEssentialTrueDofs(bdr_attr,solid_bdr_tdofs);
       solid_bdr_nodes.SetSize(solid_bdr_tdofs.Size());
+      solid_bdr_nodes = 0.0;
+      solid_bdr_nodes_tn.SetSize(solid_bdr_tdofs.Size());
+      solid_bdr_nodes_tn = 0.0;
 
       const int Ndofs = solid_bdr_tdofs.Size();
       const auto id = solid_bdr_tdofs.Read();
@@ -526,6 +529,7 @@ void ImmersedSolid::Predictors(Vector &vf, Vector &vdotf)
 
    // store tn position of solid
    interp_points_in_solid_tn = interp_points_in_solid;
+   if (stabs_scaling) solid_bdr_nodes_tn = solid_bdr_nodes;
 }
 
 void ImmersedSolid::SetEssentialBCs(const double &time)
@@ -542,14 +546,15 @@ void ImmersedSolid::Initiator()
    // move mesh and reset point search
    dtemp_gf.SetFromTrueDofs(dg);
    MoveMesh(dtemp_gf); // contains current displacements
-   UpdatePointSearch(dtemp_gf,dg);
+   // UpdatePointSearch(dtemp_gf,dg); // not needed since motion map for lambda terms fixed at tn
 
    if (stabs_scaling)
    {
       #ifdef MFEM_USE_GSLIB
       MFEM_ASSERT(dfes->GetOrdering() == s_gf_fluid->FESpace()->GetOrdering(),"Ordering of solid and fluid gridfunctions must match for special VMS stabs scaling");
       
-      finder_fluid->TransferIndicator(solid_bdr_nodes,*s_gf_fluid,dfes->GetOrdering());
+      // finder_fluid->TransferIndicator(solid_bdr_nodes,*s_gf_fluid,dfes->GetOrdering());
+      finder_fluid->TransferIndicator(solid_bdr_nodes_tn,*s_gf_fluid,dfes->GetOrdering());
       // note internally s_gf_fluid is zeroed prior to interpolation of s_gf to its fluid counterpart
       #endif
    }
