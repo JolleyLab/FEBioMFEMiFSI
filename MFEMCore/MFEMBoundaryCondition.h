@@ -24,13 +24,16 @@ public:
 	virtual void Apply(MFEMSolver* solver, int attr) = 0;
 
    void SetBoundaryID(int id) { m_bdr_attr = id; };
+   int GetBoundaryID() { return m_bdr_attr; };
 
-   double GetBoundaryID() { return m_bdr_attr; };
+   void SetSurfaceName(const std::string &name) { m_surfname = name; };
+   const std::string& GetSurfaceName() const { return m_surfname; };
 
    bool Init() override;
 
 private:
    int m_bdr_attr; // bdr attribute ID for the boundary condition
+   std::string m_surfname;
 };
 
 // Dirichlet velocity boundary condition

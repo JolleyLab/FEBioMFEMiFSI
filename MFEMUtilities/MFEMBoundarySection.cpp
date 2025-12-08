@@ -95,6 +95,8 @@ void MFEMBoundarySection::ParseMFEMBC(XMLTag& tag)
 		// // assign it
 		// mesh.AddSurface(psurf);
 		// sbc->SetSurface(psurf);
+
+      mfem_bc->SetSurfaceName(surfaceName);
 	}
 
 	// add this boundary condition to the current step

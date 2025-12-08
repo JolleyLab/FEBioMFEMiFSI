@@ -124,6 +124,7 @@ void MFEMLoadSection::ParseMFEMSurfaceLoad(XMLTag& tag)
    int mfem_bdr_attr;
    tag.AttributeValue("mfem_bdr_attr",mfem_bdr_attr,true);
    mfem_sl->SetBoundaryID(mfem_bdr_attr);
+   mfem_sl->SetSurfaceName(surfaceName);
 
 	// add it to the model
 	GetBuilder()->AddSurfaceLoad(psl);

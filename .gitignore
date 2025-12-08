@@ -416,3 +416,4 @@ results_mfem_solver*/
 *.mesh
 *.msh
 *.dat
+ParallelMesh*/

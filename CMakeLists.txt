@@ -74,7 +74,7 @@ if(NEWPATH)
         if(WIN32)
             list(APPEND LIB_SUFFIXES "cmbuild22/lib/Release" "cmbuild/lib/Release" "cmbuild/lib/Debug" "cbuild/lib/Release" "cbuild/lib/Debug" "build/lib/Release" "build/lib/Debug")
         else()
-            list(APPEND LIB_SUFFIXES "cbuild/lib" "cmbuild/lib" "build/lib" "cbuild/Release/lib" "cmbuild/Release/lib" "build/Release/lib" "cbuild/Debug/lib" "cmbuild/Debug/lib" "build/Debug/lib")
+            list(APPEND LIB_SUFFIXES "cbuild/lib" "cmbuild/lib" "build/lib" "cbuild/Release/lib" "cmbuild/Release/lib" "build/Release/lib" "cbuild/Debug/lib" "cmbuild/Debug/lib" "build/Debug/lib" "cbuild/Debug" "cmbuild/Debug" "build/Debug")
         endif()
     endif()
 
@@ -212,6 +212,9 @@ file(GLOB_RECURSE SRC_FEBioMFEMiFSI CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
 )
 
+# Exclude sources from the MFEMTools subdirectory; built separately
+list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX ".*/MFEMTools/.*")
+
 # Organize files by folder in IDEs
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${HDR_FEBioMFEMiFSI} ${SRC_FEBioMFEMiFSI}
@@ -236,3 +239,13 @@ endif()
 
 # Output the build type
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
+# Option to build the MFEMTools subdirectory (off by default)
+option(BUILD_MFEMTOOLS "Build MFEMTools helper/library targets" OFF)
+
+# Optionally build tools subdirectory
+if(BUILD_MFEMTOOLS)
+    add_subdirectory(MFEMTools)
+    # If MFEMTools should link to the main shared lib, ensure MFEMTools/CMakeLists.txt does:
+    # target_link_libraries(MFEMTools PUBLIC FEBioMFEMiFSI)
+endif()

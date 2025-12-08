@@ -287,12 +287,13 @@ void MFEMParExport::WriteLocalFebFiles()
 void MFEMParExport::WriteInitialConditionsSection()
 {
    FEModel *fem = GetFEModel();
+   int num_ICs = fem->InitialConditions();
+   if (num_ICs == 0) return;
    XMLElement el;
    el.name("Initial");
    xml_writer.add_branch(el);
    {
       // add initial conditions
-      int num_ICs = fem->InitialConditions();
       for (int i = 0; i < num_ICs; ++i)
       {
          FEInitialCondition* ic = fem->InitialCondition(i);
@@ -306,12 +307,13 @@ void MFEMParExport::WriteInitialConditionsSection()
 void MFEMParExport::WriteBoundaryConditionsSection()
 {
    FEModel *fem = GetFEModel();
+   int num_BCs = fem->BoundaryConditions();
+   if (num_BCs == 0) return;
    XMLElement el;
    el.name("Boundary");
    xml_writer.add_branch(el);
    {
       // add boundary conditions
-      int num_BCs = fem->BoundaryConditions();
       for (int i = 0; i < num_BCs; ++i)
       {
          MFEMBoundaryCondition* bc = dynamic_cast<MFEMBoundaryCondition*>(fem->BoundaryCondition(i));
@@ -327,11 +329,12 @@ void MFEMParExport::WriteBoundaryConditionsSection()
 void MFEMParExport::WriteLoadsSection()
 {
    FEModel *fem = GetFEModel();
+   int num_loads = fem->ModelLoads();
+   if (num_loads == 0) return;
    XMLElement el;
    el.name("Loads");
    xml_writer.add_branch(el);
    {
-      int num_loads = fem->ModelLoads();
       for (int i = 0; i < num_loads; ++i)
       {
          XMLElement load_el;
@@ -378,12 +381,13 @@ void MFEMParExport::WriteLoadsSection()
 void MFEMParExport::WriteLoadDataSection()
 {
    FEModel *fem = GetFEModel();
+   int num_LDs = fem->LoadControllers();
+   if (num_LDs == 0) return;
    XMLElement el;
    el.name("LoadData");
    xml_writer.add_branch(el);
    {
       // add load data
-      int num_LDs = fem->LoadControllers();
       for (int i = 0; i < num_LDs; ++i)
       {
          FELoadController* ld = fem->GetLoadController(i);

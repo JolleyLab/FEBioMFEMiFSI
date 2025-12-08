@@ -111,6 +111,9 @@ public:
 
     void AddSurface(const std::string &name_, int bdr_attr_)
     {
+        MFEM_ASSERT(mesh != nullptr, "SurfacePressureTimeSeries: mesh is null");
+        MFEM_ASSERT(mesh->bdr_attributes.Size() > 0,
+                    "SurfacePressureTimeSeries: mesh has no boundary attributes"); 
         int maxb = mesh->bdr_attributes.Max();
         SurfacePressureSpec spec;
         spec.name = name_;
@@ -177,24 +180,27 @@ struct SurfaceFlowRateSpec
 class SurfaceFlowRateTimeSeries : public OutputTimeSeriesBase
 {
 public:
-    SurfaceFlowRateTimeSeries(mfem::Mesh *mesh_,
-                              mfem::GridFunction *vel_gf_,
-                              ins_solver::INS_Solver *solver_,
-                              double fluid_density_)
-        : mesh(mesh_), v(vel_gf_), solver(solver_), rho(fluid_density_) {}
+   SurfaceFlowRateTimeSeries(mfem::Mesh *mesh_,
+                           mfem::GridFunction *vel_gf_,
+                           ins_solver::INS_Solver *solver_,
+                           double fluid_density_)
+      : mesh(mesh_), v(vel_gf_), solver(solver_), rho(fluid_density_) {}
 
-    void AddSurface(const std::string &name_, int bdr_attr_)
-    {
-        int maxb = mesh->bdr_attributes.Max();
-        SurfaceFlowRateSpec spec;
-        spec.name = name_;
-        spec.attribute = bdr_attr_;
-        spec.mask.SetSize(maxb);
-        spec.mask = 0;
-        MFEM_ASSERT(bdr_attr_ >= 1 && bdr_attr_ <= maxb, "Invalid boundary attribute");
-        spec.mask[bdr_attr_ - 1] = 1;
-        surfaces.push_back(spec);
-    }
+   void AddSurface(const std::string &name_, int bdr_attr_)
+   {
+      MFEM_ASSERT(mesh != nullptr, "SurfacePressureTimeSeries: mesh is null");
+      MFEM_ASSERT(mesh->bdr_attributes.Size() > 0,
+                  "SurfacePressureTimeSeries: mesh has no boundary attributes"); 
+      int maxb = mesh->bdr_attributes.Max();
+      SurfaceFlowRateSpec spec;
+      spec.name = name_;
+      spec.attribute = bdr_attr_;
+      spec.mask.SetSize(maxb);
+      spec.mask = 0;
+      MFEM_ASSERT(bdr_attr_ >= 1 && bdr_attr_ <= maxb, "Invalid boundary attribute");
+      spec.mask[bdr_attr_ - 1] = 1;
+      surfaces.push_back(spec);
+   }
 
 protected:
     const char* GetDescriptor() const override { return "FlowRate"; }

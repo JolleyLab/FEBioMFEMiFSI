@@ -111,6 +111,12 @@ public:
    std::unique_ptr<SurfacePressureTimeSeries> surf_press_ts;
    bool output_surface_flowrates = false;
    std::unique_ptr<SurfaceFlowRateTimeSeries> surf_flow_ts;
+   struct SurfaceData
+   {
+      std::string name;
+      int attribute;
+   };
+   mutable std::vector<SurfaceData> output_surfaces;
    #ifdef MFEM_USE_MPI
    ParGridFunction* wss_gf = nullptr; // wall shear stress grid function
    ParGridFunction vorticity_gf; // vorticity grid function
@@ -1139,17 +1145,21 @@ bool MFEMSolver::SetupFluid()
 		{
 			FESurface* surf = bc->GetSurface();
          int id = 0;
+         std::string surf_name;
          if (surf && surf->Elements() > 0)
          {
             FEFacetSet* set = surf->GetFacetSet();
             id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
             bc->SetBoundaryID(id);
+            surf_name = surf->GetName();
+            bc->SetSurfaceName(surf_name);
          }
          else
          {
             id = bc->GetBoundaryID(); assert(id > 0);
+            surf_name = bc->GetSurfaceName();
          }		
-         
+         m.output_surfaces.push_back({surf_name, id});         
 			bc->Apply(this, id - 1);
 		}
 	}
@@ -1168,17 +1178,21 @@ bool MFEMSolver::SetupFluid()
 		{
          FESurface* surf = &sl->GetSurface();
          int id = 0;
+         std::string surf_name;
          if (surf && surf->Elements() > 0)
          {
             FEFacetSet* set = surf->GetFacetSet();
             id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
             sl->SetBoundaryID(id);
+            surf_name = surf->GetName();
+            sl->SetSurfaceName(surf_name);
          }
          else
          {
             id = sl->GetBoundaryID(); assert(id > 0);
+            surf_name = sl->GetSurfaceName();
          }
-
+         m.output_surfaces.push_back({surf_name, id}); 
          sl->Apply(this, id - 1);
 		}
 
@@ -1555,24 +1569,40 @@ void MFEMSolver::PostProcessOutput()
 
    if (m.output_surface_pressures)
    {
+      #ifdef MFEM_USE_MPI
       m.surf_press_ts = std::make_unique<SurfacePressureTimeSeries>(
-         m.mesh, m.p_gf, m.flowsolver);
+         m.fluid_pmesh, m.p_gf, m.flowsolver);
+      #else
+      m.surf_press_ts = std::make_unique<SurfacePressureTimeSeries>(
+         m.fluid_mesh, m.p_gf, m.flowsolver);
+      #endif
 
       FEModel* fem = GetFEModel();
       FEMesh &mesh = fem->GetMesh();
-      for (int i = 0; i < mesh.Surfaces(); ++i)
+      if (mesh.Surfaces() == 0)
       {
-         FESurface& surf = mesh.Surface(i);
-         if (surf.IsActive())
+         for (int i=0; i<m.output_surfaces.size(); ++i) 
          {
-            int attr = m.mesh->GetSurfaceAttribute(surf.GetFacetSet());
-            std::string sname = surf.GetName().empty()
-                              ? ("Surface_" + std::to_string(attr))
-                              : surf.GetName();
+            std::string sname = m.output_surfaces[i].name;
+            int attr = m.output_surfaces[i].attribute;
             m.surf_press_ts->AddSurface(sname, attr);
          }
       }
-
+      else
+      {
+         for (int i = 0; i < mesh.Surfaces(); ++i)
+         {
+            FESurface& surf = mesh.Surface(i);
+            if (surf.IsActive())
+            {
+               int attr = m.mesh->GetSurfaceAttribute(surf.GetFacetSet());
+               std::string sname = surf.GetName().empty()
+                                 ? ("Surface_" + std::to_string(attr))
+                                 : surf.GetName();
+               m.surf_press_ts->AddSurface(sname, attr);
+            }
+         }
+      }
       if (m.surf_press_ts->Initialize(m.fname, "surface_pressures.txt"))
       {
          double start_time = m.restarting ? m.restart_t :
@@ -1582,21 +1612,38 @@ void MFEMSolver::PostProcessOutput()
    }
    if (m.output_surface_flowrates) 
    {
+      #ifdef MFEM_USE_MPI
       m.surf_flow_ts = std::make_unique<SurfaceFlowRateTimeSeries>(
-         m.mesh, m.u_gf, m.flowsolver, m.fluid_density);
+         m.fluid_pmesh, m.u_gf, m.flowsolver, m.fluid_density);
+      #else
+      m.surf_flow_ts = std::make_unique<SurfaceFlowRateTimeSeries>(
+         m.fluid_mesh, m.u_gf, m.flowsolver, m.fluid_density);
+      #endif
 
       FEModel* fem = GetFEModel();
       FEMesh &mesh = fem->GetMesh();
-      for (int i = 0; i < mesh.Surfaces(); ++i) 
+      if (mesh.Surfaces() == 0) 
       {
-         FESurface& surf = mesh.Surface(i);
-         if (surf.IsActive()) 
+         for (int i=0; i<m.output_surfaces.size(); ++i) 
          {
-            int attr = m.mesh->GetSurfaceAttribute(surf.GetFacetSet());
-            std::string sname = surf.GetName().empty()
-                                 ? ("Surface_" + std::to_string(attr))
-                                 : surf.GetName();
+            std::string sname = m.output_surfaces[i].name;
+            int attr = m.output_surfaces[i].attribute;
             m.surf_flow_ts->AddSurface(sname, attr);
+         }
+      }
+      else 
+      {
+         for (int i = 0; i < mesh.Surfaces(); ++i) 
+         {
+            FESurface& surf = mesh.Surface(i);
+            if (surf.IsActive()) 
+            {
+               int attr = m.mesh->GetSurfaceAttribute(surf.GetFacetSet());
+               std::string sname = surf.GetName().empty()
+                                    ? ("Surface_" + std::to_string(attr))
+                                    : surf.GetName();
+               m.surf_flow_ts->AddSurface(sname, attr);
+            }
          }
       }
       if (m.surf_flow_ts->Initialize(m.fname, "surface_flow_rates.txt")) 

@@ -28,13 +28,16 @@ public:
    virtual void CopyFrom(FEModelLoad* pml);
 
    void SetBoundaryID(int id) { m_bdr_attr = id; };
+   int GetBoundaryID() { return m_bdr_attr; };
 
-   double GetBoundaryID() { return m_bdr_attr; };
+   void SetSurfaceName(const std::string &name) { m_surfname = name; };
+   const std::string& GetSurfaceName() const { return m_surfname; };
 
    bool Init() override;
 
 private:
    int m_bdr_attr; // bdr attribute ID for the boundary condition
+   std::string m_surfname;
    bool m_backflow_stab; // flag for backflow stabilization
 	FEParamDouble m_beta;
 
