@@ -1,5 +1,5 @@
 #pragma once
-#include "../MFEMFSI/ImmersedFSI/immersed_solid.hpp"
+#include "../MFEMFSI/ImmersedFSI/ImmersedSolid.hpp"
 #include "../MFEMUtilities/MFEMTools.h"
 #include "../MFEMLinAlg/MFEMGlobalTypes.h"
 #include "../MFEMCore/MFEMLoad.h"

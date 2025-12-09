@@ -2,7 +2,7 @@
 
 #include "mfem.hpp"
 #include "../ImmersedFSI/Materials/material_type.hpp"
-#include "../Navier-Stokes/ins_bc_containers.hpp"
+#include "../Navier-Stokes/ifs_bc_containers.hpp"
 
 using namespace mat;
 
@@ -16,7 +16,7 @@ namespace immersed_solid
    Utilizes Voight notation following Wriggers. Nonlinear FEM. for internal work term
    S = {S_11 S_22 S_33 S_12 S_23 S_13}
 */
-class Immersed_Solid_Integrator : public mfem::NonlinearFormIntegrator
+class ImmersedSolidIntegrator : public mfem::NonlinearFormIntegrator
 {
 private:
 	mfem::ConstantCoefficient *coeff = nullptr;
@@ -71,7 +71,7 @@ private:
    
 public:
 
-   Immersed_Solid_Integrator(MaterialType *mat_type_, int formulation_type_, mfem::GridFunction *orig_nodes_, mfem::GridFunction *curr_a_, mfem::GridFunction *curr_v_, double *dt_, double beta_, double gamma_, double alpha_m_, double alpha_f_, std::vector<AccelTerm_T> *bf_terms_, mfem::Coefficient *init_rhos_, double &rhof_, double &mu_f_)
+   ImmersedSolidIntegrator(MaterialType *mat_type_, int formulation_type_, mfem::GridFunction *orig_nodes_, mfem::GridFunction *curr_a_, mfem::GridFunction *curr_v_, double *dt_, double beta_, double gamma_, double alpha_m_, double alpha_f_, std::vector<AccelTerm_T> *bf_terms_, mfem::Coefficient *init_rhos_, double &rhof_, double &mu_f_)
    : formulation_type(formulation_type_), mat_type(mat_type_), orig_nodes(orig_nodes_), coeff(nullptr), a_gf(curr_a_), v_gf(curr_v_), dt(dt_), beta(beta_), alpha_m(alpha_m_), alpha_f(alpha_f_), bf_terms(bf_terms_), rhos0_coeff(init_rhos_), rhof(rhof_), mu_f(mu_f_), gamma(gamma_)
    {
       fespace = orig_nodes->FESpace();
@@ -86,7 +86,7 @@ public:
       }
    };
 
-   Immersed_Solid_Integrator(MaterialType *mat_type_, int formulation_type_, mfem::GridFunction *orig_nodes_, mfem::GridFunction *curr_a_, mfem::GridFunction *curr_v_, double *dt_, double beta_, double gamma_, double alpha_m_, double alpha_f_, std::vector<AccelTerm_T> *bf_terms_, mfem::Coefficient *init_rhos_, double &rhof_, double &mu_f_, bool visc_)
+   ImmersedSolidIntegrator(MaterialType *mat_type_, int formulation_type_, mfem::GridFunction *orig_nodes_, mfem::GridFunction *curr_a_, mfem::GridFunction *curr_v_, double *dt_, double beta_, double gamma_, double alpha_m_, double alpha_f_, std::vector<AccelTerm_T> *bf_terms_, mfem::Coefficient *init_rhos_, double &rhof_, double &mu_f_, bool visc_)
    : formulation_type(formulation_type_), mat_type(mat_type_), orig_nodes(orig_nodes_), coeff(nullptr), a_gf(curr_a_), v_gf(curr_v_), dt(dt_), beta(beta_), alpha_m(alpha_m_), alpha_f(alpha_f_), bf_terms(bf_terms_), rhos0_coeff(init_rhos_), rhof(rhof_), mu_f(mu_f_), gamma(gamma_), subtract_fluid_visc_stress(visc_)
    {
       fespace = orig_nodes->FESpace();
@@ -113,7 +113,7 @@ public:
    // function to build mapping from parent -> initial configuration physical element
    void BuildInitTransformation(mfem::ElementTransformation &T, const mfem::IntegrationPoint &ip);
 
-   virtual ~Immersed_Solid_Integrator() 
+   virtual ~ImmersedSolidIntegrator() 
    {
       if(init_trans) delete init_trans;
    };

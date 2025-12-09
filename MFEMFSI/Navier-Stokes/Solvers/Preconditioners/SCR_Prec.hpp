@@ -62,15 +62,13 @@ public:
    virtual void Mult(const mfem::Vector &k, mfem::Vector &y) const override
    {
       // Apply S = C - D Ainv G
-
-      // G->Mult(k,temp_y);
+      
       G->Mult(Gcoeff,k,0.0,temp_y);
 
       Ainv->Mult(temp_y,temp_y_2);
 
       if (equal_order)
       {
-         // D->Mult(temp_y_2,y);
          D->Mult(Dcoeff,temp_y_2,0.0,y);
          C->Mult(1.0,k,-1.0,y);
       }

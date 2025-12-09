@@ -19,9 +19,9 @@ namespace mfem
    #endif
 }
 
-namespace ins_solver
+namespace ifs_solver
 {
-   class INS_Solver;
+   class IncompressibleFlowSolver;
 }
 
 class MFEMSolver : public FESolver
@@ -53,7 +53,7 @@ public:
    mfem::Mesh* GetMFEMsolidmesh();
    #endif
 
-   ins_solver::INS_Solver* GetFlowSolver();
+   ifs_solver::IncompressibleFlowSolver* GetFlowSolver();
 
    // flag for immersed solid
    bool ImmersedSolid();

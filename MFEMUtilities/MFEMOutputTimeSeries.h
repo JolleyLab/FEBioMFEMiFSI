@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <sstream>
 
-#include "../MFEMFSI/Navier-Stokes/ins_solver.hpp"
+#include "../MFEMFSI/Navier-Stokes/IncompressibleFlowSolver.hpp"
 #include <mfem.hpp>
 
 // Base class
@@ -106,7 +106,7 @@ class SurfacePressureTimeSeries : public OutputTimeSeriesBase
 public:
     SurfacePressureTimeSeries(mfem::Mesh *mesh_,
                               mfem::GridFunction *pressure_gf_,
-                              ins_solver::INS_Solver *solver_)
+                              ifs_solver::IncompressibleFlowSolver *solver_)
         : mesh(mesh_), p(pressure_gf_), solver(solver_) {}
 
     void AddSurface(const std::string &name_, int bdr_attr_)
@@ -163,7 +163,7 @@ protected:
 private:
     mfem::Mesh *mesh;
     mfem::GridFunction *p;
-    ins_solver::INS_Solver *solver;
+    ifs_solver::IncompressibleFlowSolver *solver;
     std::vector<SurfacePressureSpec> surfaces;
 };
 
@@ -182,7 +182,7 @@ class SurfaceFlowRateTimeSeries : public OutputTimeSeriesBase
 public:
    SurfaceFlowRateTimeSeries(mfem::Mesh *mesh_,
                            mfem::GridFunction *vel_gf_,
-                           ins_solver::INS_Solver *solver_,
+                           ifs_solver::IncompressibleFlowSolver *solver_,
                            double fluid_density_)
       : mesh(mesh_), v(vel_gf_), solver(solver_), rho(fluid_density_) {}
 
@@ -239,7 +239,7 @@ protected:
 private:
     mfem::Mesh *mesh;
     mfem::GridFunction *v;
-    ins_solver::INS_Solver *solver;
+    ifs_solver::IncompressibleFlowSolver *solver;
     double rho;
     std::vector<SurfaceFlowRateSpec> surfaces;
 };

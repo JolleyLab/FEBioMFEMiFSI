@@ -3,7 +3,7 @@
 // residual operator
 #include "mfem.hpp"
 #include "CVBC_AinvPC.hpp"
-#include "../../../Utilities/hypre_func_extensions.hpp"
+#include "../../../Utilities/HypreFunctions.hpp"
 #include "../../../Utilities/extended_solvers.hpp"
 
 // Base Class for Implementing 2x2 Block Preconditioners for matrices of the form

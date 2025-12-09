@@ -1,6 +1,6 @@
 #include "BlockPreconditioner.hpp"
-#include "../../../Utilities/sparsemat_ext.hpp"
-#include "../../../Utilities/extended_operators.hpp"
+#include "../../../Utilities/SparseMatFunctions.hpp"
+#include "../../CardiovascularBCs/SumOp.hpp"
 #include <iostream>
 
 using namespace mfem;

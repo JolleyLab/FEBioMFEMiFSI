@@ -5,20 +5,20 @@
 #include <FECore/log.h>
 #include <FEBioLib/FEBioModel.h>
 
-#include "../MFEMImSolid/MFEMImmersedFEBioSolid.h"
 #include "MFEMMesh.h"
 #include "MFEMInitialCondition.h"
 #include "MFEMBoundaryCondition.h"
 #include "MFEMLoad.h"
 #include "MFEMMaterial.h"
 #include "../MFEMLinAlg/FEBioLinearSolver.h"
-#include "ParFEModel.h"
 #include "../MFEMImSolid/MFEMImmersedElasticDomain.h"
+#include "../MFEMImSolid/MFEMImmersedFEBioSolid.h"
 #include "../MFEMUtilities/MFEMOutputTimeSeries.h"
+#include "../MFEMUtilities/MFEMParFEMeshBuilder.h"
 
-#include "../MFEMFSI/Navier-Stokes/ins_solver.hpp"
-#include "../MFEMFSI/Navier-Stokes/ins_solver_enum.hpp"
-#include "../MFEMFSI/ImmersedFSI/immersed_solid.hpp"
+#include "../MFEMFSI/Navier-Stokes/IncompressibleFlowSolver.hpp"
+#include "../MFEMFSI/Navier-Stokes/ifs_solver_enum.hpp"
+#include "../MFEMFSI/ImmersedFSI/ImmersedSolid.hpp"
 #include "../MFEMFSI/ImmersedFSI/Materials/materials.hpp"
 
 #include <typeinfo>
@@ -26,7 +26,7 @@
 #include <sstream>
 #include <iomanip>
 
-using namespace ins_solver;
+using namespace ifs_solver;
 using namespace std;
 using namespace std::placeholders;
 using namespace immersed_solid;
@@ -45,7 +45,7 @@ T sq(T x)
 
 #ifndef MFEM_USE_MPI
 // we override this so we can use the FEBio linear solvers
-class FEBio_INS_Solver : public INS_Solver
+class FEBio_INS_Solver : public IncompressibleFlowSolver
 {
 public:
 	FEBio_INS_Solver(
@@ -56,7 +56,7 @@ public:
 		double kin_vis,
 		double fluid_density_,
 		int ordering_type_ = mfem::Ordering::byNODES,
-		bool immersed_flag = false) : INS_Solver(mesh, orderv, orderp, kin_vis, fluid_density_, ordering_type_, immersed_flag) 
+		bool immersed_flag = false) : IncompressibleFlowSolver(mesh, orderv, orderp, kin_vis, fluid_density_, ordering_type_, immersed_flag) 
 	{
 		m_fem = fem;
 	}
@@ -91,7 +91,7 @@ public:
 
    // fluid
    SubMesh* fluid_mesh = nullptr; // fluid mesh
-	INS_Solver* flowsolver = nullptr; // MFEM flow solver
+	IncompressibleFlowSolver* flowsolver = nullptr; // MFEM flow solver
    #ifdef MFEM_USE_MPI
    ParGridFunction* p_gf = nullptr;
    ParGridFunction* u_gf = nullptr;
@@ -190,17 +190,17 @@ public:
    double orderp = 1.0;
    bool stabilized_LSIC = false; // turned on automatically using VMS
    bool stabilized_VMS = true;
-   int stab_type = ins_solver::StabilizationType::VMS;
+   int stab_type = ifs_solver::StabilizationType::VMS;
    int orderingtype= Ordering::byVDIM;
 
-   int nonlinear_form = ins_solver::NonlinearFormType::Convective;
-   int viscous_term_type = ins_solver::ViscousTermType::StressForm;
+   int nonlinear_form = ifs_solver::NonlinearFormType::Convective;
+   int viscous_term_type = ifs_solver::ViscousTermType::StressForm;
    bool LaplaceForm = false;
    bool total_integ = true;
    bool zero_mean_pressure = false;
 
    // Time Stepping Options
-   int ts_method = ins_solver::TimeSteppingMethod::GeneralizedAlpha;
+   int ts_method = ifs_solver::TimeSteppingMethod::GeneralizedAlpha;
    double rhoinf = 0.5;
    int step_save = 1; // frequency of storing data
    int steady_state_step_save = 1; // frequency of storing data after steady state
@@ -225,7 +225,7 @@ public:
    int linsolvertype = LinearSolverType::FGMRES;
 
    // Preconditioner Options
-   int prec_type = ins_solver::PreconditionerType::SIMPLE; // enum PreconditionerType {SIMPLE = 0, SCR = 1, aSCR = 2, ILU = 3, Jacobi = 4};
+   int prec_type = ifs_solver::PreconditionerType::SIMPLE; // enum PreconditionerType {SIMPLE = 0, SCR = 1, aSCR = 2, ILU = 3, Jacobi = 4};
    enum PrecInnerSolverType {Iterative = 0, Direct = 1}; // direct using UMFPACK
    int prec_inner_solver_type = PrecInnerSolverType::Iterative;
    bool direct_solver_prec = false;
@@ -268,7 +268,7 @@ public:
 
 public:
    #ifdef MFEM_USE_MPI
-   ParFEModel* par_fem = nullptr;
+   MFEMParFEMeshBuilder* par_femesh_builder = nullptr;
    #endif
 };
 
@@ -398,7 +398,7 @@ MFEMSolver::~MFEMSolver()
    #ifdef MFEM_USE_MPI
    delete m.fluid_pmesh;
    delete m.solid_pmesh;
-   delete m.par_fem;
+   delete m.par_femesh_builder;
    #endif
 }
 
@@ -455,7 +455,7 @@ mfem::Mesh* MFEMSolver::GetMFEMsolidmesh()
 }
 #endif
 
-INS_Solver* MFEMSolver::GetFlowSolver()
+IncompressibleFlowSolver* MFEMSolver::GetFlowSolver()
 {
    return m.flowsolver;
 }
@@ -672,7 +672,6 @@ bool MFEMSolver::CreateMesh()
    // create the mesh
 	FEMesh& femesh = fem->GetMesh();
 	m.mesh = CreateMFEMMesh3D(femesh);
-   // m.mesh->EnsureNodes();
 	if (m.mesh == nullptr) return false;
    
    #ifdef MFEM_USE_MPI
@@ -903,7 +902,7 @@ bool MFEMSolver::ExtractFluidAndSolidMeshes()
 
    // create each mesh as sum of all domains (e.g. mfem solid mesh = sum of all febio solid domains), this will preserve domain numbering.
    // This assumes each solid domain is deformable.
-   // RB: 6-4-25, fixes bug with mixed meshes and immersed fsi
+
    // fluid 
    m.fluid_mesh = new SubMesh(SubMesh::CreateFromDomain(*m.mesh,fluid_domain_attr));
    if (m.fluid_mesh == nullptr) return false;
@@ -952,10 +951,10 @@ void MFEMSolver::PartitionMesh()
 
    if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
    {
-      // create ParFEModel
+      // create MFEMParFEMeshBuilder
       FEModel& fem = *GetFEModel();
-      m.par_fem = new ParFEModel(&fem, m.mesh);
-      m.par_fem->SetMFEMSubMesh(m.solid_mesh);
+      m.par_femesh_builder = new MFEMParFEMeshBuilder(&fem, m.mesh);
+      m.par_femesh_builder->SetMFEMSubMesh(m.solid_mesh);
    }
 }
 
@@ -970,10 +969,10 @@ void MFEMSolver::ClearSerialMeshData()
    if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
    {
       ParFiniteElementSpace *dfes = m.flowsolver->GetImmersedSolidDisplacement()->ParFESpace();
-      m.par_fem->BuildLocalFEBioMesh(dfes);
+      m.par_femesh_builder->BuildLocalFEBioMesh(dfes);
 
       // clear FEBio serial surface mesh data
-      m.par_fem->ClearSerialSurfaces();
+      m.par_femesh_builder->ClearSerialSurfaces();
    }
 
    // delete the serial MFEM meshes
@@ -1026,9 +1025,9 @@ bool MFEMSolver::SetupFluid()
    else
    {
       #ifdef MFEM_USE_MPI
-      m.flowsolver = new INS_Solver(m.fluid_pmesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
+      m.flowsolver = new IncompressibleFlowSolver(m.fluid_pmesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
       #else
-      m.flowsolver = new INS_Solver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
+      m.flowsolver = new IncompressibleFlowSolver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
       #endif
    }
    
@@ -1081,9 +1080,9 @@ bool MFEMSolver::SetupFluid()
    if (m.stabilized_VMS)
    {
       switch (m.stab_type) {
-       case ins_solver::StabilizationType::NONE:
+       case ifs_solver::StabilizationType::NONE:
             break;
-		 case ins_solver::StabilizationType::SUPG:
+		 case ifs_solver::StabilizationType::SUPG:
             if (m.orderv != m.orderp - 1) 
             {
                   feLogError("using SUPG only requires mixed order elements");
@@ -1092,7 +1091,7 @@ bool MFEMSolver::SetupFluid()
             m.flowsolver->UseSUPG();
             break;
 
-		 case ins_solver::StabilizationType::SUPG_PSPG:
+		 case ifs_solver::StabilizationType::SUPG_PSPG:
             if (m.orderv != m.orderp) 
             {
                   feLogError("SUPG/PSPG requires equal order elements");
@@ -1102,7 +1101,7 @@ bool MFEMSolver::SetupFluid()
             m.flowsolver->UsePSPG();
             break;
 
-		 case ins_solver::StabilizationType::VMS:
+		 case ifs_solver::StabilizationType::VMS:
          default:
             if (m.orderv != m.orderp) 
             {
@@ -1122,7 +1121,7 @@ bool MFEMSolver::SetupFluid()
 	// set viscous term type, default is StressForm
 	if (m.LaplaceForm)
 	{
-		m.flowsolver->SetViscousTermType(ins_solver::ViscousTermType::LaplaceForm);
+		m.flowsolver->SetViscousTermType(ifs_solver::ViscousTermType::LaplaceForm);
 	}
 
    // Here we assume the immersed solid has no initial or boundary conditions set
@@ -1351,13 +1350,6 @@ bool MFEMSolver::SetupSolid()
       // add any immersed solid BCs
       for (int i = 0; i < fem->ModelLoads(); ++i)
       {
-         // // nodal loads
-         // MFEMNodalLoad* nl = dynamic_cast<MFEMNodalLoad*>(fem->ModelLoad(i));
-         // if (nl && nl->IsActive())
-         // {
-         //    nl->Apply(this);
-         // }
-
          // surface loads
          FEImmersedSurfaceLoad* im_sl = dynamic_cast<FEImmersedSurfaceLoad*>(fem->ModelLoad(i));
          if (im_sl && im_sl->IsActive())
@@ -1378,30 +1370,6 @@ bool MFEMSolver::SetupSolid()
             im_sl->Apply(this, id - 1);
             m.immersed_febio_solid->immersed_surface_loads = true;
          }
-
-         // // body loads
-         // MFEMBodyLoad* bl = dynamic_cast<MFEMBodyLoad*>(fem->ModelLoad(i));
-         // if (bl && bl->IsActive())
-         // {
-         //    std::vector<int> &dom_id_list = bl->GetDomainIDList();
-         //    if (dom_id_list.size() != 0)
-         //    {
-         //       for (int j=0; j<dom_id_list.size(); ++j)
-         //       {
-         //          int id = dom_id_list[j]; assert(id > 0);
-         //          bl->Apply(this, id - 1);
-         //       }
-         //    }
-         //    else
-         //    {
-         //       for (int j=0; j<bl->Domains(); ++j)
-         //       {
-         //          FEDomain* dom = bl->Domain(j);
-         //          int id = m.mesh->GetDomainAttribute(dom); assert(id > 0);
-         //          bl->Apply(this, id - 1);
-         //       }
-         //    }                  
-         // }
       }
 
       // immersed solid grid functions
@@ -1484,14 +1452,11 @@ void MFEMSolver::PostProcessOutput()
 
    std::string fluid_filename = m.fname + "/fluid";
    #ifdef MFEM_USE_MPI
-
-   // m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
    #ifdef MFEM_USE_HDF5
    m.pvdc = new ParaViewHDFDataCollection(fluid_filename, m.fluid_pmesh);
    #else
    m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
    #endif
-
    #else
    m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_mesh);
    #endif   
@@ -1542,14 +1507,11 @@ void MFEMSolver::PostProcessOutput()
    {
       std::string solid_filename = m.fname + "/solid";
       #ifdef MFEM_USE_MPI
-
-      // m.sdc = new ParaViewDataCollection(solid_filename, m.solid_pmesh);
       #ifdef MFEM_USE_HDF5
       m.sdc = new ParaViewHDFDataCollection(solid_filename, m.solid_pmesh);
       #else
       m.sdc = new ParaViewDataCollection(solid_filename, m.solid_pmesh);
       #endif
-
       #else
       m.sdc = new ParaViewDataCollection(solid_filename, m.solid_mesh);  
       #endif
@@ -1564,7 +1526,6 @@ void MFEMSolver::PostProcessOutput()
 
       m.sdc->SetCycle(curr_step);
       m.sdc->SetTime(curr_time);
-      // m.sdc->Save();
    }
 
    if (m.output_surface_pressures)
@@ -1666,7 +1627,6 @@ void MFEMSolver::RestartFiles()
    {
       m.flowsolver->Restarting(m.restart_folder, m.restart_step, m.restart_dt, m.restart_t);
       m.flowsolver->readRestarts(m.restart_step, m.restart_dt, m.restart_t);
-      // if (m.immersed_febio_solid) m.immersed_febio_solid->UpdateFEBioDataFromRestart();
 
       // save the restart state
       if (m.wss) m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
@@ -1678,15 +1638,8 @@ void MFEMSolver::RestartFiles()
       m.pvdc->Save();
       if (m.immersed_solid)
       {
-         // if (m.vonMisesStress)
-         // {
-         //    auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
-         //    m.vonMisesStress_gf = immersed_solid_solver->ComputeNodallyAveragedVonMisesStress(*m.d_gf);
-         // }
-
          m.sdc->SetCycle(m.restart_step);
          m.sdc->SetTime(m.restart_t);
-         // m.sdc->Save();
       }
    }
    if (m.start_from_specific_time)
@@ -1715,7 +1668,6 @@ void MFEMSolver::RestartFiles()
       {
          m.sdc->SetCycle(m.start_sim_step);
          m.sdc->SetTime(m.start_sim_time);
-         // m.sdc->Save();
       }
    }
 }

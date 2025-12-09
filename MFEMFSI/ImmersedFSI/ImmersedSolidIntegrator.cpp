@@ -4,7 +4,7 @@ using namespace mfem;
 using namespace std;
 using namespace immersed_solid;
 
-void Immersed_Solid_Integrator::AssembleElementVector(const FiniteElement &el,
+void ImmersedSolidIntegrator::AssembleElementVector(const FiniteElement &el,
                                       ElementTransformation &trans,
                                       const Vector &elfun,
                                       Vector &elvect)
@@ -262,7 +262,7 @@ void Immersed_Solid_Integrator::AssembleElementVector(const FiniteElement &el,
 
 
 // generic linearized virtual internal work term
-void Immersed_Solid_Integrator::AssembleElementGrad(const FiniteElement &el,
+void ImmersedSolidIntegrator::AssembleElementGrad(const FiniteElement &el,
                                      ElementTransformation &trans,
                                      const Vector &elfun,
                                      DenseMatrix &elmat)
@@ -747,7 +747,7 @@ void Immersed_Solid_Integrator::AssembleElementGrad(const FiniteElement &el,
    // int temp_val = 0;
 }
 
-void Immersed_Solid_Integrator::AssembleMaterialStiffness(int &si,int &sk, const int &dim, const int &nd, double &af, DenseMatrix &elmat)
+void ImmersedSolidIntegrator::AssembleMaterialStiffness(int &si,int &sk, const int &dim, const int &nd, double &af, DenseMatrix &elmat)
 {
    if (formulation_type == form_type::UpdatedLagrangian)
    {
@@ -882,7 +882,7 @@ void Immersed_Solid_Integrator::AssembleMaterialStiffness(int &si,int &sk, const
    }     
 }
 
-void Immersed_Solid_Integrator::BuildInitTransformation(ElementTransformation &T, const IntegrationPoint &ip)
+void ImmersedSolidIntegrator::BuildInitTransformation(ElementTransformation &T, const IntegrationPoint &ip)
 {
    auto curr_trans = dynamic_cast<IsoparametricTransformation *>(&T);
    auto curr_elem = curr_trans->GetFE();

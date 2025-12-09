@@ -6,7 +6,7 @@ using namespace std;
 
 void CVBC_AinvPC::SetOperator(const Operator &op)
 {
-   // dummy definition to satisfy base class requirement
+   // to satisfy base class requirement
 }
 
 // Operator application
