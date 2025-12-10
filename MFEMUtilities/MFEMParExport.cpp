@@ -46,6 +46,21 @@ void MFEMParExport::WriteFiles(std::string &feb_filename_, std::string &part_dir
    bool file_opened = xml_reader.Open(file_name.c_str());
    MFEM_ASSERT(file_opened, "Error: could not open " + file_name);
 
+   // Build section cache once (skips Mesh)
+   BuildTopLevelSectionCache();
+
+   // Build a single temp XML file that contains all cached sections
+   m_cachedTmpFile = part_dir + "_tmp_cached_sections.xml";
+   {
+      std::ofstream ofs(m_cachedTmpFile.c_str(), std::ios::binary);
+      ofs << "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n";
+      ofs << "<root>\n";
+      for (const auto& kv : m_sectionCache) {
+         ofs << kv.second << "\n";
+      }
+      ofs << "</root>\n";
+   }
+
    WriteMainFebFile();
 
    FEModel* fem = GetFEModel();
@@ -70,6 +85,9 @@ void MFEMParExport::WriteFiles(std::string &feb_filename_, std::string &part_dir
 
    // close reader
    xml_reader.Close();
+
+   // remove temporary cached sections file
+   std::remove(m_cachedTmpFile.c_str());
 }
 
 void MFEMParExport::WriteMainFebFile()
@@ -246,6 +264,13 @@ void MFEMParExport::WriteLocalFebFiles()
    std::string local_feb_file = part_dir + feb_filename + "_Local_" + oss.str() + ".feb";
    xml_writer.open(local_feb_file.c_str());
 
+   mfem::Mesh* mesh = nullptr;
+   if (immersed_febio_solid)
+   {
+      mesh = LoadMeshPart(part_dir + "solid");
+      MFEM_ASSERT(mesh, "Error: failed to load parallel solid mesh for rank " << myid);
+   }
+
    // set modified formats
    XMLElement::intFormat = "%d";
 
@@ -272,7 +297,7 @@ void MFEMParExport::WriteLocalFebFiles()
       if (immersed_febio_solid)
       {
          // mesh
-         WriteMeshSection();
+         WriteMeshSection(mesh);
 
          // mesh domain
          WriteMeshDomainsSection();
@@ -282,6 +307,8 @@ void MFEMParExport::WriteLocalFebFiles()
 
    // close the file
    xml_writer.close();
+
+   if (mesh) delete mesh;
 }
 
 void MFEMParExport::WriteInitialConditionsSection()
@@ -398,13 +425,12 @@ void MFEMParExport::WriteLoadDataSection()
    xml_writer.close_branch(); // LoadData
 }
 
-void MFEMParExport::WriteMeshSection()
+void MFEMParExport::WriteMeshSection(mfem::Mesh* mesh)
 {
    xml_writer.add_branch("Mesh");
    {
-      WriteNodes();
-
-      WriteElements();
+      WriteNodes(mesh);
+      WriteElements(mesh);
    }
    xml_writer.close_branch(); // Mesh
 }
@@ -415,95 +441,82 @@ mfem::Mesh* MFEMParExport::LoadMeshPart(const std::string &prefix)
    return new mfem::Mesh(f, 1, 0);
 }
 
-void MFEMParExport::WriteNodes()
+void MFEMParExport::WriteNodes(mfem::Mesh* mesh)
 {
-   // read in parallel solid mesh for current rank
-   mfem::Mesh *mesh = LoadMeshPart(part_dir + "solid");
-   MFEM_ASSERT(mesh, "Error: failed to load parallel solid mesh for rank " << myid);
-   // here we assume a linear mesh
-
    XMLElement tagNodes("Nodes");
    xml_writer.add_branch(tagNodes);
    {
       XMLElement el("node");
       int nid = el.add_attribute("id", 0);
+
+      std::ostringstream ss;
+      ss.setf(std::ios::scientific);
+      ss << std::setprecision(16);
+
       for (int j = 0; j < mesh->GetNV(); ++j)
       {
          el.set_attribute(nid, j);
          const double* vertices = mesh->GetVertex(j);
-         const vec3d r = vec3d(vertices[0], vertices[1], vertices[2]);
-         std::ostringstream ss;
-         ss.setf(std::ios::scientific);
-         ss << std::setprecision(16)
-            << r.x << ", " << r.y << ", " << r.z;
+         const vec3d r(vertices[0], vertices[1], vertices[2]);
+
+         ss.str("");
+         ss.clear();
+         ss << r.x << ", " << r.y << ", " << r.z;
+
          el.value(ss.str().c_str());
          xml_writer.add_leaf(el, false);
       }
    }
    xml_writer.close_branch();
-
-   delete mesh;
 }
 
-void MFEMParExport::WriteElements()
+void MFEMParExport::WriteElements(mfem::Mesh* mesh)
 {
    FEModel* fem = GetFEModel();
    FEMesh& femesh = fem->GetMesh();
 
-   // read in parallel solid mesh for current rank
-   mfem::Mesh *mesh = LoadMeshPart(part_dir + "solid");
-   MFEM_ASSERT(mesh, "Error: failed to load parallel solid mesh for rank " << myid);
-
-   int nset = 0;
-   int ncount = 0;
    int nn[FEElement::MAX_NODES];
-   char szname[128] = { 0 };
 
-   // Assumes one combined immersed solid domain
    bool immersed_solid_domain = false;
-   for (int d=0; d < femesh.Domains(); ++d)
+   for (int d = 0; d < femesh.Domains(); ++d)
    {
       FEDomain& dom = femesh.Domain(d);
       MFEMImmersedElasticDomain* im_dom = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
       if (im_dom && im_dom->IsActive())
       {
          immersed_solid_domain = true;
-         int dom_attr = dom_attr_map->operator[](im_dom);
+         int dom_attr = (*dom_attr_map)[im_dom];
 
          mfem::Array<int> mesh_attrs = mesh->attributes;
-         if (mesh_attrs.Find(dom_attr) == -1) 
+         if (mesh_attrs.Find(dom_attr) == -1)
          {
-            // this mesh partition does not contain this domain
             im_dom->SetActive(false);
-            continue; 
+            continue;
          }
 
          XMLElement xe("Elements");
          xe.add_attribute("name", im_dom->GetName().c_str());
          xml_writer.add_branch(xe);
          {
-            for (int i=0; i<mesh->GetNE(); ++i)
+            for (int i = 0; i < mesh->GetNE(); ++i)
             {
                auto element = mesh->GetElement(i);
                if (element->GetAttribute() != dom_attr) continue;
 
                XMLElement xej("elem");
-               xej.add_attribute("id", i+1); // FEBio ID = MFEM ID + 1
+               xej.add_attribute("id", i+1);
 
-               const int *node_ids = element->GetVertices();
+               const int* node_ids = element->GetVertices();
                int ne = element->GetNVertices();
                for (int k = 0; k < ne; ++k) nn[k] = node_ids[k];
                xej.value(nn, ne);
                xml_writer.add_leaf(xej, false);
             }
-            nset++;
          }
-         xml_writer.close_branch(); // Elements
+         xml_writer.close_branch();
       }
    }
-   MFEM_ASSERT(immersed_solid_domain,"No immersed solid domain found!");
-
-   delete mesh;
+   MFEM_ASSERT(immersed_solid_domain, "No immersed solid domain found!");
 }
 
 const char* MFEMParExport::ElementTypeString(int ntype)
@@ -818,35 +831,23 @@ void MFEMParExport::WriteParam(FEParam &p)
 
 void MFEMParExport::WriteSectionComponent(const char* szname, XMLElement &el, FECoreBase &base)
 {
-   // Build cache once (skips large Mesh section)
-   BuildTopLevelSectionCache();
-
-   std::string section_xml;
-   if (!GetCachedSection(szname, section_xml))
+   std::string dummy;
+   if (!GetCachedSection(szname, dummy))
    {
       MFEM_ABORT("Section not cached: " << szname);
       return;
    }
 
-   std::string wrapped = "<root>\n" + section_xml + "\n</root>\n";
-   std::string tmpFile = part_dir + "_tmp_cached_section.xml";
-   {
-      std::ofstream ofs(tmpFile, std::ios::binary);
-      ofs << "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n"
-          << wrapped;
-   }
-
    XMLReader local;
-   if (!local.Open(tmpFile.c_str()))
+   if (!local.Open(m_cachedTmpFile.c_str()))
    {
-      MFEM_ABORT("Failed to open temp cached section file");
+      MFEM_ABORT("Failed to open temp cached sections file");
       return;
    }
 
    XMLTag root;
    if (!local.FindTag("root", root))
    {
-      local.Close();
       MFEM_ABORT("Temp root not found");
       return;
    }
@@ -904,7 +905,6 @@ void MFEMParExport::WriteSectionComponent(const char* szname, XMLElement &el, FE
    }
 
    local.Close();
-   std::remove(tmpFile.c_str());
 }
 
 void MFEMParExport::BuildTopLevelSectionCache()

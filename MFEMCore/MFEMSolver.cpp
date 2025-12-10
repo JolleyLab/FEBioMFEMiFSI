@@ -670,13 +670,19 @@ bool MFEMSolver::CreateMesh()
    FEModel* fem = GetFEModel();
 
    // create the mesh
+   mfem::StopWatch timer_buildmesh;
+   timer_buildmesh.Start();
 	FEMesh& femesh = fem->GetMesh();
 	m.mesh = CreateMFEMMesh3D(femesh);
+   timer_buildmesh.Stop();
 	if (m.mesh == nullptr) return false;
    
    #ifdef MFEM_USE_MPI
    if(m.pre_partition)
    {
+      mfem::out << "-----------------------------------------------------\n";
+      mfem::out << "Time to build MFEM mesh: " << timer_buildmesh.RealTime() << "s\n";
+      mfem::out << "-----------------------------------------------------\n";
       mfem::StopWatch timer_partitioning;
       timer_partitioning.Start();
       if (m.partition_opt == Imp::ParallelMesh::PartitionMesh)
@@ -692,11 +698,12 @@ bool MFEMSolver::CreateMesh()
             }
          }
 
-         mfem::out << "-----------------------------------------------------\n";
-         mfem::out << "Writing mfem mesh partition data for " << std::to_string(m.np) << " ranks ..." << std::endl;
+         mfem::out << "Writing partition data for " << std::to_string(m.np) << " ranks ..." << std::endl;
          mfem::out << "-----------------------------------------------------\n";
 
          // Partition the serial mesh and save the parallel mesh on np ranks
+         mfem::StopWatch timer_mfem_meshpart;
+         timer_mfem_meshpart.Start();
          // Create directory structure if it doesn't exist
          MFEM_ASSERT(mfem::Mpi::WorldSize() == 1, "Pre-partitioning should be done on a single rank (mpirun -np 1 ...)");
          #ifdef MFEM_USE_MPI
@@ -723,17 +730,18 @@ bool MFEMSolver::CreateMesh()
                std::string solid_mname = part_dir + "solid";
                SavePartitionedMesh(solid_mname, *m.solid_mesh, m.np);
             }
-         }        
+         }       
+         timer_mfem_meshpart.Stop(); 
+         mfem::out << "Time to write MFEM partition data: " << timer_mfem_meshpart.RealTime() << "s\n";
+         mfem::out << "-----------------------------------------------------\n";
 
          // This ensures that each BC has a MFEM attribute to write out
-         PartitionMesh();
-         if (SetupFluid() == false) return false;
-         if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
-         {
-            if (SetupSolid() == false) return false;            
-         }
+         SetFluidConditions(false);
+         if(m.immersed_solid) SetSolidConditions(false);
 
          // write main and local .feb files
+         mfem::StopWatch timer_febio_export;
+         timer_febio_export.Start();
          std::string feb_filename = dynamic_cast<FEBioModel*>(fem)->GetFileTitle();
          feb_filename = std::filesystem::path(feb_filename).stem().string(); // remove .feb
          
@@ -746,13 +754,16 @@ bool MFEMSolver::CreateMesh()
             par_export.SetDomainAttributeMap(m.dom_attr_map);
          }
          
-         mfem::out << "-----------------------------------------------------\n";
          mfem::out << "Writing parallel .feb files";
          par_export.WriteFiles(feb_filename, part_dir, m.np, immersed_febio_solid_and_solver);
+         timer_febio_export.Stop();
          
          timer_partitioning.Stop();
          mfem::out << " ...SUCCESS!" << std::endl;
-         mfem::out << "\nTime to partition: " << timer_partitioning.RealTime() << "s\n";
+         mfem::out << "-----------------------------------------------------\n";
+         mfem::out << "Time to write parallel .feb files: " << timer_febio_export.RealTime() << "s\n";
+         mfem::out << "-----------------------------------------------------\n";
+         mfem::out << "Total time to partition: " << timer_partitioning.RealTime() << "s\n";
          mfem::out << "-----------------------------------------------------\n";
          std::exit(EXIT_SUCCESS);
       }
@@ -926,9 +937,9 @@ bool MFEMSolver::ExtractFluidAndSolidMeshes()
 void MFEMSolver::SavePartitionedMesh(const std::string &prefix, Mesh &mesh, int np, int *partitioning)
 {
    MeshPartitioner partitioner(mesh, np, partitioning);
-   MeshPart mesh_part;
    for (int i = 0; i < np; i++)
-   {
+   { 
+      MeshPart mesh_part;
       partitioner.ExtractPart(i, mesh_part);
 
       ofstream f(MakeParFilename(prefix + "_", i, ".mesh", 10));
@@ -1124,7 +1135,23 @@ bool MFEMSolver::SetupFluid()
 		m.flowsolver->SetViscousTermType(ifs_solver::ViscousTermType::LaplaceForm);
 	}
 
-   // Here we assume the immersed solid has no initial or boundary conditions set
+   // Set Fluid ICs and BCs
+   SetFluidConditions(true);
+
+   // Zero mean pressure
+   if (m.zero_mean_pressure) m.flowsolver->AddZeroMeanPressureCondition();
+
+   // Fluid grid functions
+	m.u_gf = m.flowsolver->GetCurrentVelocity();
+	m.p_gf = m.flowsolver->GetCurrentPressure();
+
+   return true;
+}
+
+void MFEMSolver::SetFluidConditions(bool apply)
+{
+   FEModel *fem = GetFEModel();
+
    // Set the initial conditions.
 	for (int i = 0; i < fem->InitialConditions(); ++i)
 	{
@@ -1132,7 +1159,7 @@ bool MFEMSolver::SetupFluid()
       if (dynamic_cast<MFEMInitialConditionFromFolder*>(ic)) continue; // skip ICs from folder, applied later on
 		if (ic && ic->IsActive())
 		{
-			ic->Apply(this);
+			if (apply) ic->Apply(this);
 		}
 	}
 
@@ -1159,7 +1186,7 @@ bool MFEMSolver::SetupFluid()
             surf_name = bc->GetSurfaceName();
          }		
          m.output_surfaces.push_back({surf_name, id});         
-			bc->Apply(this, id - 1);
+			if (apply) bc->Apply(this, id - 1);
 		}
 	}
 	for (int i = 0; i < fem->ModelLoads(); ++i)
@@ -1168,7 +1195,7 @@ bool MFEMSolver::SetupFluid()
       MFEMNodalLoad* nl = dynamic_cast<MFEMNodalLoad*>(fem->ModelLoad(i));
       if (nl && nl->IsActive())
       {
-         nl->Apply(this);
+         if (apply) nl->Apply(this);
       }
 
       // surface loads
@@ -1192,7 +1219,7 @@ bool MFEMSolver::SetupFluid()
             surf_name = sl->GetSurfaceName();
          }
          m.output_surfaces.push_back({surf_name, id}); 
-         sl->Apply(this, id - 1);
+         if (apply) sl->Apply(this, id - 1);
 		}
 
       // body loads
@@ -1205,12 +1232,12 @@ bool MFEMSolver::SetupFluid()
             for (int j=0; j<dom_id_list.size(); ++j)
             {
                int id = dom_id_list[j]; assert(id > 0);
-               bl->Apply(this, id - 1);
+               if (apply) bl->Apply(this, id - 1);
             }
          }
          else if (bl->GetDomainAttr() != -1)
          {
-            bl->Apply(this, bl->GetDomainAttr() - 1);
+            if (apply) bl->Apply(this, bl->GetDomainAttr() - 1);
          }
          else
          {
@@ -1219,7 +1246,7 @@ bool MFEMSolver::SetupFluid()
             {
                FEDomain* dom = bl->Domain(j);
                int id = m.mesh->GetDomainAttribute(dom); assert(id > 0);
-               bl->Apply(this, id - 1);
+               if (apply) bl->Apply(this, id - 1);
                dom_list.push_back(id);
             }
             if (dom_list.size() == 1) bl->SetDomainAttr(dom_list[0]);
@@ -1227,15 +1254,6 @@ bool MFEMSolver::SetupFluid()
          }
       }
 	}
-
-   // Zero mean pressure
-   if (m.zero_mean_pressure) m.flowsolver->AddZeroMeanPressureCondition();
-
-   // Fluid grid functions
-	m.u_gf = m.flowsolver->GetCurrentVelocity();
-	m.p_gf = m.flowsolver->GetCurrentPressure();
-
-   return true;
 }
 
 bool MFEMSolver::SetupSolid()
@@ -1347,31 +1365,6 @@ bool MFEMSolver::SetupSolid()
       // add immersed solid to the flow solver
       m.flowsolver->AddImmersedSolid(m.immersed_febio_solid,m.stabs_scale);
 
-      // add any immersed solid BCs
-      for (int i = 0; i < fem->ModelLoads(); ++i)
-      {
-         // surface loads
-         FEImmersedSurfaceLoad* im_sl = dynamic_cast<FEImmersedSurfaceLoad*>(fem->ModelLoad(i));
-         if (im_sl && im_sl->IsActive())
-         {
-            FESurface* surf = &im_sl->GetSurface();
-            int id = 0;
-            if (surf)
-            {
-               FEFacetSet* set = surf->GetFacetSet();
-               id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
-               im_sl->SetBoundaryID(id); // store for later use
-            }
-            else
-            {
-               id = im_sl->GetBoundaryID(); assert(id > 0);
-            }
-
-            im_sl->Apply(this, id - 1);
-            m.immersed_febio_solid->immersed_surface_loads = true;
-         }
-      }
-
       // immersed solid grid functions
       m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
       m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
@@ -1382,6 +1375,9 @@ bool MFEMSolver::SetupSolid()
       feLogError("Invalid immersed solid solver type");
       return false;
    }      
+
+   // Set Solid ICs and BCs
+   SetSolidConditions(true);
 
    // Create transfer maps and global functions 
    #ifndef MFEM_USE_MPI
@@ -1414,6 +1410,39 @@ bool MFEMSolver::SetupSolid()
    #endif
 
    return true;
+}
+
+void MFEMSolver::SetSolidConditions(bool apply)
+{
+   FEModel *fem = GetFEModel();
+
+   if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
+   {
+      // add any immersed solid BCs
+      for (int i = 0; i < fem->ModelLoads(); ++i)
+      {
+         // surface loads
+         FEImmersedSurfaceLoad* im_sl = dynamic_cast<FEImmersedSurfaceLoad*>(fem->ModelLoad(i));
+         if (im_sl && im_sl->IsActive())
+         {
+            FESurface* surf = &im_sl->GetSurface();
+            int id = 0;
+            if (surf)
+            {
+               FEFacetSet* set = surf->GetFacetSet();
+               id = m.mesh->GetSurfaceAttribute(set); assert(id > 0);
+               im_sl->SetBoundaryID(id); // store for later use
+            }
+            else
+            {
+               id = im_sl->GetBoundaryID(); assert(id > 0);
+            }
+
+            if (apply) im_sl->Apply(this, id - 1);
+            m.immersed_febio_solid->immersed_surface_loads = true;
+         }
+      }
+   }
 }
 
 void MFEMSolver::SetupSolvers()

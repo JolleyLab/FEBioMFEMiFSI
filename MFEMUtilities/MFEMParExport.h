@@ -47,6 +47,7 @@ private:
    XMLReader xml_reader;
    bool m_sectionCacheBuilt = false;
    std::unordered_map<std::string, std::string> m_sectionCache;
+   std::string m_cachedTmpFile;
    void BuildTopLevelSectionCache();
    bool GetCachedSection(const std::string& name, std::string& out) const;
 
@@ -66,9 +67,9 @@ private:
    void WriteBoundaryConditionsSection();
    void WriteLoadsSection();
    void WriteLoadDataSection();
-   void WriteMeshSection();
-   void WriteNodes();
-   void WriteElements();
+   void WriteMeshSection(mfem::Mesh* mesh);
+   void WriteNodes(mfem::Mesh* mesh);
+   void WriteElements(mfem::Mesh* mesh);
    void WriteMeshDomainsSection();
 
    // helper functions   

@@ -102,7 +102,9 @@ private:
    bool CreateMesh();
    bool ExtractFluidAndSolidMeshes();
    bool SetupFluid();
+   void SetFluidConditions(bool apply);
    bool SetupSolid();
+   void SetSolidConditions(bool apply);
    void SetupSolvers();
    void PostProcessOutput();
    void FinalizeSolid();
