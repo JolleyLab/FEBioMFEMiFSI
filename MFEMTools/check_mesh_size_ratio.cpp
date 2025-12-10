@@ -27,13 +27,20 @@ int main(int argc, char *argv[])
 
    std::string fluid_mesh_name = "";
    std::string solid_mesh_name = "";
-   bool viz = true;
+   bool vis = true;
+   bool save_to_paraview = false;
 
    OptionsParser args(argc, argv);
    args.AddOption(&fluid_mesh_name, "-fm", "--fluid-mesh",
                   "Fluid mesh file to use.");
    args.AddOption(&solid_mesh_name, "-sm", "--solid-mesh",
                   "Solid mesh file to use.");
+   args.AddOption(&save_to_paraview, "-sp", "--save-to-paraview", "-no-sp",
+                  "--no-save-to-paraview",
+                  "Save the mesh size ratio field to a Paraview file.");
+   args.AddOption(&vis, "-vis", "--visualization", "-no-vis",
+                  "--no-visualization",
+                  "Enable or disable GLVis visualization.");
    args.Parse();
    args.ParseCheck();
 
@@ -64,8 +71,7 @@ int main(int argc, char *argv[])
              << "  Min element size: " << fluid_hmin << "\n"
              << "  Max element size: " << fluid_hmax << "\n"
              << "  Avg element size: " << fluid_havg << "\n";
-   }
-   
+   }   
 
    Mesh solid_mesh(solid_mesh_name.c_str());
    #ifdef MFEM_USE_MPI
@@ -126,7 +132,31 @@ int main(int argc, char *argv[])
    }
    #endif
 
-   if (viz)
+   if (save_to_paraview)
+   {
+      ParaViewDataCollectionBase *pvdc = nullptr;
+      #ifdef MFEM_USE_MPI
+      #ifdef MFEM_USE_HDF5
+      pvdc = new ParaViewHDFDataCollection("MeshSizeRatio", &fluid_pmesh);
+      #else
+      pvdc = new ParaViewDataCollection("MeshSizeRatio", &fluid_pmesh);
+      #endif       
+      #else
+      pvdc = new ParaViewDataCollection("MeshSizeRatio", &fluid_mesh);
+      #endif
+      pvdc->SetDataFormat(mfem::VTKFormat::BINARY32);
+      pvdc->SetHighOrderOutput(false);
+      pvdc->SetLevelsOfDetail(1);
+      pvdc->SetCompression(true);
+      pvdc->SetCycle(0);
+      pvdc->SetTime(0);
+      pvdc->RegisterField("MeshSizeRatio", &h_ratio);
+
+      pvdc->Save();
+      delete pvdc;
+   }
+
+   if (vis)
    {
       char vishost[] = "localhost";
       int  visport   = 19916;

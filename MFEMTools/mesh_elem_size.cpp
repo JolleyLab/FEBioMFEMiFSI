@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
 
    std::string mesh_name = "";
    bool vis = false;
+   double ratio = 2.0;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_name, "-m", "--mesh",
@@ -30,6 +31,8 @@ int main(int argc, char *argv[])
    args.AddOption(&vis, "-vis", "--visualization", "-no-vis",
                   "--no-visualization",
                   "Enable or disable GLVis visualization.");
+   args.AddOption(&ratio, "-r", "--ratio",
+                  "h_fluid/h_solid ratio for target solid mesh size.");
    args.Parse();
    args.ParseCheck();
    
@@ -88,6 +91,13 @@ int main(int argc, char *argv[])
                << "  Avg element size: " << havg << "\n";
                //  << "  Min curvature radius: " << kappamin << "\n"
                //  << "  Max curvature radius: " << kappamax << "\n";
+   }
+
+   #ifdef MFEM_USE_MPI
+   if (Mpi::Root())
+   #endif
+   {
+      mfem::out << "\n  Target solid mesh size: " << hmin / ratio << " (ratio " << ratio << ")\n";
    }
 
    if (vis)
