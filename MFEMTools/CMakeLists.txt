@@ -31,3 +31,4 @@ endfunction()
 # Tools
 # add_mfem_tool(<exe_name> <source_cpp_path>)
 add_mfem_tool(MeshElemSize mesh_elem_size.cpp)
+add_mfem_tool(CheckMeshSizeRatio check_mesh_size_ratio.cpp)

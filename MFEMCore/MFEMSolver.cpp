@@ -324,7 +324,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.wss, "Save_Wall_Shear_Stress");
       ADD_PARAMETER(m.vorticity, "Save_Vorticity");
       ADD_PARAMETER(m.q_criterion, "Save_Q_Criterion");
-      ADD_PARAMETER(m.output_surface_pressures, "Output_avg_surface_pressures");
+      ADD_PARAMETER(m.output_surface_pressures, "Output_surface_pressures");
       ADD_PARAMETER(m.output_surface_flowrates, "Output_surface_flow_rates");
    END_PARAM_GROUP();
 
