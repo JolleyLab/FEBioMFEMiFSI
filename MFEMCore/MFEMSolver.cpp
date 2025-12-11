@@ -16,8 +16,8 @@
 #include "../MFEMUtilities/MFEMOutputTimeSeries.h"
 #include "../MFEMUtilities/MFEMParFEMeshBuilder.h"
 
-#include "../MFEMFSI/Navier-Stokes/IncompressibleFlowSolver.hpp"
-#include "../MFEMFSI/Navier-Stokes/ifs_solver_enum.hpp"
+#include "../MFEMFSI/IncompressibleFluid/IncompressibleFluidSolver.hpp"
+#include "../MFEMFSI/IncompressibleFluid/ifs_solver_enum.hpp"
 #include "../MFEMFSI/ImmersedFSI/ImmersedSolid.hpp"
 #include "../MFEMFSI/ImmersedFSI/Materials/materials.hpp"
 
@@ -45,7 +45,7 @@ T sq(T x)
 
 #ifndef MFEM_USE_MPI
 // we override this so we can use the FEBio linear solvers
-class FEBio_INS_Solver : public IncompressibleFlowSolver
+class FEBio_INS_Solver : public IncompressibleFluidSolver
 {
 public:
 	FEBio_INS_Solver(
@@ -56,7 +56,7 @@ public:
 		double kin_vis,
 		double fluid_density_,
 		int ordering_type_ = mfem::Ordering::byNODES,
-		bool immersed_flag = false) : IncompressibleFlowSolver(mesh, orderv, orderp, kin_vis, fluid_density_, ordering_type_, immersed_flag) 
+		bool immersed_flag = false) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, fluid_density_, ordering_type_, immersed_flag) 
 	{
 		m_fem = fem;
 	}
@@ -91,7 +91,7 @@ public:
 
    // fluid
    SubMesh* fluid_mesh = nullptr; // fluid mesh
-	IncompressibleFlowSolver* flowsolver = nullptr; // MFEM flow solver
+	IncompressibleFluidSolver* flowsolver = nullptr; // MFEM flow solver
    #ifdef MFEM_USE_MPI
    ParGridFunction* p_gf = nullptr;
    ParGridFunction* u_gf = nullptr;
@@ -455,7 +455,7 @@ mfem::Mesh* MFEMSolver::GetMFEMsolidmesh()
 }
 #endif
 
-IncompressibleFlowSolver* MFEMSolver::GetFlowSolver()
+IncompressibleFluidSolver* MFEMSolver::GetFlowSolver()
 {
    return m.flowsolver;
 }
@@ -1036,9 +1036,9 @@ bool MFEMSolver::SetupFluid()
    else
    {
       #ifdef MFEM_USE_MPI
-      m.flowsolver = new IncompressibleFlowSolver(m.fluid_pmesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
+      m.flowsolver = new IncompressibleFluidSolver(m.fluid_pmesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
       #else
-      m.flowsolver = new IncompressibleFlowSolver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
+      m.flowsolver = new IncompressibleFluidSolver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
       #endif
    }
    

@@ -1,10 +1,10 @@
 #pragma once
-#define INS_SOLVER_VERSION 1.0
+#define IFS_VERSION 1.0
 
 #include "mfem.hpp"
 
-#include "../Navier-Stokes/ifs_solver_enum.hpp"
-#include "../Navier-Stokes/ifs_bc_containers.hpp"
+#include "../IncompressibleFluid/ifs_solver_enum.hpp"
+#include "../IncompressibleFluid/ifs_bc_containers.hpp"
 
 #include "SpatialOperators/ResidualOpFluid.hpp"
 #include "SpatialOperators/TractionIntegrator.hpp"
@@ -31,8 +31,8 @@
 
 namespace ifs_solver
 {
-// Class for Incompressible Navier-Stokes Solver based on CG Method
-class IncompressibleFlowSolver
+// Class for Incompressible IncompressibleFluid Solver based on CG Method
+class IncompressibleFluidSolver
 {
 public:
 
@@ -42,9 +42,9 @@ public:
 
    /// Initialize data structures, set FE space order and kinematic viscosity.
    #ifdef MFEM_USE_MPI
-   IncompressibleFlowSolver(mfem::ParMesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_ = mfem::Ordering::byNODES, bool immersed_flag = false);
+   IncompressibleFluidSolver(mfem::ParMesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_ = mfem::Ordering::byNODES, bool immersed_flag = false);
    // constructor for dimensional form of equations
-   IncompressibleFlowSolver(mfem::ParMesh *mesh, int orderv, int orderp, double kin_vis, double fluid_density_, int ordering_type_ = mfem::Ordering::byNODES, bool immersed_flag = false) : IncompressibleFlowSolver(mesh, orderv, orderp, kin_vis, ordering_type_,immersed_flag)
+   IncompressibleFluidSolver(mfem::ParMesh *mesh, int orderv, int orderp, double kin_vis, double fluid_density_, int ordering_type_ = mfem::Ordering::byNODES, bool immersed_flag = false) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, ordering_type_,immersed_flag)
    {
       fluid_density = fluid_density_;
       rhof.constant = fluid_density;
@@ -53,9 +53,9 @@ public:
       dimensional_flag = ifs_solver::dim_flag::Dimensional;
    };
    #else
-   IncompressibleFlowSolver(mfem::Mesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_ = mfem::Ordering::byNODES, bool immersed_flag = false);
+   IncompressibleFluidSolver(mfem::Mesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_ = mfem::Ordering::byNODES, bool immersed_flag = false);
    // constructor for dimensional form of equations
-   IncompressibleFlowSolver(mfem::Mesh *mesh, int orderv, int orderp, double kin_vis, double fluid_density_, int ordering_type_ = mfem::Ordering::byNODES, bool immersed_flag = false) : IncompressibleFlowSolver(mesh, orderv, orderp, kin_vis, ordering_type_,immersed_flag)
+   IncompressibleFluidSolver(mfem::Mesh *mesh, int orderv, int orderp, double kin_vis, double fluid_density_, int ordering_type_ = mfem::Ordering::byNODES, bool immersed_flag = false) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, ordering_type_,immersed_flag)
    {
       fluid_density = fluid_density_;
       rhof.constant = fluid_density;
@@ -638,7 +638,7 @@ public:
    /// DESTRUCTOR ///
    //////////////////
 
-   virtual ~IncompressibleFlowSolver();
+   virtual ~IncompressibleFluidSolver();
 
 protected:
    /// Print information about the Navier version.

@@ -2,7 +2,7 @@
 
 // residual operator
 #include "mfem.hpp"
-#include "../../../Navier-Stokes/ifs_bc_containers.hpp"
+#include "../../../IncompressibleFluid/ifs_bc_containers.hpp"
 #include <general/forall.hpp>
 
 using namespace std;

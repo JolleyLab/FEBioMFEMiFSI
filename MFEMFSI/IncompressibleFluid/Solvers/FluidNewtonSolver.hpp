@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mfem.hpp"
-#include "../../Navier-Stokes/ifs_bc_containers.hpp"
+#include "../../IncompressibleFluid/ifs_bc_containers.hpp"
 #include "../SpatialOperators/ResidualOpFluid.hpp"
 #include "BlockOrthoSolver.hpp"
 #include "../../ImmersedFSI/ImmersedSolid.hpp"

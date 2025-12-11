@@ -5,7 +5,7 @@
 #include "Materials/material_type.hpp"
 #include "ImmersedFSIFindPts.hpp"
 #include "ImmersedSolidIntegrator.hpp"
-#include "../Navier-Stokes/ifs_bc_containers.hpp"
+#include "../IncompressibleFluid/ifs_bc_containers.hpp"
 
 #ifdef MFEM_USE_MPI
 #include "immersed_bc_containers.hpp"

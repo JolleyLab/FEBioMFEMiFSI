@@ -2,7 +2,7 @@
 
 #include "mfem.hpp"
 #include "../ImmersedFSI/Materials/material_type.hpp"
-#include "../Navier-Stokes/ifs_bc_containers.hpp"
+#include "../IncompressibleFluid/ifs_bc_containers.hpp"
 
 using namespace mat;
 

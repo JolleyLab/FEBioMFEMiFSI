@@ -6,7 +6,7 @@
 #include "mfem.hpp"
 #endif
 #include "../MFEMUtilities/MFEMTools.h"
-#include "../MFEMFSI/Navier-Stokes/IncompressibleFlowSolver.hpp"
+#include "../MFEMFSI/IncompressibleFluid/IncompressibleFluidSolver.hpp"
 
 BEGIN_FECORE_CLASS(MFEMInitialPressure, MFEMInitialCondition)
 	ADD_PARAMETER(m_pressure, "pressure");

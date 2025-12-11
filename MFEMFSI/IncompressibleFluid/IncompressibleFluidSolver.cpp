@@ -1,4 +1,4 @@
-#include "IncompressibleFlowSolver.hpp"
+#include "IncompressibleFluidSolver.hpp"
 #include <general/forall.hpp>
 #include <fstream>
 #include <iomanip>
@@ -14,10 +14,10 @@ using namespace std;
 using namespace immersed_solid;
 
 #ifdef MFEM_USE_MPI
-IncompressibleFlowSolver::IncompressibleFlowSolver(ParMesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_, bool immersed_flag)
+IncompressibleFluidSolver::IncompressibleFluidSolver(ParMesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_, bool immersed_flag)
    : pmesh(mesh), orderv(orderv), orderp(orderp), kin_vis(kin_vis), orderingtype(ordering_type_)
 #else
-IncompressibleFlowSolver::IncompressibleFlowSolver(Mesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_, bool immersed_flag)
+IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_, bool immersed_flag)
    : pmesh(mesh), orderv(orderv), orderp(orderp), kin_vis(kin_vis), orderingtype(ordering_type_)
 #endif
 {
@@ -186,7 +186,7 @@ IncompressibleFlowSolver::IncompressibleFlowSolver(Mesh *mesh, int orderv, int o
    rhof.constant = fluid_density;
 }
 
-void IncompressibleFlowSolver::MeanZero(GridFunction &v)
+void IncompressibleFluidSolver::MeanZero(GridFunction &v)
 {  
    // Make sure not to recompute the inner product linear form every
    // application. Only update if mesh moves!
@@ -220,7 +220,7 @@ void IncompressibleFlowSolver::MeanZero(GridFunction &v)
    v -= integ / volume;
 }
 
-void IncompressibleFlowSolver::Orthogonalize(Vector &v)
+void IncompressibleFluidSolver::Orthogonalize(Vector &v)
 {
    double global_sum = v.Sum();
    int global_size = v.Size();
@@ -233,7 +233,7 @@ void IncompressibleFlowSolver::Orthogonalize(Vector &v)
    v -= global_sum / static_cast<double>(global_size);
 }
 
-void IncompressibleFlowSolver::AllocDirectSolver()
+void IncompressibleFluidSolver::AllocDirectSolver()
 {
    #ifndef MFEM_USE_MPI
       #ifdef MFEM_USE_SUITESPARSE
@@ -261,7 +261,7 @@ void IncompressibleFlowSolver::AllocDirectSolver()
    #endif
 }
 
-void IncompressibleFlowSolver::Setup(double dt)
+void IncompressibleFluidSolver::Setup(double dt)
 {
    sw_setup.Start();
    Array<int> empty; // for forming some of the matrices
@@ -759,7 +759,7 @@ void IncompressibleFlowSolver::Setup(double dt)
    sw_setup.Stop();
 }
 
-void IncompressibleFlowSolver::Step(double &time, double dt, int current_step,
+void IncompressibleFluidSolver::Step(double &time, double dt, int current_step,
                         bool provisional)
 {
    if (verbose && my_rank == 0)
@@ -833,7 +833,7 @@ void IncompressibleFlowSolver::Step(double &time, double dt, int current_step,
    sw_step.Stop();
 }
 
-void IncompressibleFlowSolver::UpdateParameters(double time, double dt, int current_step_)
+void IncompressibleFluidSolver::UpdateParameters(double time, double dt, int current_step_)
 {
    cur_step = current_step_;
    curr_dt = dt;
@@ -844,7 +844,7 @@ void IncompressibleFlowSolver::UpdateParameters(double time, double dt, int curr
    }
 }
 
-void IncompressibleFlowSolver::Predictors(double dt)
+void IncompressibleFluidSolver::Predictors(double dt)
 {
    ynp1 = yn;
    ydotnp1.Set((gamma - 1.0)/gamma,ydotn);
@@ -866,7 +866,7 @@ void IncompressibleFlowSolver::Predictors(double dt)
    }
 }
 
-void IncompressibleFlowSolver::SetEssentialBCs(const double &time)
+void IncompressibleFluidSolver::SetEssentialBCs(const double &time)
 {
    Vector &vnp1 = ynp1.GetBlock(0);
    Vector &pnp1 = ynp1.GetBlock(1);
@@ -958,7 +958,7 @@ void IncompressibleFlowSolver::SetEssentialBCs(const double &time)
    }
 }
 
-void IncompressibleFlowSolver::UpdateVariables(double &time, double &dt)
+void IncompressibleFluidSolver::UpdateVariables(double &time, double &dt)
 {
    if (windkessel_bc) UpdateWindkesselParameters();
    
@@ -967,7 +967,7 @@ void IncompressibleFlowSolver::UpdateVariables(double &time, double &dt)
    if (IFEM) im_solid->Update();
 }
 
-void IncompressibleFlowSolver::UpdateTimestepHistory(const double &time, double &dt)
+void IncompressibleFluidSolver::UpdateTimestepHistory(const double &time, double &dt)
 {
    Vector &vn = yn.GetBlock(0);
    Vector &vnp1 = ynp1.GetBlock(0);
@@ -1007,7 +1007,7 @@ void IncompressibleFlowSolver::UpdateTimestepHistory(const double &time, double 
    pdotn_gf.SetFromTrueDofs(pdotn);
 }
 
-void IncompressibleFlowSolver::UpdateWindkesselParameters()
+void IncompressibleFluidSolver::UpdateWindkesselParameters()
 {
    // compute current integ term with new converged velocity, then update 
    // prev time, prev flow rate, and integ_hist_terms and pass integ_hist_terms to each 
@@ -1039,7 +1039,7 @@ void IncompressibleFlowSolver::UpdateWindkesselParameters()
    }
 }
 
-void IncompressibleFlowSolver::PrintInfo()
+void IncompressibleFluidSolver::PrintInfo()
 {
    #ifdef MFEM_USE_MPI
    int fes_size0 = vfes->GlobalTrueVSize();
@@ -1054,7 +1054,7 @@ void IncompressibleFlowSolver::PrintInfo()
 
    if (my_rank == 0)
    {
-      mfem::out << "IncompressibleFlowSolver version: " << INS_SOLVER_VERSION << std::endl
+      mfem::out <<   "IFS version: " << IFS_VERSION << std::endl
                   << "MFEM version: " << MFEM_VERSION << std::endl
                   << "Number of fluid elements: " << numelements << std::endl
                   << "Velocity #DOFs: " << fes_size0 << std::endl
@@ -1065,7 +1065,7 @@ void IncompressibleFlowSolver::PrintInfo()
    }
 }
 
-void IncompressibleFlowSolver::RegisterTimers()
+void IncompressibleFluidSolver::RegisterTimers()
 {
    timer_reg.Clear();
 
@@ -1125,7 +1125,7 @@ void IncompressibleFlowSolver::RegisterTimers()
    timer_reg.Add("io","I/O",&sw_io,"timestep","",0,false);
 }
 
-void IncompressibleFlowSolver::PrintTimingData()
+void IncompressibleFluidSolver::PrintTimingData()
 {
    RegisterTimers();
 
@@ -1206,7 +1206,7 @@ void IncompressibleFlowSolver::PrintTimingData()
    }
 }
 
-void IncompressibleFlowSolver::ConvertTimeToFormattedTime(double time_in_seconds, char* time_str, size_t size)
+void IncompressibleFluidSolver::ConvertTimeToFormattedTime(double time_in_seconds, char* time_str, size_t size)
 {
    // Decompose using milliseconds to avoid floating rounding issues.
    long long total_ms = static_cast<long long>(std::llround(time_in_seconds * 1000.0));
@@ -1228,7 +1228,7 @@ void IncompressibleFlowSolver::ConvertTimeToFormattedTime(double time_in_seconds
 /// BOUNDARY CONDITIONS ///
 ///////////////////////////
 
-void IncompressibleFlowSolver::AddVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr)
+void IncompressibleFluidSolver::AddVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr)
 {
    vel_dbcs.emplace_back(attr, coeff);
 
@@ -1272,12 +1272,12 @@ void IncompressibleFlowSolver::AddVelDirichletBC(VectorCoefficient *coeff, Array
    vel_ess_tdofs.Append(temp_dof,temp_dof.Size());
 }
 
-void IncompressibleFlowSolver::AddVelDirichletBC(VecFuncT *f, Array<int> &attr)
+void IncompressibleFluidSolver::AddVelDirichletBC(VecFuncT *f, Array<int> &attr)
 {
    AddVelDirichletBC(new VectorFunctionCoefficient(pmesh->Dimension(), f), attr);
 }
 
-void IncompressibleFlowSolver::AddVelDirichletBC(Coefficient *coeff, Array<int> &attr, int component_)
+void IncompressibleFluidSolver::AddVelDirichletBC(Coefficient *coeff, Array<int> &attr, int component_)
 {
    if (verbose && my_rank == 0)
    {
@@ -1333,12 +1333,12 @@ void IncompressibleFlowSolver::AddVelDirichletBC(Coefficient *coeff, Array<int> 
    vel_ess_tdofs.Append(temp_dof,temp_dof.Size());
 }
 
-void IncompressibleFlowSolver::AddVelDirichletBC(ScalarFuncT *f, Array<int> &attr, int component_)
+void IncompressibleFluidSolver::AddVelDirichletBC(ScalarFuncT *f, Array<int> &attr, int component_)
 {
    AddVelDirichletBC(new FunctionCoefficient(f), attr, component_);
 }
 
-void IncompressibleFlowSolver::AddPresDirichletBC(Coefficient *coeff, Array<int> &attr)
+void IncompressibleFluidSolver::AddPresDirichletBC(Coefficient *coeff, Array<int> &attr)
 {
    MFEM_ABORT("Error: Dont use these! Use AddPressureBC instead!");
    pres_dbcs.emplace_back(attr, coeff);
@@ -1374,12 +1374,12 @@ void IncompressibleFlowSolver::AddPresDirichletBC(Coefficient *coeff, Array<int>
    pres_ess_tdofs.Append(temp_dof,temp_dof.Size());
 }
 
-void IncompressibleFlowSolver::AddPresDirichletBC(ScalarFuncT *f, Array<int> &attr)
+void IncompressibleFluidSolver::AddPresDirichletBC(ScalarFuncT *f, Array<int> &attr)
 {
    AddPresDirichletBC(new FunctionCoefficient(f), attr);
 }
 
-void IncompressibleFlowSolver::AddPressureNodeCondition(const double &p, Vector &coords, double tol)
+void IncompressibleFluidSolver::AddPressureNodeCondition(const double &p, Vector &coords, double tol)
 {
    if (verbose && my_rank == 0)
    {
@@ -1456,7 +1456,7 @@ void IncompressibleFlowSolver::AddPressureNodeCondition(const double &p, Vector 
    }
 }
 
-void IncompressibleFlowSolver::AddPressureNodeCondition(ScalarFuncT &p_coeff, Vector &coords, double tol)
+void IncompressibleFluidSolver::AddPressureNodeCondition(ScalarFuncT &p_coeff, Vector &coords, double tol)
 {
    if (verbose && my_rank == 0)
    {
@@ -1531,7 +1531,7 @@ void IncompressibleFlowSolver::AddPressureNodeCondition(ScalarFuncT &p_coeff, Ve
    }
 }
 
-void IncompressibleFlowSolver::AddPeriodicBC(Array<int> &attr)
+void IncompressibleFluidSolver::AddPeriodicBC(Array<int> &attr)
 {
    if (verbose && my_rank == 0)
    {
@@ -1557,7 +1557,7 @@ void IncompressibleFlowSolver::AddPeriodicBC(Array<int> &attr)
    }
 }
 
-void IncompressibleFlowSolver::AddVelNeumannBC(VectorCoefficient *coeff, Array<int> &attr)
+void IncompressibleFluidSolver::AddVelNeumannBC(VectorCoefficient *coeff, Array<int> &attr)
 {
    vel_nbcs.emplace_back(attr, coeff);
 
@@ -1585,12 +1585,12 @@ void IncompressibleFlowSolver::AddVelNeumannBC(VectorCoefficient *coeff, Array<i
    }
 }
 
-void IncompressibleFlowSolver::AddVelNeumannBC(VecFuncT *f, Array<int> &attr)
+void IncompressibleFluidSolver::AddVelNeumannBC(VecFuncT *f, Array<int> &attr)
 {
    AddVelNeumannBC(new VectorFunctionCoefficient(pmesh->Dimension(), f), attr);
 }
 
-void IncompressibleFlowSolver::AddVelNeumannBC(MatrixCoefficient *coeff, Array<int> &attr)
+void IncompressibleFluidSolver::AddVelNeumannBC(MatrixCoefficient *coeff, Array<int> &attr)
 {
    vel_nbcs.emplace_back(attr, coeff);
 
@@ -1618,12 +1618,12 @@ void IncompressibleFlowSolver::AddVelNeumannBC(MatrixCoefficient *coeff, Array<i
    }
 }
 
-void IncompressibleFlowSolver::AddVelNeumannBC(MatFuncT *f, Array<int> &attr)
+void IncompressibleFluidSolver::AddVelNeumannBC(MatFuncT *f, Array<int> &attr)
 {
    AddVelNeumannBC(new MatrixFunctionCoefficient(pmesh->Dimension(), f), attr);
 }
 
-void IncompressibleFlowSolver::AddVelNeumannBC(Coefficient *coeff, Array<int> &attr, bool pressure)
+void IncompressibleFluidSolver::AddVelNeumannBC(Coefficient *coeff, Array<int> &attr, bool pressure)
 {
    vel_nbcs.emplace_back(attr, coeff,  pressure);
 
@@ -1658,17 +1658,17 @@ void IncompressibleFlowSolver::AddVelNeumannBC(Coefficient *coeff, Array<int> &a
    }
 }
 
-void IncompressibleFlowSolver::AddVelNeumannBC(ScalarFuncT *f, Array<int> &attr, bool pressure)
+void IncompressibleFluidSolver::AddVelNeumannBC(ScalarFuncT *f, Array<int> &attr, bool pressure)
 {
    AddVelNeumannBC(new FunctionCoefficient(f), attr, pressure);
 }
 
-void IncompressibleFlowSolver::AddOutflowBC(Array<int> &attr)
+void IncompressibleFluidSolver::AddOutflowBC(Array<int> &attr)
 {  
    AddTractionFreeBC(attr);
 }
 
-void IncompressibleFlowSolver::AddNoSlipBC(Array<int> &attr)
+void IncompressibleFluidSolver::AddNoSlipBC(Array<int> &attr)
 {
    if (verbose && my_rank == 0)
    {
@@ -1712,7 +1712,7 @@ void IncompressibleFlowSolver::AddNoSlipBC(Array<int> &attr)
    vel_ess_tdofs.Append(temp_dof,temp_dof.Size());
 }
 
-void IncompressibleFlowSolver::AddBodyForce(VectorCoefficient *coeff, Array<int> &attr)
+void IncompressibleFluidSolver::AddBodyForce(VectorCoefficient *coeff, Array<int> &attr)
 {
    accel_terms.emplace_back(attr, coeff);
 
@@ -1730,12 +1730,12 @@ void IncompressibleFlowSolver::AddBodyForce(VectorCoefficient *coeff, Array<int>
    }
 }
 
-void IncompressibleFlowSolver::AddBodyForce(VecFuncT *f, Array<int> &attr)
+void IncompressibleFluidSolver::AddBodyForce(VecFuncT *f, Array<int> &attr)
 {
    AddBodyForce(new VectorFunctionCoefficient(pmesh->Dimension(), f), attr);
 }
 
-void IncompressibleFlowSolver::UseBackflowStabilization(Array<int> &attr, double beta_)
+void IncompressibleFluidSolver::UseBackflowStabilization(Array<int> &attr, double beta_)
 {
    backflow_stab = true;
 
@@ -1769,9 +1769,9 @@ void IncompressibleFlowSolver::UseBackflowStabilization(Array<int> &attr, double
 
 // resistance bc
 #ifdef MFEM_USE_MPI
-void IncompressibleFlowSolver::AddResistanceBC(Array<int> &attr, double R_, double p0_, ParFiniteElementSpace *gfes)
+void IncompressibleFluidSolver::AddResistanceBC(Array<int> &attr, double R_, double p0_, ParFiniteElementSpace *gfes)
 #else
-void IncompressibleFlowSolver::AddResistanceBC(Array<int> &attr, double R_, double p0_, FiniteElementSpace *gfes)
+void IncompressibleFluidSolver::AddResistanceBC(Array<int> &attr, double R_, double p0_, FiniteElementSpace *gfes)
 #endif
 {
    // duplicate bc check
@@ -1807,9 +1807,9 @@ void IncompressibleFlowSolver::AddResistanceBC(Array<int> &attr, double R_, doub
 
 // windkessel bc
 #ifdef MFEM_USE_MPI
-void IncompressibleFlowSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, Coefficient *p_0_, std::function<double(double)> p_d_, double init_flow_rate_, ParFiniteElementSpace *gfes)
+void IncompressibleFluidSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, Coefficient *p_0_, std::function<double(double)> p_d_, double init_flow_rate_, ParFiniteElementSpace *gfes)
 #else
-void IncompressibleFlowSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, Coefficient *p_0_, std::function<double(double)> p_d_, double init_flow_rate_, FiniteElementSpace *gfes)
+void IncompressibleFluidSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, Coefficient *p_0_, std::function<double(double)> p_d_, double init_flow_rate_, FiniteElementSpace *gfes)
 #endif
 {
    // duplicate bc check
@@ -1844,9 +1844,9 @@ void IncompressibleFlowSolver::AddWindkesselBC(Array<int> &attr, double R_, doub
 }
 
 #ifdef MFEM_USE_MPI
-void IncompressibleFlowSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, double p_0_, std::function<double(double)> p_d_, double init_flow_rate_, ParFiniteElementSpace *gfes)
+void IncompressibleFluidSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, double p_0_, std::function<double(double)> p_d_, double init_flow_rate_, ParFiniteElementSpace *gfes)
 #else
-void IncompressibleFlowSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, double p_0_, std::function<double(double)> p_d_, double init_flow_rate_, FiniteElementSpace *gfes)
+void IncompressibleFluidSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, double p_0_, std::function<double(double)> p_d_, double init_flow_rate_, FiniteElementSpace *gfes)
 #endif
 {
    // duplicate bc check
@@ -1881,9 +1881,9 @@ void IncompressibleFlowSolver::AddWindkesselBC(Array<int> &attr, double R_, doub
 }
 
 #ifdef MFEM_USE_MPI
-void IncompressibleFlowSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, double p_0_, double p_d_, double init_flow_rate_, ParFiniteElementSpace *gfes)
+void IncompressibleFluidSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, double p_0_, double p_d_, double init_flow_rate_, ParFiniteElementSpace *gfes)
 #else
-void IncompressibleFlowSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, double p_0_, double p_d_, double init_flow_rate_, FiniteElementSpace *gfes)
+void IncompressibleFluidSolver::AddWindkesselBC(Array<int> &attr, double R_, double Rd_, double C_, double p_0_, double p_d_, double init_flow_rate_, FiniteElementSpace *gfes)
 #endif
 {
    // duplicate bc check
@@ -1918,7 +1918,7 @@ void IncompressibleFlowSolver::AddWindkesselBC(Array<int> &attr, double R_, doub
 }
 
 #ifdef MFEM_USE_MPI
-void IncompressibleFlowSolver::AddMappedInflowBC_FromFile(int inflow_type_, Mesh *mesh, std::string filename_, bool time_depend, Array<int> &attr, int approx_type, bool periodic_data, int num_fourier_modes_)
+void IncompressibleFluidSolver::AddMappedInflowBC_FromFile(int inflow_type_, Mesh *mesh, std::string filename_, bool time_depend, Array<int> &attr, int approx_type, bool periodic_data, int num_fourier_modes_)
 {
    mapped_inflow = new MappedInflowCoefficient(pmesh->Dimension(),true,inflow_type_,orderv,pmesh,mesh,attr,time_depend);
    mapped_inflow->FlowRateFileOptions(filename_, approx_type, periodic_data, num_fourier_modes_);
@@ -1975,7 +1975,7 @@ void IncompressibleFlowSolver::AddMappedInflowBC_FromFile(int inflow_type_, Mesh
    vel_ess_tdofs.Append(temp_dof,temp_dof.Size());
 }
 
-void IncompressibleFlowSolver::AddMappedInflowBC(int inflow_type_, Mesh *mesh, std::function<double (double)> flow_rate, bool time_depend, Array<int> &attr)
+void IncompressibleFluidSolver::AddMappedInflowBC(int inflow_type_, Mesh *mesh, std::function<double (double)> flow_rate, bool time_depend, Array<int> &attr)
 {
    mapped_inflow = new MappedInflowCoefficient(pmesh->Dimension(),flow_rate,inflow_type_,orderv,pmesh,mesh,attr,time_depend);
    
@@ -2033,9 +2033,9 @@ void IncompressibleFlowSolver::AddMappedInflowBC(int inflow_type_, Mesh *mesh, s
 #endif
 
 #ifdef MFEM_USE_MPI
-void IncompressibleFlowSolver::AddImmersedSolid(ParMesh *solid_pmesh, int orderd, Coefficient *init_rhos, MaterialType *mat_, int form_type_, bool visc_, double scale_fac_)
+void IncompressibleFluidSolver::AddImmersedSolid(ParMesh *solid_pmesh, int orderd, Coefficient *init_rhos, MaterialType *mat_, int form_type_, bool visc_, double scale_fac_)
 #else
-void IncompressibleFlowSolver::AddImmersedSolid(Mesh *solid_pmesh, int orderd, Coefficient *init_rhos, MaterialType *mat_, int form_type_, bool visc_, double scale_fac_)
+void IncompressibleFluidSolver::AddImmersedSolid(Mesh *solid_pmesh, int orderd, Coefficient *init_rhos, MaterialType *mat_, int form_type_, bool visc_, double scale_fac_)
 #endif
 {
    if (verbose && my_rank == 0)
@@ -2067,7 +2067,7 @@ void IncompressibleFlowSolver::AddImmersedSolid(Mesh *solid_pmesh, int orderd, C
    MFEM_ASSERT(dimensional_flag, "Error: fsi only supported with dimensional form of equations!");
 }
 
-void IncompressibleFlowSolver::AddImmersedSolid(ImmersedSolid *im_solid_, double scale_fac_)
+void IncompressibleFluidSolver::AddImmersedSolid(ImmersedSolid *im_solid_, double scale_fac_)
 {
    if (verbose)
    {
@@ -2103,7 +2103,7 @@ void IncompressibleFlowSolver::AddImmersedSolid(ImmersedSolid *im_solid_, double
 /// POST-PROCESSING ///
 ///////////////////////
 
-void IncompressibleFlowSolver::ComputeCurl3D(GridFunction &u, GridFunction &cu)
+void IncompressibleFluidSolver::ComputeCurl3D(GridFunction &u, GridFunction &cu)
 {
    FiniteElementSpace *fes = u.FESpace();
 
@@ -2195,7 +2195,7 @@ void IncompressibleFlowSolver::ComputeCurl3D(GridFunction &u, GridFunction &cu)
    }
 }
 
-void IncompressibleFlowSolver::ComputeCurl2D(GridFunction &u,
+void IncompressibleFluidSolver::ComputeCurl2D(GridFunction &u,
                                  GridFunction &cu,
                                  bool assume_scalar)
 {
@@ -2297,7 +2297,7 @@ void IncompressibleFlowSolver::ComputeCurl2D(GridFunction &u,
    }
 }
 
-double IncompressibleFlowSolver::ComputeCFL(const GridFunction &u, double dt)
+double IncompressibleFluidSolver::ComputeCFL(const GridFunction &u, double dt)
 {
    Mesh *pmesh_u = u.FESpace()->GetMesh();
    const FiniteElementSpace *fes = u.FESpace();
@@ -2374,7 +2374,7 @@ double IncompressibleFlowSolver::ComputeCFL(const GridFunction &u, double dt)
    return cflmax;
 }
 
-double IncompressibleFlowSolver::ComputeIntegralDivV(const GridFunction &v_gf)
+double IncompressibleFluidSolver::ComputeIntegralDivV(const GridFunction &v_gf)
 {
    const FiniteElement *fe;
    ElementTransformation *Tr;
@@ -2417,7 +2417,7 @@ double IncompressibleFlowSolver::ComputeIntegralDivV(const GridFunction &v_gf)
 }
 
 // method for adaptive time stepping based on CFL_Crit
-double IncompressibleFlowSolver::est_dt()
+double IncompressibleFluidSolver::est_dt()
 {
    MFEM_ABORT("TO DO");
    FiniteElementSpace *fes = vn_gf.FESpace();
@@ -2507,7 +2507,7 @@ double IncompressibleFlowSolver::est_dt()
    return min_val;
 }
 
-void IncompressibleFlowSolver::ComputeWSS(GridFunction &u, GridFunction &p, int avg_type)
+void IncompressibleFluidSolver::ComputeWSS(GridFunction &u, GridFunction &p, int avg_type)
 {
    /*
    // Wall shear stress = force that the fluid exerts on the wall
@@ -2822,7 +2822,7 @@ void IncompressibleFlowSolver::ComputeWSS(GridFunction &u, GridFunction &p, int 
 }
 
 // computes mass (or volume flow rate) thru a surface
-double IncompressibleFlowSolver::ComputeMassFlowThruSurf(GridFunction &u, Array<int> &attr_surf, bool inflow_flag, double fluid_density, bool volume_flow_rate)
+double IncompressibleFluidSolver::ComputeMassFlowThruSurf(GridFunction &u, Array<int> &attr_surf, bool inflow_flag, double fluid_density, bool volume_flow_rate)
 {
    // \int_{Gamma} \rho u dot n dGamma (by default)
    // or 
@@ -2937,7 +2937,7 @@ double IncompressibleFlowSolver::ComputeMassFlowThruSurf(GridFunction &u, Array<
 }
 
 // computes mass (or volume flow rate) thru a surface
-double IncompressibleFlowSolver::ComputeAvgVeloOnSurf(GridFunction &u, Array<int> &attr_surf, Vector &avg_velo)
+double IncompressibleFluidSolver::ComputeAvgVeloOnSurf(GridFunction &u, Array<int> &attr_surf, Vector &avg_velo)
 {
    const FiniteElement *ufe;
    FaceElementTransformations *ftr;
@@ -3021,7 +3021,7 @@ double IncompressibleFlowSolver::ComputeAvgVeloOnSurf(GridFunction &u, Array<int
 }
 
 // computes average pressure on surface
-double IncompressibleFlowSolver::ComputeAvgPressureOnSurf(GridFunction &p_gf, Array<int> &attr_surf, double &area)
+double IncompressibleFluidSolver::ComputeAvgPressureOnSurf(GridFunction &p_gf, Array<int> &attr_surf, double &area)
 {
    // \int_{Gamma} p dGamma / \int{Gamma} dGamma
 
@@ -3090,7 +3090,7 @@ double IncompressibleFlowSolver::ComputeAvgPressureOnSurf(GridFunction &p_gf, Ar
 //////////////////
 //// RESTART /////
 //////////////////
-void IncompressibleFlowSolver::Restarting(std::string restart_folder_, int step, double &dt, double &time, bool ics)
+void IncompressibleFluidSolver::Restarting(std::string restart_folder_, int step, double &dt, double &time, bool ics)
 {
    restart_folder = restart_folder_;
    restarting = ics ? false : true;
@@ -3114,14 +3114,14 @@ void IncompressibleFlowSolver::Restarting(std::string restart_folder_, int step,
    MFEM_ASSERT(step_from_file == step, "Error: user provided restart step does not match the step number in the restart file");
 }
 
-void IncompressibleFlowSolver::writeRestartFiles(std::string restart_folder_, int restart_save_step_)
+void IncompressibleFluidSolver::writeRestartFiles(std::string restart_folder_, int restart_save_step_)
 {
    restart_folder = restart_folder_;
    restart_save_step = restart_save_step_;
    write_restarts = true;
 }
 
-void IncompressibleFlowSolver::writeRestarts(int step, double dt, double time)
+void IncompressibleFluidSolver::writeRestarts(int step, double dt, double time)
 {
    // Create directory structure if it doesn't exist
    if (my_rank == 0)
@@ -3255,7 +3255,7 @@ void IncompressibleFlowSolver::writeRestarts(int step, double dt, double time)
    }
 }
 
-void IncompressibleFlowSolver::readRestarts(int &step, double &dt, double &time, bool read_bcs)
+void IncompressibleFluidSolver::readRestarts(int &step, double &dt, double &time, bool read_bcs)
 {
    // this assumes that the fluid mesh is not moving
    // if ALE, then pull back mesh to reference config to map!
@@ -3492,7 +3492,7 @@ void IncompressibleFlowSolver::readRestarts(int &step, double &dt, double &time,
 /// DESTRUCTOR ///
 //////////////////
 
-IncompressibleFlowSolver::~IncompressibleFlowSolver()
+IncompressibleFluidSolver::~IncompressibleFluidSolver()
 {
    delete vfec;
    delete pfec;
