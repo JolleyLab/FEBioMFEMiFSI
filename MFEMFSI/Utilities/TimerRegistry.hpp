@@ -18,6 +18,7 @@ public:
       mfem::StopWatch* sw;      // stopwatch pointer
       std::string percent_of;   // key used for % calc (e.g., "timestep")
       std::string parent;       // optional parent key for grouping/indent
+      double restart_time = 0.0;// collected time prior to restart
       int indent = 0;           // printed indent level
       bool enabled = true;      // allow toggling at runtime
       bool show_percent = true;  // whether to show percent column
@@ -40,7 +41,17 @@ public:
            bool enabled = true)
    {
       assert(index.count(key) == 0 && "Duplicate timer key");
-      entries.push_back({key, label, sw, percent_of_key, parent_key, indent, enabled, show_percent});
+         // Initialize fields in the same order as declared in Entry so that
+         // restart_time is not accidentally set from the indent parameter.
+         entries.push_back({key,            // key
+             label,          // label
+             sw,             // stopwatch
+             percent_of_key, // percent_of
+             parent_key,     // parent
+             0.0,            // restart_time (can be set later)
+             indent,         // indent
+             enabled,        // enabled
+             show_percent}); // show_percent
       int idx = static_cast<int>(entries.size() - 1);
       index[key] = idx;
       return idx;
@@ -50,6 +61,16 @@ public:
    {
       auto it = index.find(key);
       if (it != index.end()) entries[it->second].enabled = enabled;
+   }
+
+   // Set the stored restart_time for a given timer key. This value is
+   // added to the live stopwatch time in CollectSeconds(), allowing us
+   // to carry timing information across restarts.
+   void SetRestartTime(const std::string& key, double restart_time)
+   {
+      auto it = index.find(key);
+      if (it == index.end()) { return; }
+      entries[it->second].restart_time = restart_time;
    }
 
    const std::vector<Entry>& Entries() const { return entries; }
@@ -64,6 +85,9 @@ public:
       if (it == index.end()) return 0.0;
       return times[it->second];
    }
+
+   // return number of timers
+   int NumTimers() const { return static_cast<int>(entries.size()); }
 
 private:
    std::vector<Entry> entries;

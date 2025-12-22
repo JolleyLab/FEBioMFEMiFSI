@@ -650,14 +650,14 @@ bool MFEMSolver::Init()
 
    PostProcessOutput();
 
-   RestartFiles();
-
    #ifdef MFEM_USE_MPI
    if (!m.pre_partition)
    {
       ClearSerialMeshData();
    }
    #endif
+
+   RestartFiles();
 
    // solid post processing depends on parallel solid mesh
    if (m.immersed_solid) FinalizeSolid();

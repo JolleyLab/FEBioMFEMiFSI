@@ -980,6 +980,7 @@ void ImmersedFEBioSolid::UpdateFEBioDataFromRestart()
    int dofVIMY = fem->GetDOFIndex("im_vy");
    int dofVIMZ = fem->GetDOFIndex("im_vz");
    int NN = mesh.Nodes();
+   // int NN = dfes->GetVSize() / pmesh->SpaceDimension();
 	for (int i=0; i<NN; ++i)
 	{      
 		FENode& ni = mesh.Node(i);

@@ -7,7 +7,8 @@ std::vector<double> TimerRegistry::CollectSeconds() const
    secs.reserve(entries.size());
    for (const auto& e : entries)
    {
-      secs.push_back(e.enabled && e.sw ? e.sw->RealTime() : 0.0);
+      double time = e.enabled && e.sw ? e.sw->RealTime() : 0.0;
+      secs.push_back(time + e.restart_time);
    }
    return secs;
 }

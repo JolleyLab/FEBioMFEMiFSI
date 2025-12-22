@@ -907,6 +907,7 @@ protected:
    mfem::StopWatch sw_fluidtan, sw_fluidres, sw_solidtan, sw_solidres, sw_fsires, sw_fsitan, sw_fsicmat;
    mfem::StopWatch sw_predictors, sw_essbcs, sw_weakbcs, sw_updates, sw_restarts;
    bool extended_timing = true;
+   bool timers_registered = false;
 
    // solver outputs
    // Iteration counts.

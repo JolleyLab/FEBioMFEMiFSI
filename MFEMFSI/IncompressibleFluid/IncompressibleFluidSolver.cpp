@@ -1082,6 +1082,7 @@ void IncompressibleFluidSolver::PrintInfo()
 
 void IncompressibleFluidSolver::RegisterTimers()
 {
+   if (timers_registered) return;
    timer_reg.Clear();
 
    // Base rows
@@ -1138,6 +1139,8 @@ void IncompressibleFluidSolver::RegisterTimers()
    if (extended_timing) timer_reg.Add("updates","UPDATES", &sw_updates,"timestep","",1);
    if (write_restarts) timer_reg.Add("restarts","RESTARTS",&sw_restarts,"timestep","",1);
    timer_reg.Add("io","I/O",&sw_io,"timestep","",0,false);
+
+   timers_registered = true;
 }
 
 void IncompressibleFluidSolver::PrintTimingData()
@@ -1202,14 +1205,25 @@ void IncompressibleFluidSolver::PrintTimingData()
          const auto& e = entries[i];
          if (!e.enabled) continue;
 
+         // Adjust the reported time for certain timers to avoid double
+         // counting any time accumulated prior to a restart. For example,
+         // for the SETUP timer we subtract e.restart_time here while the
+         // raw times[] vector still contains the full cumulative time.
+         double this_time = times[i];
+         if (e.key == "setup")
+         {
+            this_time -= e.restart_time;
+            if (this_time < 0.0) { this_time = 0.0; }
+         }
+
          char buf[32];
-         ConvertTimeToFormattedTime(times[i], buf, sizeof(buf));
+         ConvertTimeToFormattedTime(this_time, buf, sizeof(buf));
 
          std::string indent;
          if (e.indent > 0) indent.assign(3 * e.indent, ' ');
 
          double denom = e.percent_of.empty() ? base_t : time_of(e.percent_of);
-         double pct = (denom > 0.0) ? (times[i] / denom * 100.0) : 0.0;
+         double pct = (denom > 0.0) ? (this_time / denom * 100.0) : 0.0;
          oss.str("");
          oss.clear();
          oss << std::setw(5) << pct;
@@ -3188,6 +3202,18 @@ void IncompressibleFluidSolver::Restarting(std::string restart_folder_, int step
    in_restart >> step_from_file;
    in_restart >> time;
    in_restart >> dt;
+
+   // timer info to restore on restart
+   int ntimers = 0;
+   if (in_restart >> ntimers)
+   {
+      std::string key;
+      double t;
+      for (int i = 0; i < ntimers; ++i)
+      {
+         if (!(in_restart >> key >> t)) { break; }
+      }
+   }
    in_restart.close();
 
    MFEM_ASSERT(step_from_file == step, "Error: user provided restart step does not match the step number in the restart file");
@@ -3241,6 +3267,21 @@ void IncompressibleFluidSolver::writeRestarts(int step, double dt, double time)
       out_restart << step << std::endl;
       out_restart << time << std::endl;
       out_restart << dt << std::endl;
+
+      // Also write current timer values so they can be restored on
+      // restart. We (re)register timers here to ensure timer_reg has
+      // the up-to-date list and stopwatches.
+      RegisterTimers();
+      sw_restarts.Stop();
+      std::vector<double> timer_times = timer_reg.CollectSeconds();
+      sw_restarts.Start();
+      const auto &entries = timer_reg.Entries();
+
+      out_restart << entries.size() << std::endl;
+      for (size_t i = 0; i < entries.size(); ++i)
+      {
+         out_restart << entries[i].key << " " << timer_times[i] << std::endl;
+      }
       out_restart.close();
    }
    #ifdef MFEM_USE_MPI
@@ -3343,7 +3384,8 @@ void IncompressibleFluidSolver::readRestarts(int &step, double &dt, double &time
    // Below maps the restart data from potentially different number of processors
    // to the current number of processors   
 
-   // read in .dat file with time step data and number of processors
+   // read in .dat file with time step data, number of processors,
+   // and (optionally) timer information written by writeRestarts
    int src_num_procs;
    std::ifstream in_restart;
    std::string restart_dat_file = restart_folder + "/Step_" + std::to_string(step) + "/restart.dat";
@@ -3353,6 +3395,31 @@ void IncompressibleFluidSolver::readRestarts(int &step, double &dt, double &time
       MFEM_ABORT("Error: unable to open restart file " << restart_dat_file);
    }
    in_restart >> src_num_procs;
+
+   // step, time, dt, and then the timer block. Consume these if present so that the stream is
+   // positioned correctly before reading timer data.
+   int    step_from_file = 0;
+   double time_from_file = 0.0;
+   double dt_from_file   = 0.0;
+   if (in_restart >> step_from_file >> time_from_file >> dt_from_file)
+   {
+      MFEM_ASSERT(step_from_file == step,
+                  "Error: restart step does not match value in restart.dat");
+   }
+
+   // Restore per-timer restart times if they were written
+   RegisterTimers();
+   int ntimers = 0;
+   if (in_restart >> ntimers)
+   {
+      for (int i = 0; i < ntimers; ++i)
+      {
+         std::string key;
+         double t = 0.0;
+         if (!(in_restart >> key >> t)) { break; }
+         timer_reg.SetRestartTime(key, t);
+      }
+   }
    in_restart.close();
 
    std::ifstream in;
