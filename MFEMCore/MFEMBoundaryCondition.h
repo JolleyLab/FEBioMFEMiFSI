@@ -51,6 +51,8 @@ private:
 	FEParamDouble m_vy;
 	FEParamDouble m_vz;
 
+   bool m_zero_bdr = false; // if true, the boundary nodes of this bc are set to zero velocity
+
 	DECLARE_FECORE_CLASS();
 };
 
@@ -81,6 +83,7 @@ public:
 private:
    FEParamDouble m_vval;
    int m_dof;
+   bool m_zero_bdr = false; // if true, the boundary nodes of this bc are set to zero velocity
 
 	DECLARE_FECORE_CLASS();
 };

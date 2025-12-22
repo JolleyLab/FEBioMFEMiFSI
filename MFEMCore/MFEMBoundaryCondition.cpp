@@ -42,6 +42,7 @@ BEGIN_FECORE_CLASS(MFEMVelDirichletBC, MFEMBoundaryCondition)
 	ADD_PARAMETER(m_vx, "vx");
 	ADD_PARAMETER(m_vy, "vy");
 	ADD_PARAMETER(m_vz, "vz");
+   ADD_PARAMETER(m_zero_bdr, "zero_boundary");
 END_FECORE_CLASS();
 
 void MFEMVelDirichletBC::Apply(MFEMSolver* solver, int attr)
@@ -50,7 +51,7 @@ void MFEMVelDirichletBC::Apply(MFEMSolver* solver, int attr)
 	mfem::Array<int> vel_bc_attr(mesh->bdr_attributes.Max());
 	vel_bc_attr = 0;
 	vel_bc_attr[attr] = 1;
-	solver->AddVelDirichletBC(new FEVectorCoefficient(GetFEModel(), m_vx, m_vy, m_vz), vel_bc_attr);
+	solver->AddVelDirichletBC(new FEVectorCoefficient(GetFEModel(), m_vx, m_vy, m_vz), vel_bc_attr, m_zero_bdr);
 }
 
 void MFEMVelDirichletBC::CopyFrom(FEBoundaryCondition* pbc)
@@ -62,6 +63,7 @@ void MFEMVelDirichletBC::CopyFrom(FEBoundaryCondition* pbc)
    (*this).m_vx = m_vbc->m_vx;
    (*this).m_vy = m_vbc->m_vy;
    (*this).m_vz = m_vbc->m_vz;
+   (*this).m_zero_bdr = m_vbc->m_zero_bdr;
 }
 
 BEGIN_FECORE_CLASS(MFEMNoSlipBC, MFEMBoundaryCondition)
@@ -87,6 +89,7 @@ void MFEMNoSlipBC::CopyFrom(FEBoundaryCondition* pbc)
 BEGIN_FECORE_CLASS(MFEMPrescribedVelocityComponentBC, MFEMBoundaryCondition)
 	ADD_PARAMETER(m_dof, "dof", 0, "$(dof_list:velocity)");
    ADD_PARAMETER(m_vval, "value");
+   ADD_PARAMETER(m_zero_bdr, "zero_boundary");
 END_FECORE_CLASS();
 
 void MFEMPrescribedVelocityComponentBC::Apply(MFEMSolver* solver, int attr)
@@ -95,7 +98,7 @@ void MFEMPrescribedVelocityComponentBC::Apply(MFEMSolver* solver, int attr)
 	mfem::Array<int> vel_bc_attr(mesh->bdr_attributes.Max());
 	vel_bc_attr = 0;
 	vel_bc_attr[attr] = 1;
-   solver->AddVelDirichletBC(new FEScalarCoefficient(GetFEModel(),m_vval), vel_bc_attr, m_dof);
+   solver->AddVelDirichletBC(new FEScalarCoefficient(GetFEModel(),m_vval), vel_bc_attr, m_dof, m_zero_bdr);
 }
 
 void MFEMPrescribedVelocityComponentBC::CopyFrom(FEBoundaryCondition* pbc)
@@ -106,6 +109,7 @@ void MFEMPrescribedVelocityComponentBC::CopyFrom(FEBoundaryCondition* pbc)
    CopyParameterListState(m_pvbc->GetParameterList());
    (*this).m_dof = m_pvbc->m_dof;
    (*this).m_vval = m_pvbc->m_vval;
+   (*this).m_zero_bdr = m_pvbc->m_zero_bdr;
 }
 
 BEGIN_FECORE_CLASS(MFEMPeriodicBC, MFEMBoundaryCondition)

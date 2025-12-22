@@ -475,14 +475,14 @@ int MFEMSolver::SolidSolverType()
    return m.solidsolvertype;
 }
 
-void MFEMSolver::AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr)
+void MFEMSolver::AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr, bool zero_bdr)
 {
-	m.flowsolver->AddVelDirichletBC(coeff, attr);
+	m.flowsolver->AddVelDirichletBC(coeff, attr, zero_bdr);
 }
 
-void MFEMSolver::AddVelDirichletBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int component)
+void MFEMSolver::AddVelDirichletBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int component, bool zero_bdr)
 {
-	m.flowsolver->AddVelDirichletBC(coeff, attr, component);
+	m.flowsolver->AddVelDirichletBC(coeff, attr, component, zero_bdr);
 }
 
 void MFEMSolver::AddNoSlipBC(mfem::Array<int>& attr)

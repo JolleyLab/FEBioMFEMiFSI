@@ -64,8 +64,8 @@ public:
    bool ThreeFieldFormulation();
 
    // velocity bcs
-	void AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr);
-   void AddVelDirichletBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int component);
+	void AddVelDirichletBC(mfem::VectorCoefficient* coeff, mfem::Array<int>& attr, bool zero_bdr = false);
+   void AddVelDirichletBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int component, bool zero_bdr = false);
    void AddNoSlipBC(mfem::Array<int>& attr);
    void AddPrescribedVelocityComponentBC(mfem::Coefficient* coeff, mfem::Array<int>& attr, int dof);
    // to do - add mapped velocity bc

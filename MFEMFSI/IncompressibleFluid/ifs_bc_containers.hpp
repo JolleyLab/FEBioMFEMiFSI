@@ -36,6 +36,9 @@ public:
       this->component = obj.component;
       obj.coeff = nullptr;
       obj.coeff_array = nullptr;
+
+      this->zero_bdr = obj.zero_bdr;
+      this->zero_bdr_tdofs = obj.zero_bdr_tdofs;
    }
 
    ~VelDirichletBC_T() 
@@ -56,6 +59,9 @@ public:
    mfem::Coefficient **coeff_array;
    bool all_comp;
    int component = -1;
+
+   bool zero_bdr = false; // if true, the boundary nodes of this bc are set to zero velocity
+   mfem::Array<int> zero_bdr_tdofs;
 };
 
 /// Container for a Neumann boundary condition of the velocity field.

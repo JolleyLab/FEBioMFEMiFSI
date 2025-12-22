@@ -169,11 +169,11 @@ public:
 
    //////////////// Velocity BCs ////////////////
    /// Add a Dirichlet boundary condition to the velocity field in cartesian components
-   void AddVelDirichletBC(mfem::VectorCoefficient *coeff, mfem::Array<int> &attr);
-   void AddVelDirichletBC(VecFuncT *f, mfem::Array<int> &attr);
+   void AddVelDirichletBC(mfem::VectorCoefficient *coeff, mfem::Array<int> &attr, bool zero_bdr = false);
+   void AddVelDirichletBC(VecFuncT *f, mfem::Array<int> &attr, bool zero_bdr = false);
    // components are 1,2,3 = x,y,z
-   void AddVelDirichletBC(mfem::Coefficient *coeff, mfem::Array<int> &attr,int component_);
-   void AddVelDirichletBC(ScalarFuncT *f, mfem::Array<int> &attr,int component_);
+   void AddVelDirichletBC(mfem::Coefficient *coeff, mfem::Array<int> &attr,int component_, bool zero_bdr = false);
+   void AddVelDirichletBC(ScalarFuncT *f, mfem::Array<int> &attr,int component_, bool zero_bdr = false);
 
    // Add no slip velocity boundary condition
    void AddNoSlipBC(mfem::Array<int> &attr);

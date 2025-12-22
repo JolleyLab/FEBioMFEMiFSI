@@ -901,6 +901,21 @@ void IncompressibleFluidSolver::SetEssentialBCs(const double &time)
    #else
    vn_next_gf.GetTrueDofs(vnp1);
    #endif
+   // zero boundary nodes of a prescribed velocity bc
+   for (auto &vel_dbc : vel_dbcs)
+   {
+      if(vel_dbc.zero_bdr)
+      {
+         const int N = vel_dbc.zero_bdr_tdofs.Size();
+         const auto idx = vel_dbc.zero_bdr_tdofs.Read();
+         auto Y_RW = vnp1.ReadWrite();
+         mfem::forall(N, [=] MFEM_HOST_DEVICE (int i) { Y_RW[idx[i]] = 0.0; });
+      }
+      else
+      {
+         continue;
+      }
+   }
 
    // pressure
    pn_next_gf.SetFromTrueDofs(pnp1);
@@ -1228,7 +1243,7 @@ void IncompressibleFluidSolver::ConvertTimeToFormattedTime(double time_in_second
 /// BOUNDARY CONDITIONS ///
 ///////////////////////////
 
-void IncompressibleFluidSolver::AddVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr)
+void IncompressibleFluidSolver::AddVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr, bool zero_bdr)
 {
    vel_dbcs.emplace_back(attr, coeff);
 
@@ -1270,14 +1285,46 @@ void IncompressibleFluidSolver::AddVelDirichletBC(VectorCoefficient *coeff, Arra
    Array<int> temp_dof;
    vfes->GetEssentialTrueDofs(attr,temp_dof);
    vel_ess_tdofs.Append(temp_dof,temp_dof.Size());
+
+   if (zero_bdr)
+   {
+      vel_dbcs.back().zero_bdr = true;
+
+      // extract all the true dofs besides this bc
+      Array<int> bdr_tdofs;
+      Array<int> not_attr;
+      not_attr.SetSize(attr.Size());
+      not_attr = 1;
+      for (int i = 0; i < attr.Size(); ++i)
+      {
+         if (attr[i] == 1)
+         {
+            not_attr[i] = 0;
+         }
+      }
+      vfes->GetEssentialTrueDofs(not_attr,bdr_tdofs);
+      bdr_tdofs.Sort();
+
+      // Find intersection of bdr_tdofs and temp_dof (essential dofs for this bc)
+      Array<int> intersect_tdofs;
+      for (int i=0; i < temp_dof.Size(); i++)
+      {
+         int idx = bdr_tdofs.FindSorted(temp_dof[i]);
+         if (idx >= 0)
+         {
+            intersect_tdofs.Append(temp_dof[i]);
+         }
+      }
+      vel_dbcs.back().zero_bdr_tdofs = intersect_tdofs;
+   }
 }
 
-void IncompressibleFluidSolver::AddVelDirichletBC(VecFuncT *f, Array<int> &attr)
+void IncompressibleFluidSolver::AddVelDirichletBC(VecFuncT *f, Array<int> &attr, bool zero_bdr)
 {
-   AddVelDirichletBC(new VectorFunctionCoefficient(pmesh->Dimension(), f), attr);
+   AddVelDirichletBC(new VectorFunctionCoefficient(pmesh->Dimension(), f), attr, zero_bdr);
 }
 
-void IncompressibleFluidSolver::AddVelDirichletBC(Coefficient *coeff, Array<int> &attr, int component_)
+void IncompressibleFluidSolver::AddVelDirichletBC(Coefficient *coeff, Array<int> &attr, int component_, bool zero_bdr)
 {
    if (verbose && my_rank == 0)
    {
@@ -1331,11 +1378,43 @@ void IncompressibleFluidSolver::AddVelDirichletBC(Coefficient *coeff, Array<int>
    Array<int> temp_dof;
    vfes->GetEssentialTrueDofs(attr,temp_dof,component);
    vel_ess_tdofs.Append(temp_dof,temp_dof.Size());
+
+   if (zero_bdr)
+   {
+      vel_dbcs.back().zero_bdr = true;
+
+      // extract all the true dofs besides this bc
+      Array<int> bdr_tdofs;
+      Array<int> not_attr;
+      not_attr.SetSize(attr.Size());
+      not_attr = 1;
+      for (int i = 0; i < attr.Size(); ++i)
+      {
+         if (attr[i] == 1)
+         {
+            not_attr[i] = 0;
+         }
+      }
+      vfes->GetEssentialTrueDofs(not_attr,bdr_tdofs,component);
+      bdr_tdofs.Sort();
+
+      // Find intersection of bdr_tdofs and temp_dof (essential dofs for this bc)
+      Array<int> intersect_tdofs;
+      for (int i=0; i < temp_dof.Size(); i++)
+      {
+         int idx = bdr_tdofs.FindSorted(temp_dof[i]);
+         if (idx >= 0)
+         {
+            intersect_tdofs.Append(temp_dof[i]);
+         }
+      }
+      vel_dbcs.back().zero_bdr_tdofs = intersect_tdofs;
+   }
 }
 
-void IncompressibleFluidSolver::AddVelDirichletBC(ScalarFuncT *f, Array<int> &attr, int component_)
+void IncompressibleFluidSolver::AddVelDirichletBC(ScalarFuncT *f, Array<int> &attr, int component_, bool zero_bdr)
 {
-   AddVelDirichletBC(new FunctionCoefficient(f), attr, component_);
+   AddVelDirichletBC(new FunctionCoefficient(f), attr, component_, zero_bdr);
 }
 
 void IncompressibleFluidSolver::AddPresDirichletBC(Coefficient *coeff, Array<int> &attr)

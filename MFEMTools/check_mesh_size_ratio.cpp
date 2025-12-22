@@ -97,6 +97,11 @@ int main(int argc, char *argv[])
                << "  Min element size: " << solid_hmin << "\n"
                << "  Max element size: " << solid_hmax << "\n"
                << "  Avg element size: " << solid_havg << "\n";
+
+      mfem::out << "Ratio of fluid element size to max solid element size:\n"
+               << "  Min: " << fluid_hmin / solid_hmax << "\n"
+               << "  Max: " << fluid_hmax / solid_hmax << "\n"
+               << "  Avg: " << fluid_havg / solid_hmax << "\n";
    }
    
    // Visualize ratio of fluid element size to max solid element size
@@ -164,7 +169,7 @@ int main(int argc, char *argv[])
       VisualizeField(sout, vishost, visport, h_ratio,
                      "Fluid to Solid Mesh Size Ratio",
                      0, 0, 600, 600,
-                     "mci", false);
+                     "ci", false);
    }
 
    return 0;

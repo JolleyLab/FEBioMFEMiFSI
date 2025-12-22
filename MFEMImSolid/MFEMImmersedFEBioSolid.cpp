@@ -425,7 +425,6 @@ void ImmersedFEBioSolid::Correctors(mfem::Vector &del)
    mfem::Vector &d = *dnp1_global_gf;
    #else
    mfem::Vector &delvdot = temp_delvdot_ib_gf;
-
    dnp1_gf.SetFromTrueDofs(dnp1);
    mfem::Vector &d = dnp1_gf;
    #endif
