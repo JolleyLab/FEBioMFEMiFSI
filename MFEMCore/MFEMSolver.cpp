@@ -152,6 +152,11 @@ public:
    std::string fname = "results_mfem_solver";
    mfem::VTKFormat output_format = mfem::VTKFormat::BINARY32; // ASCII, BINARY, or BINARY32
    int compression_level = -1; // zlib compression -1 default, max 9
+   #ifdef MFEM_USE_HDF5
+   bool hdf5_output = true;
+   #else
+   bool hdf5_output = false;
+   #endif
 
    // Restarting
    std::string restart_folder = "RestartFiles";
@@ -326,6 +331,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.q_criterion, "Save_Q_Criterion");
       ADD_PARAMETER(m.output_surface_pressures, "Output_surface_pressures");
       ADD_PARAMETER(m.output_surface_flowrates, "Output_surface_flow_rates");
+      ADD_PARAMETER(m.hdf5_output, "HDF5_output");
    END_PARAM_GROUP();
 
    // // Nonlinear Solver Options
@@ -1481,11 +1487,14 @@ void MFEMSolver::PostProcessOutput()
 
    std::string fluid_filename = m.fname + "/fluid";
    #ifdef MFEM_USE_MPI
-   #ifdef MFEM_USE_HDF5
-   m.pvdc = new ParaViewHDFDataCollection(fluid_filename, m.fluid_pmesh);
-   #else
-   m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
-   #endif
+   if (m.hdf5_output) m.pvdc = new ParaViewHDFDataCollection(fluid_filename, m.fluid_pmesh);
+   else m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
+
+   // #ifdef MFEM_USE_HDF5
+   // m.pvdc = new ParaViewHDFDataCollection(fluid_filename, m.fluid_pmesh);
+   // #else
+   // m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
+   // #endif
    #else
    m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_mesh);
    #endif   

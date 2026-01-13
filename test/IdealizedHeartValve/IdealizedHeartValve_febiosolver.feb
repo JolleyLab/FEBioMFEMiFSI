@@ -33,6 +33,7 @@
 			<Zero_mean_pressure>0</Zero_mean_pressure>
 			<Immersed_solid>1</Immersed_solid>
 			<Solid_solver_type>FEBio</Solid_solver_type>
+         <Save_Von_Mises_Stress>1</Save_Von_Mises_Stress>
 			<Subtract_viscous_stress>1</Subtract_viscous_stress>
 			<VMS_stabilization_scaling>1</VMS_stabilization_scaling>
 			<rho_inf>0.5</rho_inf>
