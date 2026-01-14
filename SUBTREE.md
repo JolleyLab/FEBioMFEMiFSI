@@ -1,6 +1,6 @@
 # Working with Git Subtree in FEBioMFEMiFSI
 
-This repository uses **Git subtree** to include the MFEMFSI code. Subtree keeps the code integrated in the main repo while allowing you to push and pull changes to the original MFEMFSI repository.
+This repository uses **Git subtree** to include the iFSI code. Subtree keeps the code integrated in the main repo while allowing you to push and pull changes to the original iFSI repository.
 
 ---
 
@@ -9,35 +9,35 @@ No special steps are needed for subtree. Just clone as usual:
 ```bash
 git clone git@github.com:JolleyLab/FEBioMFEMiFSI.git
 ```
-All files, including MFEMFSI, will be present.
+All files, including iFSI, will be present.
 
 ---
 
-## Pulling Updates from MFEMFSI
-To update the MFEMFSI subtree from its remote repository:
+## Pulling Updates from iFSI
+To update the iFSI subtree from its remote repository:
 ```bash
-git subtree pull --prefix=MFEMFSI git@github.com:ryanblack129/MFEMFSI.git main --squash
+git subtree pull --prefix=iFSI git@github.com:ryanblack129/iFSI.git main --squash
 ```
 **Explanation:**
-- `--prefix=MFEMFSI` → folder where subtree lives
+- `--prefix=iFSI` → folder where subtree lives
 - `main` → branch to pull from
 - `--squash` → optional, reduces history to one commit
 
 ---
 
-## Pushing Changes Back to MFEMFSI
-If you make changes in `MFEMFSI/` and want to push them back to the MFEMFSI repo:
+## Pushing Changes Back to iFSI
+If you make changes in `iFSI/` and want to push them back to the iFSI repo:
 ```bash
-git subtree push --prefix=MFEMFSI git@github.com:ryanblack129/MFEMFSI.git main
+git subtree push --prefix=iFSI git@github.com:ryanblack129/iFSI.git main
 ```
 
 ---
 
 ## Workflow Summary
-- Edit files in `MFEMFSI/` directly.
+- Edit files in `iFSI/` directly.
 - Commit changes in the main repo as usual.
-- Use `git subtree push` to sync changes back to MFEMFSI.
-- Use `git subtree pull` to bring in updates from MFEMFSI.
+- Use `git subtree push` to sync changes back to iFSI.
+- Use `git subtree pull` to bring in updates from iFSI.
 
 ---
 
