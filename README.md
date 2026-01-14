@@ -1,5 +1,5 @@
 # Description
-This project aims to couple FEBio with an MFEM-based FSI solver. 
+This project aims to couple FEBio with an MFEM-based FSI solver ([MFEMFSI](https://github.com/ryanblack129/MFEMFSI)).
 
 This is a work in progress! Use at your own risk!!
 
