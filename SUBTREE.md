@@ -1,46 +1,64 @@
-# Working with Git Subtree in FEBioMFEMiFSI
+# Git Subtree Guide for MFEMFSI folder (iFSI Upstream)
 
-This repository uses **Git subtree** to include the iFSI code. Subtree keeps the code integrated in the main repo while allowing you to push and pull changes to the original iFSI repository.
+This project includes the external **iFSI** codebase using git subtree, stored locally in the directory **MFEMFSI/**
+
+Upstream repository details:
+
+- **Repository:** https://github.com/ryanblack129/iFSI  
+- **Local remote name:** `iFSI`  
+- **Default branch:** `main`
+
+This guide explains how to **add**, **update**, **push changes**, and **reset** the subtree cleanly.
 
 ---
 
-## Cloning the Repository
-No special steps are needed for subtree. Just clone as usual:
+## 1. Initial Setup (run once)
+
+If you do not yet have the `iFSI` remote configured:
+
 ```bash
-git clone git@github.com:JolleyLab/FEBioMFEMiFSI.git
+git remote add iFSI https://github.com/ryanblack129/iFSI.git
+git fetch iFSI
 ```
-All files, including iFSI, will be present.
 
----
+You can verify with:
 
-## Pulling Updates from iFSI
-To update the iFSI subtree from its remote repository:
 ```bash
-git subtree pull --prefix=iFSI git@github.com:ryanblack129/iFSI.git main --squash
-```
-**Explanation:**
-- `--prefix=iFSI` → folder where subtree lives
-- `main` → branch to pull from
-- `--squash` → optional, reduces history to one commit
-
----
-
-## Pushing Changes Back to iFSI
-If you make changes in `iFSI/` and want to push them back to the iFSI repo:
-```bash
-git subtree push --prefix=iFSI git@github.com:ryanblack129/iFSI.git main
+git remote -v
 ```
 
 ---
 
-## Workflow Summary
-- Edit files in `iFSI/` directly.
-- Commit changes in the main repo as usual.
-- Use `git subtree push` to sync changes back to iFSI.
-- Use `git subtree pull` to bring in updates from iFSI.
+## 2. Adding the Subtree
+
+If the directory `MFEMFSI/` does **not** yet exist:
+
+```bash
+git subtree add --prefix=MFEMFSI iFSI main --squash
+```
+
+This pulls the latest `iFSI` code into your project.
 
 ---
 
-## Best Practices
-- Use `--squash` when pulling to keep history clean.
-- Document any subtree updates in commit messages.
+## 3. Updating the Subtree (pulling upstream changes)
+
+To update your local subtree with the latest code from the `iFSI` repo:
+
+```bash
+git subtree pull --prefix=MFEMFSI iFSI main --squash
+```
+
+The `--squash` flag keeps your main repo history clean by condensing subtree commits.
+
+---
+
+## 4. Pushing Local Changes Upstream
+
+If you make changes inside `MFEMFSI/` and want to contribute them back to the upstream `iFSI` repository:
+
+```bash
+git subtree push --prefix=MFEMFSI iFSI main
+```
+
+This extracts only the subtree changes and pushes them to the `main` branch of `iFSI`.
