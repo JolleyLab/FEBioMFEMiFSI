@@ -1487,14 +1487,12 @@ void MFEMSolver::PostProcessOutput()
 
    std::string fluid_filename = m.fname + "/fluid";
    #ifdef MFEM_USE_MPI
+   #ifdef MFEM_USE_HDF5
    if (m.hdf5_output) m.pvdc = new ParaViewHDFDataCollection(fluid_filename, m.fluid_pmesh);
    else m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
-
-   // #ifdef MFEM_USE_HDF5
-   // m.pvdc = new ParaViewHDFDataCollection(fluid_filename, m.fluid_pmesh);
-   // #else
-   // m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
-   // #endif
+   #else
+   m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_pmesh);
+   #endif
    #else
    m.pvdc = new ParaViewDataCollection(fluid_filename, m.fluid_mesh);
    #endif   
@@ -1546,7 +1544,8 @@ void MFEMSolver::PostProcessOutput()
       std::string solid_filename = m.fname + "/solid";
       #ifdef MFEM_USE_MPI
       #ifdef MFEM_USE_HDF5
-      m.sdc = new ParaViewHDFDataCollection(solid_filename, m.solid_pmesh);
+      if (m.hdf5_output) m.sdc = new ParaViewHDFDataCollection(solid_filename, m.solid_pmesh);
+      else m.sdc = new ParaViewDataCollection(solid_filename, m.solid_pmesh);
       #else
       m.sdc = new ParaViewDataCollection(solid_filename, m.solid_pmesh);
       #endif

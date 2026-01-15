@@ -38,7 +38,7 @@ endif()
 
 # Find FEBio Libs
 if(NOT DEFINED FEBio_SDK OR FEBio_SDK STREQUAL "")
-    set(FEBio_SDK "/Users/blackr1/Documents/Software/FEBio/" CACHE PATH "Path to FEBio SDK root" FORCE)
+   message(STATUS "FEBio_SDK not defined, please set ...")
 endif()
 message(STATUS "Using FEBio_SDK = ${FEBio_SDK}")
 
@@ -144,9 +144,9 @@ set(FEBio_LIBS ${FECORE} ${FEBIOLIB} ${FEBIOMECH} ${FEBIOXML} ${XMLLIB})
 #  * mfem_DIR - absolute path to where MFEMConfig.cmake is.
 message(STATUS "Looking for mfem ...")
 if(NOT DEFINED MFEM_DIR OR MFEM_DIR STREQUAL "")
-    set(MFEM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../FSI_Solver_v2.0/Software/build-mfem/" CACHE PATH "Path to MFEM build prefix" FORCE)
+   message(STATUS "MFEM_DIR not defined, please set ...")
 endif()
-set(MFEM_SOURCE_DIR "${MFEM_DIR}/../mfem/" CACHE PATH "Path to the MFEM source prefix.")
+set(MFEM_SOURCE_DIR "${MFEM_DIR}/" CACHE PATH "Path to the MFEM source prefix.")
 # Note: make sure to install mfem, then below will automatically find the library + header files. Otherwise set MFEM_DIR above
 if (MFEM_DIR)
    find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
@@ -197,6 +197,10 @@ file(GLOB_RECURSE HDR_FEBioMFEMiFSI CONFIGURE_DEPENDS
 file(GLOB_RECURSE SRC_FEBioMFEMiFSI CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
 )
+
+# Exclude TPLs
+list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX ".*/Software/.*")
+list(FILTER HDR_FEBioMFEMiFSI EXCLUDE REGEX ".*/Software/.*")
 
 # Exclude sources from the MFEMTools subdirectory; built separately
 list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX ".*/MFEMTools/.*")

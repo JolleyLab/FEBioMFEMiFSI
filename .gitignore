@@ -415,3 +415,4 @@ results_mfem_solver*/
 *.dat
 ParallelMesh*/
 RestartFiles/
+Software/
