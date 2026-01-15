@@ -60,7 +60,10 @@ usage() {
     echo "  --cc CC                     Override C compiler for CMake builds (default: platform-specific)"
     echo "  --cxx CXX                   Override C++ compiler for CMake builds (default: platform-specific)"
     echo "  --mfem-options STR          Pass additional options to MFEM CMake (e.g., '-DMFEM_USE_MPI=ON')"
-    echo "  --clean                     Clean build directory before building"
+    echo "  --update-ifsi               Update iFSI subtree from remote (requires clean working tree)"
+    echo "  --clean                     Clean and rebuild both MFEM and FEBioMFEMiFSI plugin"
+    echo "  --clean-mfem                Clean and rebuild MFEM only"
+    echo "  --clean-plugin              Clean and rebuild FEBioMFEMiFSI plugin only"
     echo "  --help                      Show this help message"
     echo ""
     echo "Example:"
@@ -78,6 +81,9 @@ METIS_CFLAGS=""
 METIS_CXXFLAGS=""
 MFEM_CXXFLAGS=""
 CLEAN_BUILD=false
+CLEAN_MFEM=false
+CLEAN_PLUGIN=false
+UPDATE_IFSI=false
 BUILD_TYPE="Release"
 
 while [[ $# -gt 0 ]]; do
@@ -134,8 +140,20 @@ while [[ $# -gt 0 ]]; do
             MFEM_OPTIONS="$2"
             shift 2
             ;;
+        --update-ifsi)
+            UPDATE_IFSI=true
+            shift
+            ;;
         --clean)
             CLEAN_BUILD=true
+            shift
+            ;;
+        --clean-mfem)
+            CLEAN_MFEM=true
+            shift
+            ;;
+        --clean-plugin)
+            CLEAN_PLUGIN=true
             shift
             ;;
         --help)
@@ -347,10 +365,10 @@ if [ ! -d "${MFEM_DIR}" ]; then
 fi
 
 # Build MFEM if needed
-if [ ! -d "${MFEM_BUILD_DIR}" ] || [ "$CLEAN_BUILD" = true ]; then
+if [ ! -d "${MFEM_BUILD_DIR}" ] || [ "$CLEAN_BUILD" = true ] || [ "$CLEAN_MFEM" = true ]; then
     echo -e "${YELLOW}Building MFEM...${NC}"
     
-    if [ "$CLEAN_BUILD" = true ] && [ -d "${MFEM_BUILD_DIR}" ]; then
+    if { [ "$CLEAN_BUILD" = true ] || [ "$CLEAN_MFEM" = true ]; } && [ -d "${MFEM_BUILD_DIR}" ]; then
         rm -rf "${MFEM_BUILD_DIR}"
     fi
     
@@ -370,12 +388,16 @@ else
 fi
 
 # Update git subtree (MFEMFSI)
-# Check if working tree has changes; skip subtree update if it does
 cd "${PROJECT_ROOT}"
-if git status --short | grep -q .; then
-    echo -e "${YELLOW}Working tree has uncommitted changes. Skipping git subtree update.${NC}"
-else
-    echo -e "${YELLOW}Setting up git subtree (iFSI)...${NC}"
+
+# Check if MFEMFSI directory exists; always add if missing
+if [ ! -d "${PROJECT_ROOT}/MFEMFSI" ]; then
+    if git status --short | grep -q .; then
+        echo -e "${RED}Error: Cannot add MFEMFSI subtree with uncommitted changes. Please commit or stash your changes first.${NC}"
+        exit 1
+    fi
+    
+    echo -e "${YELLOW}Adding MFEMFSI subtree...${NC}"
     
     # Check if iFSI remote exists
     if ! git remote get-url iFSI > /dev/null 2>&1; then
@@ -384,17 +406,30 @@ else
         git fetch iFSI
         echo -e "${GREEN}iFSI remote added${NC}"
     fi
-
-    # Check if MFEMFSI directory exists
-    if [ ! -d "${PROJECT_ROOT}/MFEMFSI" ]; then
-        echo -e "${YELLOW}Adding MFEMFSI subtree...${NC}"
-        git subtree add --prefix=MFEMFSI iFSI main --squash
-        echo -e "${GREEN}MFEMFSI subtree added${NC}"
-    else
-        echo -e "${YELLOW}Updating MFEMFSI subtree...${NC}"
-        git subtree pull --prefix=MFEMFSI iFSI main --squash
-        echo -e "${GREEN}MFEMFSI subtree updated${NC}"
+    
+    git subtree add --prefix=MFEMFSI iFSI main --squash
+    echo -e "${GREEN}MFEMFSI subtree added${NC}"
+elif [ "$UPDATE_IFSI" = true ]; then
+    # Only update if explicitly requested via --update-ifsi
+    if git status --short | grep -q .; then
+        echo -e "${RED}Error: Cannot update iFSI subtree with uncommitted changes. Please commit or stash your changes first.${NC}"
+        exit 1
     fi
+    
+    echo -e "${YELLOW}Updating MFEMFSI subtree...${NC}"
+    
+    # Check if iFSI remote exists
+    if ! git remote get-url iFSI > /dev/null 2>&1; then
+        echo -e "${YELLOW}Adding iFSI remote...${NC}"
+        git remote add iFSI https://github.com/ryanblack129/iFSI.git
+        git fetch iFSI
+        echo -e "${GREEN}iFSI remote added${NC}"
+    fi
+    
+    git subtree pull --prefix=MFEMFSI iFSI main --squash
+    echo -e "${GREEN}MFEMFSI subtree updated${NC}"
+else
+    echo -e "${GREEN}Skipping iFSI subtree update (use --update-ifsi to update)${NC}"
 fi
 
 # Build FEBioMFEMiFSI project
@@ -405,7 +440,7 @@ if [ ! -d "${PROJECT_ROOT}/build" ]; then
     mkdir -p "${PROJECT_ROOT}/build"
 fi
 
-if [ "$CLEAN_BUILD" = true ]; then
+if [ "$CLEAN_BUILD" = true ] || [ "$CLEAN_PLUGIN" = true ]; then
     rm -rf "${PROJECT_ROOT}/build"
     mkdir -p "${PROJECT_ROOT}/build"
 fi

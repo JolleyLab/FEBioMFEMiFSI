@@ -53,10 +53,14 @@ The simplest way to build is:
 - `--mfem-options STR` - Additional CMake options for MFEM
   - Useful for enabling/disabling specific MFEM features
   - Example: `--mfem-options '-DMFEM_USE_MPI=ON'`
-- `--clean` - Clean build directories before building
-  - Removes and rebuilds MFEM and FEBioMFEMiFSI
+- `--update-ifsi` - Update iFSI subtree from remote repository
+  - Requires a clean working tree (no uncommitted changes)
+  - Skipped by default; only runs when this flag is provided
+  - The subtree is automatically added on first build if missing
+- `--clean` - Clean and rebuild both MFEM and FEBioMFEMiFSI plugin
   - Does not clean dependencies (GSLIB, HYPRE, METIS)
-  - Use for incremental rebuilds after code changes
+- `--clean-mfem` - Clean and rebuild MFEM only
+- `--clean-plugin` - Clean and rebuild FEBioMFEMiFSI plugin only
 - `--help` - Display help message and exit
 
 ## Usage Examples
@@ -68,7 +72,19 @@ The simplest way to build is:
 
 ### Clean Rebuild
 ```bash
+# Clean and rebuild everything
 ./build.sh --febio-sdk /path/to/FEBio --clean
+
+# Clean and rebuild MFEM only
+./build.sh --febio-sdk /path/to/FEBio --clean-mfem
+
+# Clean and rebuild plugin only
+./build.sh --febio-sdk /path/to/FEBio --clean-plugin
+```
+
+### Update iFSI Subtree
+```bash
+./build.sh --febio-sdk /path/to/FEBio --update-ifsi
 ```
 
 ## Build Output
