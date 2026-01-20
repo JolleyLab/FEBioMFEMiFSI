@@ -1,7 +1,7 @@
 #include "MFEMParExport.h"
 
 // FEBio Headers
-#include <XML/XMLWriter.h>
+#include <FEBioXML/XMLWriter.h>
 #include <FEBioLib/FEBioModel.h>
 #include <FECore/FEPlotDataStore.h>
 #include <FECore/fecore_enum.h>
@@ -10,7 +10,7 @@
 #include <FECore/FEInitialCondition.h>
 #include <FECore/log.h>
 #include <FECore/FELoadController.h>
-#include <XML/XMLReader.h>
+#include <FEBioXML/XMLReader.h>
 
 // MFEM Headers
 #include <mfem.hpp>
@@ -95,8 +95,8 @@ void MFEMParExport::WriteMainFebFile()
    std::string main_feb_file = part_dir + feb_filename + "_Main.feb";
    xml_writer.open(main_feb_file.c_str());
    
-   // set modified formats
-   XMLElement::intFormat = "%d";
+   // // set modified formats
+   // XMLElement::intFormat = "%d";
 
    XMLElement el;
 
@@ -271,8 +271,8 @@ void MFEMParExport::WriteLocalFebFiles()
       MFEM_ASSERT(mesh, "Error: failed to load parallel solid mesh for rank " << myid);
    }
 
-   // set modified formats
-   XMLElement::intFormat = "%d";
+   // // set modified formats
+   // XMLElement::intFormat = "%d";
 
    XMLElement el;
 

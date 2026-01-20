@@ -13,11 +13,11 @@ The `build.sh` script is a comprehensive build automation tool that:
 
 Before running the build script, ensure you have:
 
-- **CMake** (version 3.10 or higher)
-- **C/C++ Compiler** (gcc/clang with C++17 support)
-- **Make** or compatible build system
-- **Git** (for fetching dependencies and managing subtrees)
-- **FEBio SDK** (FEBio installation)
+- **CMake** (version 3.15 or higher)
+- **C/C++ Compiler** (with C++17 support)
+- **Make**
+- **Git**
+- **FEBio installation**
 - **MPI** (for parallel computing support)
 
 ### macOS support
@@ -29,15 +29,15 @@ Before running the build script, ensure you have:
 The simplest way to build is:
 
 ```bash
-./build.sh --febio-sdk /path/to/FEBio
+./build.sh --febio-dir /path/to/FEBio
 ```
 
 ## Build Script Options
 
 ### Required Options
 
-- `--febio-sdk PATH` - Path to FEBio SDK root directory (REQUIRED)
-  - Example: `--febio-sdk /Users/user/Software/FEBio`
+- `--febio-dir PATH` - Path to FEBio installation directory (REQUIRED)
+  - Example: `--febio-dir /Users/user/Software/FEBio/install`
 
 ### Optional Options
 
@@ -61,30 +61,23 @@ The simplest way to build is:
   - Does not clean dependencies (GSLIB, HYPRE, METIS)
 - `--clean-mfem` - Clean and rebuild MFEM only
 - `--clean-plugin` - Clean and rebuild FEBioMFEMiFSI plugin only
-- `--help` - Display help message and exit
-
-## Usage Examples
-
-### Basic Release Build
-```bash
-./build.sh --febio-sdk /path/to/FEBio
-```
+- `--help` - Display usage
 
 ### Clean Rebuild
 ```bash
 # Clean and rebuild everything
-./build.sh --febio-sdk /path/to/FEBio --clean
+./build.sh --febio-dir /path/to/FEBio/install --clean
 
 # Clean and rebuild MFEM only
-./build.sh --febio-sdk /path/to/FEBio --clean-mfem
+./build.sh --febio-dir /path/to/FEBio/install --clean-mfem
 
 # Clean and rebuild plugin only
-./build.sh --febio-sdk /path/to/FEBio --clean-plugin
+./build.sh --febio-dir /path/to/FEBio/install --clean-plugin
 ```
 
 ### Update iFSI Subtree
 ```bash
-./build.sh --febio-sdk /path/to/FEBio --update-ifsi
+./build.sh --febio-dir /path/to/FEBio/install --update-ifsi
 ```
 
 ## Build Output
@@ -99,7 +92,7 @@ The script creates the following build directory structure:
 .
 ├── Software/                      # Third-party libraries and dependencies
 │   ├── mfem/                      # MFEM source and build
-│   │   ├── build-mfem/            # MFEM build directory
+│   │   ├── build/            # MFEM build directory
 │   │   └── [MFEM source files]
 │   ├── gslib/                     # GSLIB source and build
 │   │   ├── build/                 # GSLIB build directory
@@ -114,7 +107,7 @@ The script creates the following build directory structure:
 │   │   └── [METIS source files]
 │   └── metis → metis-5.1.0        # Symlink to current METIS version
 ├── build/                         # FEBioMFEMiFSI build
-│   ├── lib/                       # Output library
+│   ├── lib/                       # Built plugin library
 │   └── CMakeFiles/
 ├── MFEMFSI/                       # iFSI subtree (git managed)
 │   └── [iFSI source files]
@@ -134,7 +127,7 @@ Set up directory structure and environment variables:
 ```bash
 export PROJECT_ROOT="$(pwd)"
 export SOFTWARE_DIR="${PROJECT_ROOT}/Software"
-export FEBio_SDK="/path/to/your/FEBio"
+export FEBio_DIR="/path/to/your/FEBio/install"
 mkdir -p "${SOFTWARE_DIR}"
 ```
 
@@ -168,7 +161,7 @@ HYPRE is built using autotools with an in-place build in the `src/` directory.
 - Build system: autotools (configure + make)
 - Fortran: disabled (`--disable-fortran`)
 - Flags: `-fPIC` (mandatory)
-- Compiler: System defaults (not overridden)
+- Compiler: System defaults
 
 **Build Steps:**
 
@@ -268,26 +261,9 @@ cmake .. \
 make
 ```
 
-**macOS-specific compiler override:**
-
-If you need to override compilers on macOS (or any platform):
-
-```bash
-cmake .. \
-  -DCMAKE_CXX_COMPILER=clang++ \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_FLAGS="-fPIC" \
-  -DMFEM_USE_GSLIB=ON \
-  -DGSLIB_DIR="${SOFTWARE_DIR}/gslib/build" \
-  -DMFEM_USE_MPI=ON \
-  -DHYPRE_DIR="${SOFTWARE_DIR}/hypre/src/hypre/lib" \
-  -DMFEM_USE_METIS=ON \
-  -DMETIS_DIR="${SOFTWARE_DIR}/metis"
-```
-
 **Output:**
-- Build directory: `${SOFTWARE_DIR}/mfem/build-mfem/`
-- MFEM config: `${SOFTWARE_DIR}/mfem/build-mfem/MFEMConfig.cmake`
+- Build directory: `${SOFTWARE_DIR}/mfem/build/`
+- MFEM config: `${SOFTWARE_DIR}/mfem/build/MFEMConfig.cmake`
 
 ### 5. Update iFSI Subtree (Optional)
 
@@ -331,21 +307,10 @@ cd build
 cmake .. \
   -DCMAKE_BUILD_TYPE=Release \
   -DMFEM_DIR="${SOFTWARE_DIR}/mfem/build-mfem" \
-  -DFEBio_SDK="${FEBio_SDK}"
+  -DFEBio_DIR="${FEBio_DIR}"
 
 # Build
 make
-```
-
-**macOS-specific compiler override:**
-
-```bash
-cmake .. \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DMFEM_DIR="${SOFTWARE_DIR}/mfem/build-mfem" \
-  -DFEBio_SDK="${FEBio_SDK}"
 ```
 
 **Output:**

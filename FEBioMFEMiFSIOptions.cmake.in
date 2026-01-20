@@ -1,4 +1,3 @@
 # Options for FEBioMFEMiFSI
 
-set(iFSI_USE_MPI @iFSI_USE_MPI@)
-set(iFSI_USE_GSLIB @iFSI_USE_GSLIB@)
+# TODO

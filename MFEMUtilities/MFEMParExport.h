@@ -1,7 +1,7 @@
 #pragma once
 
-#include <XML/XMLWriter.h>
-#include <XML/XMLReader.h>
+#include <FEBioXML/XMLWriter.h>
+#include <FEBioXML/XMLReader.h>
 #include <FECore/FECoreBase.h>
 #include <FECore/FEParam.h>
 #include <FECore/FEModel.h>

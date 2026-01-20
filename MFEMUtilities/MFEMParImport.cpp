@@ -1,7 +1,7 @@
 #include "MFEMParImport.h"
 
 // FEBio Headers
-#include <XML/XMLReader.h>
+#include <FEBioXML/XMLReader.h>
 #include <FEBioXML/FEBioIncludeSection.h>
 #include <FEBioXML/FEBioModuleSection.h>
 #include <FEBioXML/FEBioControlSection4.h>

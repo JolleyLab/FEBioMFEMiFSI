@@ -1,5 +1,5 @@
 # CMake Housekeeping
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -18,12 +18,6 @@ if(APPLE)
    set(CMAKE_CXX_COMPILER clang++)
 endif()
 
-# Name of your plugin
-project(FEBioMFEMiFSI)
-
-# Name of the FEBio libraries you need to link to
-set(FEBio_LIB_NAMES FECore FEBioMech FEBioXML XML)
-
 # Set a default build type if none was specified
 set(default_build_type "Release")
  
@@ -36,158 +30,77 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# Find FEBio Libs
-if(NOT DEFINED FEBio_SDK OR FEBio_SDK STREQUAL "")
-   message(STATUS "FEBio_SDK not defined, please set ...")
-endif()
-message(STATUS "Using FEBio_SDK = ${FEBio_SDK}")
+# Name of your plugin
+project(FEBioMFEMiFSI)
 
-# Only update the include and lib directories if the FEBio_SDK path has been changed. 
-if(NOT OLD_SDK)
-    message(STATUS "Setting up sdk ...")
-    set(NEWPATH TRUE)
+##### Find FEBio #####
+message(STATUS "Looking for FEBio ...")
+set(FEBio_DIR "" CACHE PATH "Path to FEBio installation.")
+
+# Auto-detect FEBio_SOURCE_DIR based on FEBio_DIR if not explicitly set
+if(NOT FEBio_SOURCE_DIR AND FEBio_DIR)
+   set(FEBio_SOURCE_DIR "${FEBio_DIR}" CACHE PATH "Path to the FEBio source prefix.")
+endif()
+
+if(FEBio_DIR)
+   find_package(FEBio CONFIG REQUIRED PATHS "${FEBio_DIR}" NO_DEFAULT_PATH)
 else()
-    #cmake_path(CONVERT ${OLD_SDK} TO_CMAKE_PATH_LIST STD_OLD_SDK)
-    #cmake_path(CONVERT ${FEBio_SDK} TO_CMAKE_PATH_LIST STD_FEBIO_SDK)
-    #string(COMPARE NOTEQUAL ${STD_FEBIO_SDK} ${STD_OLD_SDK} NEWPATH)
-    string(COMPARE NOTEQUAL ${FEBio_SDK} ${OLD_SDK} NEWPATH)
+   find_package(FEBio CONFIG REQUIRED)
 endif()
 
-if(NEWPATH)
-    # Is this the SDK?
-    string(REGEX MATCH "sdk" IS_SDK ${FEBio_SDK})
-
-    set(LIB_SUFFIXES "")
-    if(IS_SDK)
-        set(FEBio_INC "${FEBio_SDK}/include" CACHE PATH "Path to FEBio include directory." FORCE)
-        
-        if(WIN32)
-            list(APPEND LIB_SUFFIXES "vs2017/Release" "vs2017/Debug" "lib")
-        else()
-            list(APPEND LIB_SUFFIXES "lib")
-        endif()
-    else()
-        set(FEBio_INC ${FEBio_SDK} CACHE PATH "Path to FEBio include directory." FORCE)
-        
-        if(WIN32)
-            list(APPEND LIB_SUFFIXES "cmbuild22/lib/Release" "cmbuild/lib/Release" "cmbuild/lib/Debug" "cbuild/lib/Release" "cbuild/lib/Debug" "build/lib/Release" "build/lib/Debug")
-        else()
-            list(APPEND LIB_SUFFIXES "cbuild/lib" "cmbuild/lib" "build/lib" "cbuild/Release/lib" "cmbuild/Release/lib" "build/Release/lib" "cbuild/Debug/lib" "cmbuild/Debug/lib" "build/Debug/lib" "cbuild/Debug" "cmbuild/Debug" "build/Debug")
-        endif()
-    endif()
-
-    mark_as_advanced(FEBio_INC)
-
-    # Find lib path
-    find_library(FECORE  
-        NAMES FECore fecore fecore_gcc64 fecore_lnx64
-        PATHS ${FEBio_SDK}
-        PATH_SUFFIXES ${LIB_SUFFIXES}
-        DOC "FEBio library path")
-
-    if(FECORE)
-        get_filename_component(FECORE_TEMP ${FECORE} DIRECTORY)
-        set(FEBio_LIB_DIR ${FECORE_TEMP} CACHE PATH "Path to the FEBio lib directory." FORCE)
-        mark_as_advanced(FEBio_LIB_DIR)
-        unset(FECORE_TEMP)
-        unset(FECORE CACHE)
-    else()
-        set(FEBio_LIB_DIR CACHE PATH "Path to the FEBio lib directory." FORCE)
-        message(SEND_ERROR "Unable to find FEBio Library path automatically. Set FEBio_LIB_DIR.")
-        unset(FECORE CACHE)
-    endif()
+if (FEBio_FOUND)
+   message(STATUS "Found FEBio in: ${FEBio_DIR}")
+else()
+   message(FATAL_ERROR "Could not find FEBio. Please set FEBio_DIR to the FEBio installation path.")
 endif()
-
-set(OLD_SDK ${FEBio_SDK} CACHE PATH "Don't edit. Old SDK path used to automatically make changes." FORCE)
-mark_as_advanced(OLD_SDK)
-
-#### Check if paths are valid and find libs ####
-function(findLib libName libDir libOut)
-    string(TOLOWER ${libName} lname)
-
-    find_library(TEMP 
-        NAMES ${libName} ${lname} ${lname}_gcc64 ${lname}_lnx64 
-        PATHS ${${libDir}} 
-        NO_DEFAULT_PATH)
-
-    if(TEMP)
-        set(${libOut} ${TEMP} PARENT_SCOPE)
-        unset(TEMP CACHE)
-    else()
-        if(WIN32)
-            message(SEND_ERROR "Could not find ${libName}.lib. Check ${libName}.")
-        elseif(APPLE)
-            message(SEND_ERROR "Could not find ${libName}.so, ${libName}.a, or ${libName}.dylib Check ${libDir}.")
-        else()
-            message(SEND_ERROR "Could not find ${libName}.so, or ${libName}.a. Check ${libDir}")
-        endif()
-        unset(TEMP CACHE)
-    endif()
-endfunction()
-
-if(FEBio_LIB_DIR)
-    # Find all needed FEBio libs by full path
-    findLib(FECore     FEBio_LIB_DIR FECORE)
-    findLib(FEBioLib   FEBio_LIB_DIR FEBIOLIB)
-    findLib(FEBioMech  FEBio_LIB_DIR FEBIOMECH)
-    findLib(FEBioXML   FEBio_LIB_DIR FEBIOXML)
-    findLib(XML        FEBio_LIB_DIR XMLLIB)
-endif()
-message(STATUS "Found FEBio Include in: ${FEBio_INC}")
-
-# Aggregate libs we will link
-set(FEBio_LIBS ${FECORE} ${FEBIOLIB} ${FEBIOMECH} ${FEBIOXML} ${XMLLIB})
+set(FEBio_LIBS FEBio::FECore FEBio::FEBioMech FEBio::FEBioXML)
 
 ##### Find MFEM #####
 # Import MFEM. The following variables can be used to help CMake find MFEM:
 #  * MFEM_DIR - absolute path to the MFEM build or install prefix.
-#  * mfem_DIR - absolute path to where MFEMConfig.cmake is.
 message(STATUS "Looking for mfem ...")
 if(NOT DEFINED MFEM_DIR OR MFEM_DIR STREQUAL "")
    message(STATUS "MFEM_DIR not defined, please set ...")
 endif()
-set(MFEM_SOURCE_DIR "${MFEM_DIR}/" CACHE PATH "Path to the MFEM source prefix.")
+set(MFEM_SOURCE_DIR "" CACHE PATH "Path to the MFEM source prefix.")
+# Set MFEM_SOURCE_DIR to the MFEM directory (Software/mfem) for includes
+if(NOT MFEM_SOURCE_DIR)
+   set(MFEM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Software/mfem" CACHE PATH "Path to the MFEM source prefix.")
+endif()
 # Note: make sure to install mfem, then below will automatically find the library + header files. Otherwise set MFEM_DIR above
 if (MFEM_DIR)
-   find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
-                "${MFEM_DIR}/lib/cmake/mfem" NO_DEFAULT_PATH)
+   find_package(MFEM CONFIG REQUIRED PATHS "${MFEM_DIR}" NO_DEFAULT_PATH)
 else()
-   find_package(mfem REQUIRED NAMES MFEM)
+   find_package(MFEM REQUIRED NAMES MFEM)
 endif()
-message(STATUS "Found mfem config in: ${mfem_DIR} (version ${MFEM_VERSION})")
 
-#set options based on mfem config
-if(MFEM_USE_MPI)
-   add_definitions(-DMFEM_USE_MPI)
+if (MFEM_FOUND)
+   message(STATUS "Found MFEM config in: ${MFEM_DIR} (version ${MFEM_VERSION})")
+else()
+   message(FATAL_ERROR "Could not find MFEM. Set MFEM_DIR to the folder containing MFEMConfig.cmake or add its install prefix to CMAKE_PREFIX_PATH.")
 endif()
-if (MFEM_USE_GSLIB)
-   add_definitions(-DiFSI_USE_GSLIB)
-endif()
+list(APPEND MFEM_SOURCE_DIR ${MFEM_INCLUDE_DIRS})
 
 ##### Set definitions and compile options #####
 if(WIN32)
-    add_definitions(-DWIN32  -DFECORE_DLL /MP /openmp /wd4251 /wd4275)
+   add_definitions(-DWIN32 -DFECORE_DLL /MP /openmp)
 elseif(APPLE)
-    add_definitions(-D__APPLE__)
+   add_definitions(-D__APPLE__)
    #  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.13)
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup")
-   #  add_compile_options(-frtti) # Enable RTTI for macOS
-   # add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
-   # add_link_options(-fsanitize=address)
+   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup")
 else()
 	add_definitions(-DLINUX)
-   #  add_compile_options(-static-libstdc++ -static-libgcc -w -Wall -frtti)
    add_compile_options(-static-libstdc++ -static-libgcc -w -Wall)
     
-    set(CMAKE_BUILD_RPATH_USE_LINK_PATH FALSE)
-    set(CMAKE_BUILD_RPATH $ORIGIN/../lib/)
+   set(CMAKE_BUILD_RPATH_USE_LINK_PATH FALSE)
+   set(CMAKE_BUILD_RPATH $ORIGIN/../lib/)
 endif()
 
 # Options file
 CONFIGURE_FILE(FEBioMFEMiFSIOptions.cmake.in FEBioMFEMiFSIOptions.cmake @ONLY)
 
 # Set include directory
-include_directories(${FEBio_INC} ${MFEM_SOURCE_DIR})
+include_directories(${FEBio_SOURCE_DIR} ${MFEM_SOURCE_DIR})
 
 # Add library (include sources from subfolders)
 file(GLOB_RECURSE HDR_FEBioMFEMiFSI CONFIGURE_DEPENDS
@@ -211,12 +124,16 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
 )
 
 add_library(FEBioMFEMiFSI SHARED ${HDR_FEBioMFEMiFSI} ${SRC_FEBioMFEMiFSI})
+set_property(TARGET FEBioMFEMiFSI PROPERTY AUTOGEN_BUILD_DIR ${CMAKE_BINARY_DIR}/CMakeFiles/AutoGen/FEBioMFEMiFSI_autogen)
 
 # Link FEBio Libraries (now actual paths)
 target_link_libraries(FEBioMFEMiFSI PRIVATE ${FEBio_LIBS})
 
 # Link MFEM
 target_link_libraries(FEBioMFEMiFSI PRIVATE mfem)
+
+# Propagate MFEM's compile definitions (MFEM_USE_MPI, MFEM_USE_GSLIB, etc.)
+target_compile_definitions(FEBioMFEMiFSI PRIVATE $<TARGET_PROPERTY:mfem,INTERFACE_COMPILE_DEFINITIONS>)
 
 # macOS: ensure loader can find FEBio libs at runtime
 if (APPLE)

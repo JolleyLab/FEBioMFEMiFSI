@@ -2,7 +2,7 @@
 
 # FEBioMFEMiFSI Build Script
 # This script builds the FEBioMFEMiFSI project. It assumes FEBio is built and 
-# the path to the FEBio installation is set via the variable FEBio_SDK
+# the path to the FEBio installation is set via the variable FEBio_DIR
 
 set -e  # Exit on error
 
@@ -47,7 +47,7 @@ CXX_CHOICE=""
 usage() {
     echo -e "${YELLOW}Usage: $0 [OPTIONS]${NC}"
     echo "Required Options:"
-    echo "  --febio-sdk PATH      Path to FEBio SDK root directory (REQUIRED)"
+    echo "  --febio-dir PATH            Path to FEBio installation directory (REQUIRED)"
     echo ""
     echo "Optional Options:"
     echo "  --build-type TYPE           Build type: Debug or Release (default: Release)"
@@ -67,12 +67,12 @@ usage() {
     echo "  --help                      Show this help message"
     echo ""
     echo "Example:"
-    echo "  $0 --febio-sdk /path/to/FEBio --gslib-cflags '-O3' --mfem-cxxflags '-O3 -march=native'"
+    echo "  $0 --febio-dir /path/to/FEBio --febio-source-dir /path/to/FEBio/source --gslib-cflags '-O3' --mfem-cxxflags '-O3 -march=native'"
     exit 0
 }
 
 # Parse command line arguments
-FEBio_SDK=""
+FEBio_DIR=""
 MFEM_OPTIONS=""
 GSLIB_CFLAGS=""
 HYPRE_CFLAGS=""
@@ -88,8 +88,8 @@ BUILD_TYPE="Release"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --febio-sdk)
-            FEBio_SDK="$2"
+        --febio-dir)
+            FEBio_DIR="$2"
             shift 2
             ;;
         --build-type)
@@ -166,21 +166,21 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate required options
-if [ -z "${FEBio_SDK}" ]; then
-    echo -e "${RED}Error: --febio-sdk is required${NC}"
+# Validate required arguments
+if [ -z "${FEBio_DIR}" ]; then
+    echo -e "${RED}Error: --febio-dir is required${NC}"
     usage
 fi
 
-if [ ! -d "${FEBio_SDK}" ]; then
-    echo -e "${RED}Error: FEBio SDK directory not found at ${FEBio_SDK}${NC}"
+if [ ! -d "${FEBio_DIR}" ]; then
+    echo -e "${RED}Error: FEBio installation directory not found at ${FEBio_DIR}${NC}"
     exit 1
 fi
 
 echo -e "${GREEN}=== FEBioMFEMiFSI Build Script ===${NC}"
 echo "Project Root: ${PROJECT_ROOT}"
 echo "Software Directory: ${SOFTWARE_DIR}"
-echo "FEBio SDK: ${FEBio_SDK}"
+echo "FEBio Directory: ${FEBio_DIR}"
 echo "MFEM Directory: ${MFEM_DIR}"
 echo "MFEM Build Directory: ${MFEM_BUILD_DIR}"
 echo "Build Type: ${BUILD_TYPE}"
@@ -417,7 +417,6 @@ elif [ "$UPDATE_IFSI" = true ]; then
     fi
     
     echo -e "${YELLOW}Updating MFEMFSI subtree...${NC}"
-    
     # Check if iFSI remote exists
     if ! git remote get-url iFSI > /dev/null 2>&1; then
         echo -e "${YELLOW}Adding iFSI remote...${NC}"
@@ -448,8 +447,8 @@ fi
 cd "${PROJECT_ROOT}/build"
 
 # CMake configuration for FEBioMFEMiFSI
-# Set MFEM_DIR to point to the MFEM build directory and FEBio_SDK
-cmake_cmd="cmake ${CMAKE_COMPILER_ARGS} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DMFEM_DIR=${MFEM_BUILD_DIR} -DFEBio_SDK=${FEBio_SDK} .."
+# Set MFEM_DIR to point to the MFEM build directory and FEBio_DIR
+cmake_cmd="cmake ${CMAKE_COMPILER_ARGS} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DMFEM_DIR=${MFEM_BUILD_DIR} -DFEBio_DIR=${FEBio_DIR} .."
 echo "Running: ${cmake_cmd}"
 eval "${cmake_cmd}"
 

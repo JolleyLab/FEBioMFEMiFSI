@@ -2,12 +2,11 @@
 
 #include <FECore/FEModel.h>
 
-#ifdef MFEM_USE_MPI
-
 class MFEMMesh;
 
 #include <mfem.hpp>
 
+#ifdef MFEM_USE_MPI
 class MFEMParFEMeshBuilder
 {
 public:
