@@ -112,11 +112,11 @@ file(GLOB_RECURSE SRC_FEBioMFEMiFSI CONFIGURE_DEPENDS
 )
 
 # Exclude TPLs
-list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX ".*/Software/.*")
-list(FILTER HDR_FEBioMFEMiFSI EXCLUDE REGEX ".*/Software/.*")
+list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/Software/.*")
+list(FILTER HDR_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/Software/.*")
 
 # Exclude sources from the MFEMTools subdirectory; built separately
-list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX ".*/MFEMTools/.*")
+list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/MFEMTools/.*")
 
 # Organize files by folder in IDEs
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
