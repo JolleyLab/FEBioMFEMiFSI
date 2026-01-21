@@ -279,7 +279,7 @@ public:
 
 MFEMSolver::Imp* MFEMSolver::Imp::This = nullptr;
 
-// TODO: Add solver parameters
+// Add solver parameters
 BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
    // Discretization Options
    BEGIN_PARAM_GROUP("Discretization");
@@ -370,9 +370,6 @@ MFEMSolver::MFEMSolver(FEModel* fem) : FESolver(fem), m(*(new MFEMSolver::Imp))
    #ifdef MFEM_USE_MPI
    // block log output not on root process
    if (!Mpi::Root()) fem->BlockLog();
-   // mfem::out << "\n------------------------\n";
-   // mfem::out << "Rank = " << mfem::Mpi::WorldRank() << std::endl;
-   // mfem::out << "------------------------\n";
    #endif
 }
 
@@ -639,7 +636,6 @@ bool MFEMSolver::Init()
 	FEModel *fem = GetFEModel();
 
    // Redirect mfem::out to the custom stream buffer that writes to the log file
-   // TODO: Cleanup the output to the log file
    m.customBuffer.originalBuffer = mfem::out.rdbuf();
    m.customBuffer.fe_model = fem;
    std::ostream customStream(&m.customBuffer);
@@ -1954,105 +1950,6 @@ bool MFEMSolver::SolveStep()
          m.flowsolver->writeRestartFiles(m.final_state_folder,1); // second arg not used here
          m.flowsolver->writeRestarts(0,0,0);
       }
-
-      // // print out relative L2 error at final time step
-      // double err_u = 0.0;
-      // double err_p = 0.0;
-
-      // // exact solutions
-      // auto vel_exact = [](const Vector &x, double t, Vector &u) -> void {
-      //    u.SetSize(x.Size());
-      //    u = 0.0;
-      // };
-
-      // auto grad_vel_exact = [](const Vector &x, double t, DenseMatrix &gradu) -> void {
-      //    gradu.SetSize(x.Size());
-      //    gradu = 0.0;
-      // };
-
-      // auto pres_exact = [](const Vector &x, double t) -> double {
-      //    double p_return = 0.0;
-
-      //    // parameters
-      //    double R = 0.25;
-      //    double w = 0.06250;
-      //    double mu = 1.0;
-      //    double len = 1.0;
-
-      //    // compute r
-      //    Vector x_shifted(x.Size());
-      //    x_shifted = x;
-      //    x_shifted(0) -= 0.5;
-      //    x_shifted(1) -= 0.5;
-
-      //    // compute magnitude of vector
-      //    double r = x_shifted.Norml2();
-
-      //    // compute pres
-      //    if (r >= R + w)
-      //    {
-      //       p_return = - M_PI * mu * ( (R + w) * (R + w) - R * R)/(2.0 * len*len);
-      //    }
-      //    else if (r > R && r < (R + w))
-      //    {
-      //       p_return = mu * log((R + w)/r) - M_PI * mu * ( (R + w) * (R + w) - R * R)/(2.0 * len*len);
-      //    }
-      //    else if (r <= R)
-      //    {
-      //       p_return = mu * log(1.0 + w/R) - M_PI * mu * ( (R + w) * (R + w) - R * R)/(2.0 * len*len);
-      //    }
-      //    else
-      //    {
-      //       MFEM_ABORT("Error: r is out of range");
-      //    }
-
-      //    return p_return;
-      // };
-
-      // VectorFunctionCoefficient vel_excoeff(m.flowsolver->GetMesh()->Dimension(), vel_exact);
-      // FunctionCoefficient p_excoeff(pres_exact);
-      // vel_excoeff.SetTime(t);
-      // p_excoeff.SetTime(t);
-      
-      // // compute relative L2 error on finer mesh
-      // int order_err = m.orderv + 3;
-      // const IntegrationRule *irs[Geometry::NumGeom];
-      // for (int i=0; i < Geometry::NumGeom; ++i)
-      // {
-      //    irs[i] = &(IntRules.Get(i, order_err));
-      // }
-      // err_u  = m.u_gf->ComputeL2Error(vel_excoeff, irs);
-      // err_p  = m.p_gf->ComputeL2Error(p_excoeff, irs);
-
-      // // compute velocity h1 norm
-      // MatrixFunctionCoefficient gradu_excoeff(m.flowsolver->GetMesh()->Dimension(),grad_vel_exact);
-
-      // // set time on coefficient
-      // gradu_excoeff.SetTime(t);
-      // double h1_err_u = ComputeVectorH1Error(m.u_gf,&vel_excoeff,&gradu_excoeff,irs);
-
-      // #ifdef MFEM_USE_MPI
-      // if (Mpi::Root())
-      // {
-      //    mfem::out << setprecision(16);
-      //    // absolute h1 error
-      //    // h1 norm for velocity
-      //    mfem::out << "|| u_h - u_ex ||_h1 = " << h1_err_u << "\n";
-
-      //    // absolute L2 error
-      //    mfem::out << "|| u_h - u_ex || = " << err_u << "\n";
-      //    mfem::out << "|| p_h - p_ex || = " << err_p << "\n";  
-      // }
-      // #else
-      // mfem::out << setprecision(16);
-      // // absolute h1 error
-      // // h1 norm for velocity
-      // mfem::out << "|| u_h - u_ex ||_h1 = " << h1_err_u << "\n";
-
-      // // absolute L2 error
-      // mfem::out << "|| u_h - u_ex || = " << err_u << "\n";
-      // mfem::out << "|| p_h - p_ex || = " << err_p << "\n";  
-      // #endif
 	}
 
 	return true;

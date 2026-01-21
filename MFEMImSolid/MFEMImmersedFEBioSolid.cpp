@@ -59,36 +59,6 @@ void ImmersedFEBioSolid::Setup(double dt, double alpha_m_, double alpha_f_, doub
    PrintInfo();
 
    this->dt = dt;
-   
-   // // setup point search
-   // #ifdef MFEM_USE_GSLIB   
-
-   // #ifdef MFEM_USE_MPI
-   // finder_fluid = new ImmersedFSI_FindPts(vfes->GetComm());
-   // #else
-   // finder_fluid = new ImmersedFSI_FindPts();
-   // #endif
-
-   // finder_fluid->Setup(*fluid_pmesh);
-
-   // #ifdef MFEM_USE_MPI
-   // finder_fluid->SetupLocalDofToMasterRankMap(vfes);
-   // finder_fluid->SetupLocalTDofToLDofSolidMap(dfes);
-   // #endif
-   // #endif
-
-   // true_interp_points_in_solid.SetSize(dfes->GetTrueVSize());
-   // true_interp_points_in_solid = 0.0;
-
-   // interp_points_in_solid = *pmesh->GetNodes();
-   // mfem::GridFunction *nodes = pmesh->GetNodes();
-   // #ifdef MFEM_USE_MPI
-   // dynamic_cast<mfem::ParGridFunction *>(nodes)->ParallelProject(true_interp_points_in_solid);
-   // #else
-   // nodes->GetTrueDofs(true_interp_points_in_solid);
-   // #endif
-
-   // CheckMeshIntersection(true_interp_points_in_solid);
 
    beta = beta_;
    gamma = gamma_;
@@ -114,23 +84,6 @@ void ImmersedFEBioSolid::Setup(double dt, double alpha_m_, double alpha_f_, doub
       }
 	}
 
-   // setup FEBio domain
-   // FEMesh &mesh = fem->GetMesh();
-   // for (int nd = 0; nd<mesh.Domains(); ++nd)
-   // {
-   //    FEDomain& dom = mesh.Domain(nd);
-   //    MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
-   //    if (mfd)
-   //    {
-   //       mfd->SetFESpace(dfes);
-   //       mfd->SetFluidProperties(fluid_density,mu_f);
-   //       #ifdef MFEM_USE_MPI
-   //       mfd->SetAdditionalData(subtract_fluid_visc);
-   //       #else
-   //       mfd->SetAdditionalData(subtract_fluid_visc,dynamic_cast<mfem::SubMesh*>(pmesh),ddot_global_gf->FESpace());
-   //       #endif
-   //    }			
-   // }
    SetupFEDomains();
 
    // set initial conditions
@@ -139,22 +92,6 @@ void ImmersedFEBioSolid::Setup(double dt, double alpha_m_, double alpha_f_, doub
    #else
    dn_gf.GetTrueDofs(dn);
    #endif
-
-   // // setup VMS stab scaling
-   // if (stabs_scaling)
-   // {
-   //    // setup interpolation points (only boundary dofs of the solid)
-   //    mfem::Array<int> bdr_attr(pmesh->bdr_attributes.Max());
-   //    bdr_attr = 1;
-   //    dfes->GetEssentialTrueDofs(bdr_attr,solid_bdr_tdofs);
-   //    solid_bdr_nodes.SetSize(solid_bdr_tdofs.Size());
-
-   //    const int Ndofs = solid_bdr_tdofs.Size();
-   //    const auto id = solid_bdr_tdofs.Read();
-   //    auto FV_nodes = true_interp_points_in_solid.Read();
-   //    auto FV = solid_bdr_nodes.ReadWrite();
-   //    mfem::forall(Ndofs, [=] MFEM_HOST_DEVICE (int i) { FV[i] = FV_nodes[id[i]]; });
-   // }
 }
 
 void ImmersedFEBioSolid::SetupFEDomains()
@@ -334,16 +271,7 @@ void ImmersedFEBioSolid::Initiator()
             int neln = el.Nodes();
 
             vec3d rt[FEElement::MAX_NODES];
-            // ps->NodalCoordinates(el, rt);
-            for (int ii = 0; ii < neln; ++ii) rt[ii] = mesh.Node(el.m_lnode[ii]).m_rt;  
-
-            // // ps->GetNodalCoordinates(el, alpha_f, rt);
-            // for (int j = 0; j<neln; ++j) 
-            // {
-            //    FENode& node = mesh.Node(el.m_lnode[j]);
-            //    rt[j] = node.m_rt*alpha_f + node.m_rp*(1.0 - alpha_f);
-            // }
-                  
+            for (int ii = 0; ii < neln; ++ii) rt[ii] = mesh.Node(el.m_lnode[ii]).m_rt;                  
 
             for (int n = 0; n < nint; ++n)
             {
@@ -626,8 +554,6 @@ void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambd
       }
    }
 
-   // TODO: contact
-
    ////////////////////////////////////////////////////////
    // Get pointer to mfem::Vector version of m_R
    mfem::Vector &residual_vector = m_R->GetMfemVector();
@@ -640,15 +566,6 @@ void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambd
    #else
    mfem::Vector &res_vec = residual_vector;
    #endif
-
-   // if (disp_ess_tdof_list.Size() > 0)
-   // {
-   //    // zero essential displacement dofs
-   //    const int N = disp_ess_tdof_list.Size();
-   //    const auto idx = disp_ess_tdof_list.Read();
-   //    auto r_RW = res_vec.ReadWrite();
-   //    MFEM_FORALL(i, N, r_RW[idx[i]] = 0.0;);
-   // }
 
    sw_res->Stop();
 
@@ -833,8 +750,6 @@ mfem::Operator &ImmersedFEBioSolid::FormLHS()
       }
    }
 
-   // TODO: contact
-
    // Get MFEM version of FEBio stiffness matrix
    mfem::SparseMatrix *mfemK = m_K->GetMfemMatrix();
    if (!mfemK->Finalized())
@@ -854,16 +769,6 @@ mfem::Operator &ImmersedFEBioSolid::FormLHS()
    pK.MakePtAP(dK,Ph);
    mfem::HypreParMatrix *parmfemK = pK.As<mfem::HypreParMatrix>();
    #endif
-
-   // if (disp_ess_tdof_list.Size() > 0)
-   // {
-   //    // eliminate essential displacement dofs
-   //    #ifdef MFEM_USE_MPI
-   //    parmfemK->EliminateBC(disp_ess_tdof_list,mfem::AbstractSparseMatrix::DIAG_ONE);
-   //    #else
-   //    MFEM_ABORT("TODO in serial");
-   //    #endif
-   // }
 
    sw_tan->Stop();
 
@@ -908,8 +813,6 @@ mfem::Operator &ImmersedFEBioSolid::FormLHS()
    sw_fsitan->Stop();
    return *CKCt;
    #endif
-
-   // Eliminate essential dofs (TODO)
 }
 
 void ImmersedFEBioSolid::ReformStiffness()
@@ -918,25 +821,20 @@ void ImmersedFEBioSolid::ReformStiffness()
    // if (reshape_stiffness)
    // {
    //    // setup sparse matrix profile the first time
-   //    // update as needed (TODO: contact)
    //    m_K->CreateProfile(fem,dfes->GetVSize(),true);
 
    //    reshape_stiffness = false;
    // }
 
    // // // setup sparse matrix profile the first time
-   // // // update as needed (TODO: contact)
    // // m_K->CreateProfile(fem,dfes->GetVSize(),true);
    
    // // zero the global matrix
    // m_K->Zero();
 
-
-
    if (reshape_stiffness)
    {
       // setup sparse matrix profile the first time
-      // update as needed (TODO: contact)
       m_K->CreateProfile(fem,dfes->GetVSize(),true);
 
       reshape_stiffness = false;
@@ -955,19 +853,7 @@ void ImmersedFEBioSolid::UpdateSolidStateFromRestart()
 void ImmersedFEBioSolid::UpdateFEBioDataFromRestart()
 {
    #ifndef MFEM_USE_MPI
-   // // transfer submesh delvdot to global
-   // delvdot_global_gf = 0.0;
-   // submeshsolid_to_global_d->Transfer(temp_delvdot_ib_gf,delvdot_global_gf);
-   // mfem::Vector &delvdot = delvdot_global_gf;
-
-   // // transfer displacement to global
-   // dnp1_gf.SetFromTrueDofs(dnp1);
-   // *dnp1_global_gf = 0.0;
-   // submeshsolid_to_global_d->Transfer(dnp1_gf,*dnp1_global_gf);
-   // mfem::Vector &d = *dnp1_global_gf;
-
    MFEM_ABORT("TODO in serial");
-
    #else
    mfem::Vector &d = dn_gf;
    mfem::Vector &ddot = ddotn_gf;

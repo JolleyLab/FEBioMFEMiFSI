@@ -231,13 +231,6 @@ void ImmersedSolid::SetWeakBCs(const double &time)
    Ft_form->ParallelAssemble(ft); // evaluate at new time t
    #endif
 
-
-   // // set time on weak disp bcs
-   // for (auto &wd_terms : weak_disp_bcs)
-   // {
-   //    wd_terms.coeff->SetTime(time);
-   // }
-
    // update body force fb, this is handled via flow solver
    // set time on body force bcs
    for (auto &bf_term : *accel_terms)

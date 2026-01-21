@@ -62,27 +62,6 @@ void ResidualOpFluid::Mult_PC(const Vector &y, const Vector &ydot, const Vector 
       MFEM_ABORT("TO DO");
    }
 
-   // double norm = mfem::InnerProduct(MPI_COMM_WORLD,rblock,rblock);
-   // // double norm = mfem::InnerProduct(rblock,rblock);
-   // mfem::out << "Residual norm = " << std::setprecision(16) << sqrt(norm) << std::endl;
-   // // MFEM_ABORT("HERE");
-
-   // // print out residual vector to file
-   // std::ofstream outfile("r_vec.txt", std::ios::out);
-   // int ii,jj;
-   // int precision_out = 6;
-   // int width_out = precision_out + 6;
-   // for (int i = 0; i < rblock.Size(); ++i) 
-   // {
-   //    if (abs(rblock(i)) >= 1e-12) outfile << std::setw(width_out) << std::setprecision(precision_out) << rblock(i);
-   //    else outfile << std::setw(width_out) << std::setprecision(precision_out) << 0.0;
-   //    outfile << std::endl;
-   // }
-   // outfile << std::endl;
-   
-   // // Close the file
-   // outfile.close();
-
    ////////////////////////////////////
    // Zero out essential dofs in RHS vector
    // I implement dirichlet bcs in the following way:
@@ -203,8 +182,6 @@ Operator &ResidualOpFluid::GetGradient_PC(const Vector &y, const Vector &ydot, d
 
       // (0,1)
       #ifdef MFEM_USE_MPI
-      // HypreParMatrix *temp_e = const_cast<HypreParMatrix *>(G_stab)->EliminateCols(*pres_ess_tdofs);
-      // const_cast<HypreParMatrix *>(G_stab)->EliminateRows(*vel_ess_tdofs);
       HypreParMatrix *temp_e = G_stab->EliminateCols(*pres_ess_tdofs);
       G_stab->EliminateRows(*vel_ess_tdofs);
       delete temp_e;
@@ -233,8 +210,6 @@ Operator &ResidualOpFluid::GetGradient_PC(const Vector &y, const Vector &ydot, d
       
       // (1,0)
       #ifdef MFEM_USE_MPI
-      // HypreParMatrix *temp_e_2 = const_cast<HypreParMatrix *>(D_stab)->EliminateCols(*vel_ess_tdofs);
-      // const_cast<HypreParMatrix *>(D_stab)->EliminateRows(*pres_ess_tdofs);
       HypreParMatrix *temp_e_2 = D_stab->EliminateCols(*vel_ess_tdofs);
       D_stab->EliminateRows(*pres_ess_tdofs);
       delete temp_e_2;
@@ -264,15 +239,8 @@ Operator &ResidualOpFluid::GetGradient_PC(const Vector &y, const Vector &ydot, d
       if (equal_order)
       {
          #ifdef MFEM_USE_MPI
-         // HypreParMatrix *C_stab = const_cast<HypreParMatrix *>(dynamic_cast<const HypreParMatrix *>(&grad_stab->GetBlock(1,1)));
-         // const_cast<HypreParMatrix *>(C_stab)->EliminateBC(*pres_ess_tdofs,DIAG_ONE);
          C_stab->EliminateBC(*pres_ess_tdofs,DIAG_ONE);
          #else
-         // #ifdef WIN32
-         // SparseMatrix *C_stab = dynamic_cast<SparseMatrix *>(&grad_stab->GetBlock(1,1));   
-         // #else
-         // SparseMatrix *C_stab = const_cast<SparseMatrix *>(dynamic_cast<const SparseMatrix *>(&grad_stab->GetBlock(1,1))); 
-         // #endif    
          const_cast<SparseMatrix *>(C_stab)->EliminateBC(*pres_ess_tdofs,DIAG_ONE);
          #endif
          if (direct_solver || monolithic_prec) 
@@ -293,46 +261,6 @@ Operator &ResidualOpFluid::GetGradient_PC(const Vector &y, const Vector &ydot, d
    {
       MFEM_ABORT("TO DO");
    }
-
-   // // // Print gradOp
-   // // std::ofstream A00mat_file("A00mat.txt");
-   // std::ofstream A00mat_file("A00mat_febio.txt");
-   // SparseMatrix* A00 = const_cast<SparseMatrix *>(dynamic_cast<const SparseMatrix *>(&gradMat->GetBlock(0,0)));
-   // if (A00mat_file.is_open())
-   // {
-   //    A00->PrintMatlab(A00mat_file);
-   //    A00mat_file.close();
-   // }
-
-   // // Print gradOp block (0,1)
-   // // std::ofstream A01mat_file("A01mat.txt");
-   // std::ofstream A01mat_file("A01mat_v2.txt");
-   // SparseMatrix* A01 = const_cast<SparseMatrix *>(dynamic_cast<const SparseMatrix *>(&gradMat->GetBlock(0,1)));
-   // if (A01mat_file.is_open())
-   // {
-   //    A01->PrintMatlab(A01mat_file);
-   //    A01mat_file.close();
-   // }
-
-   // // Print gradOp block (1,0)
-   // // std::ofstream A10mat_file("A10mat.txt");
-   // std::ofstream A10mat_file("A10mat_v2.txt");
-   // SparseMatrix* A10 = const_cast<SparseMatrix *>(dynamic_cast<const SparseMatrix *>(&gradMat->GetBlock(1,0)));
-   // if (A10mat_file.is_open())
-   // {
-   //    A10->PrintMatlab(A10mat_file);
-   //    A10mat_file.close();
-   // }
-   
-   // // Print gradOp block (1,1)
-   // // std::ofstream A11mat_file("A11mat.txt");
-   // std::ofstream A11mat_file("A11mat_v2.txt");
-   // SparseMatrix* A11 = const_cast<SparseMatrix *>(dynamic_cast<const SparseMatrix *>(&gradMat->GetBlock(1,1)));
-   // if (A11mat_file.is_open())
-   // {
-   //    A11->PrintMatlab(A11mat_file);
-   //    A11mat_file.close();
-   // }
 
    if (direct_solver || monolithic_prec)
    {

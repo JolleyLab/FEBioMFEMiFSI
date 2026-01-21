@@ -54,8 +54,7 @@ void MFEMImmersed3FieldElasticDomain::Reset()
 void MFEMImmersed3FieldElasticDomain::PreSolveUpdate(const FETimeInfo& timeInfo)
 {
    MFEMImmersedElasticDomain::PreSolveUpdate(timeInfo);
-    int NE = (int)m_Data.size();
-// #pragma omp parallel for
+   int NE = (int)m_Data.size();
 	for (int i=0; i<NE; ++i)
     {
         ELEM_DATA& d = m_Data[i];

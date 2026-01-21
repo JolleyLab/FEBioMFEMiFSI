@@ -25,14 +25,12 @@ void MFEMGlobalVector::Assemble(vector<int>& en, vector<int>& elm, vector<double
 	{
 		int I = elm[i];
 		if ( I >= 0) {
-// #pragma omp atomic
 			R[I] += fe[i];
 		}
 	}
 }
 
 //-----------------------------------------------------------------------------
-//! \todo This function does not add to m_Fr. Is this a problem?
 void MFEMGlobalVector::Assemble(vector<int>& lm, vector<double>& fe)
 {
 	vector<double>& R = m_R;
@@ -41,7 +39,6 @@ void MFEMGlobalVector::Assemble(vector<int>& lm, vector<double>& fe)
 	{
 		int nid = lm[i];
 		if (nid >= 0) {
-// #pragma omp atomic
 			R[nid] += fe[i];
 		}
 	}
@@ -57,7 +54,6 @@ void MFEMGlobalVector::Assemble(int nodeId, int dof, double f)
 
 	// assemble into global vector
 	if (n >= 0) {
-// #pragma omp atomic
 		m_R[n] += f;
 	}
 }
@@ -111,10 +107,6 @@ void MFEMGlobalMatrix::CreateProfile(FEModel* pfem, int neq, bool reshape)
    // double *data = m_pA->Values();
    // mfem_K = new mfem::SparseMatrix(I,J,data,neq,neq,false,false,true);
 
-
-
-
-
    mfem_K = new mfem::SparseMatrix(neq);
 }
 
@@ -143,11 +135,7 @@ void MFEMGlobalMatrix::BuildMatrixProfile(FEModel* pfem, bool breset)
 	}
 	else
 	{
-      
-      // TODO: contact etc
-
-
-		// // Do the "dynamic" profile. That is the part of the profile that always changes
+      // // Do the "dynamic" profile. That is the part of the profile that always changes
 		// // This is mostly contact
 		// // do the nonlinear constraints
 		// int M = fem.NonlinearConstraints();
@@ -171,21 +159,3 @@ void MFEMGlobalMatrix::BuildMatrixProfile(FEModel* pfem, bool breset)
 		// }
 	}
 }
-
-// void MFEMGlobalMatrix::Assemble(const FEElementMatrix& ke)
-// {
-//    const int skip_zeros = 1;
-//    auto rows = ke.RowIndices();
-//    auto cols = ke.ColumnsIndices();
-//    mfem::Array<int> vdofs_rows(rows.data(), rows.size());
-//    mfem::Array<int> vdofs_cols(cols.data(), cols.size());
-//    mfem::DenseMatrix mfem_elmat(rows.size(),cols.size());
-//    for (int i = 0; i < rows.size(); ++i)
-//    {
-//       for (int j = 0; j < cols.size(); ++j)
-//       {
-//          mfem_elmat(i,j) = ke(i,j);
-//       }
-//    }
-//    mfem_K->AddSubMatrix(vdofs_rows,vdofs_cols,mfem_elmat,skip_zeros);
-// }

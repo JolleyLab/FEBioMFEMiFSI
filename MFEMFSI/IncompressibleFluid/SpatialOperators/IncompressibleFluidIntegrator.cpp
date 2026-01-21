@@ -68,8 +68,6 @@ void ifs_solver::IncompressibleFluidIntegrator::AssembleElementVector(const Arra
    const IntegrationRule *ir = nullptr;
    if (ir == nullptr)
    {
-      // int order = 2*el[0]->GetOrder() + 2*(el[0]->GetOrder()-1) + trans.OrderW();
-      // int order = 2*el[0]->GetOrder() + 1; // exact integration for linear terms
       int order = 2*el[0]->GetOrder(); // exact integration for linear terms
       ir = &IntRules.Get(el[0]->GetGeomType(), order);
    }
@@ -104,10 +102,8 @@ void ifs_solver::IncompressibleFluidIntegrator::AssembleElementVector(const Arra
       
       if (nxx_flag)
       {
-         // RB 1-15-25: Need to bring over my changes to mfem library to support
          // Not needed for p=1, minimal effect if included
          // this will be zero on linear triangles and tets
-         // LinearFECollectionExt: Will work for all element types except pyramid
          // H1FECollection: Will work for all element types except wedges and pyramids
          el[0]->CalcPhysLaplacian(trans,shape_u_lap);
          EF.MultTranspose(shape_u_lap,u_lap); // u_i,jj
@@ -288,8 +284,6 @@ void ifs_solver::IncompressibleFluidIntegrator::AssembleElementGrad(const Array<
    const IntegrationRule *ir = nullptr;
    if (ir == nullptr)
    {
-      // int order = 2*el[0]->GetOrder() + 2*(el[0]->GetOrder()-1) + trans.OrderW();
-      // int order = 2*el[0]->GetOrder() + 1; // exact integration for linear terms
       int order = 2*el[0]->GetOrder(); // exact integration for linear terms
       ir = &IntRules.Get(el[0]->GetGeomType(), order);
    }
@@ -322,10 +316,8 @@ void ifs_solver::IncompressibleFluidIntegrator::AssembleElementGrad(const Array<
 
       if (nxx_flag)
       {
-         // RB 1-15-25: Need to bring over my changes to mfem library to support
          // Not needed for p=1, minimal effect if included
          // this will be zero on linear triangles and tets
-         // LinearFECollectionExt: Will work for all element types except pyramid
          // H1FECollection: Will work for all element types except wedges and pyramids
          el[0]->CalcPhysLaplacian(trans,shape_u_lap);
       }      
@@ -333,7 +325,6 @@ void ifs_solver::IncompressibleFluidIntegrator::AssembleElementGrad(const Array<
       double mu_f = dyn_vis->Eval(trans,ip);
       if (vms_flag)
       {
-         // RB 5-3-24 (not needed if p=1)
          EF.MultTranspose(shape_u_lap,u_lap); // u_i,jj
 
          ///// Compute rm at the integration point /////
@@ -511,34 +502,6 @@ void ifs_solver::IncompressibleFluidIntegrator::AssembleElementGrad(const Array<
             }
          }
       }
-
-      // /// (1,0) block /////
-      // // double pspg_term = 0.0;
-      // for (int a = 0; a < nd_p; ++a)
-      // {            
-      //    for (int b = 0; b < nd_u; ++b)
-      //    {
-      //       dshapedx_u.GetRow(b,Nbdx);
-      //       Nbdx_u = Nbdx * u;
-
-      //       Np_w_af = w * af * shape_p(a);
-
-      //       /////// STABLE METHOD ///////
-      //       (*elmats(1,0))(a,b)                        += Np_w_af * Nbdx(0);
-      //       (*elmats(1,0))(a,b + nd_u)                 += Np_w_af * Nbdx(1);
-      //       if (dim == 3) (*elmats(1,0))(a,b + 2*nd_u) += Np_w_af * Nbdx(2);
-
-      //       /////// STABILIZATIONS ///////
-      //       if (pspg_flag)
-      //       {
-      //          pspg_term = w * tau_m * (am * shape_u(b) + af * Nbdx_u - af * mu_f * shape_u_lap(b) / rho );
-
-      //          (*elmats(1,0))(a,b)                        += pspg_term * dshapedx_p(a,0);
-      //          (*elmats(1,0))(a,b + nd_u)                 += pspg_term * dshapedx_p(a,1);
-      //          if (dim == 3) (*elmats(1,0))(a,b + 2*nd_u) += pspg_term * dshapedx_p(a,2);
-      //       }
-      //    }
-      // }
 
       ///// (1,1) block /////
       if (pspg_flag)

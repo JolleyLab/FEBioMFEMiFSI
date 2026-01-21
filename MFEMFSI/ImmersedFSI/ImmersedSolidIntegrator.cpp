@@ -230,33 +230,6 @@ void ImmersedSolidIntegrator::AssembleElementVector(const FiniteElement &el,
          }
       }
    }
-
-   // mfem::out << "Element id = " << trans.ElementNo << std::endl;
-   // auto Nodes = el.GetNodes();
-   // mfem::Vector curr_pos(3);
-   // for(int j=0; j<Nodes.GetNPoints(); ++j)
-   // {
-   //    auto ip_node = Nodes.IntPoint(j);
-   //    trans.SetIntPoint(&ip_node);
-   //    trans.Transform(ip_node, curr_pos);
-   //    mfem::out << std::setprecision(8) << "Node[" << j << "]=(" << curr_pos(0) << "," << curr_pos(1) << "," << curr_pos(2) << ")" << std::endl;
-   // }
-   // mfem::out << "Element Vector = " << std::endl;
-   // for (int ii=0; ii<nd; ++ii)
-   // {
-   //    mfem::out << elvect(ii) << " ";
-   //    mfem::out << elvect(ii + nd) << " ";
-   //    if (dim == 3) mfem::out << elvect(ii + 2*nd) << " ";
-   //    mfem::out << std::endl;
-   // }
-   // // mfem::out << "VDOFS = " << std::endl;
-   // // v_vdofs.Print();
-   // // for (int ii=0; ii<nd; ++ii)
-   // // {
-   // //    mfem::out << "Node " << ii << " = (" << v_vdofs[ii] << ", " << v_vdofs[ii + nd] << ", " << v_vdofs[ii + 2*nd] << ")" << std::endl;
-   // // }
-   // // elvect.Print();
-   // double temp = 0.0;
 }
 
 
@@ -684,67 +657,6 @@ void ImmersedSolidIntegrator::AssembleElementGrad(const FiniteElement &el,
          }
       }      
    }
-
-   // mfem::out << "\n";
-   // mfem::out << "Element id = " << trans.ElementNo << std::endl;
-   // auto Nodes = el.GetNodes();
-   // mfem::Vector curr_pos(3);
-   // for(int j=0; j<Nodes.GetNPoints(); ++j)
-   // {
-   //    auto ip_node = Nodes.IntPoint(j);
-   //    trans.SetIntPoint(&ip_node);
-   //    trans.Transform(ip_node, curr_pos);
-   //    mfem::out << std::setprecision(8) << "Node[" << j << "]=(" << curr_pos(0) << "," << curr_pos(1) << "," << curr_pos(2) << ")" << std::endl;
-   // }
-
-   // // Open a file to write the matrix
-   // std::ofstream outfile("matrix_ke_mfem.txt", std::ios::out);
-
-   // // Print the matrix ke to the file
-   // Array<int> febio_map(3*nd);
-   // for (int i=0; i<nd; ++i)
-   // {
-   //    febio_map[i] = 3*i;
-   //    febio_map[i+nd] = 3*i+1;
-   //    if (dim == 3) febio_map[i+2*nd] = 3*i+2;
-   // }
-
-   // // int ii,jj;
-   // // for (int i = 0; i < 3*nd; ++i) 
-   // // {
-   // //    ii = febio_map[i];
-   // //    for (int j = 0; j < 3*nd; ++j) 
-   // //    {
-   // //       jj = febio_map[j];
-   // //       if (abs(elmat(ii,jj)) >= 1e-11) outfile << std::setw(10) << std::setprecision(4) << elmat(ii,jj);
-   // //       else outfile << std::setw(10) << std::setprecision(4) << 0.0;
-   // //       if (j < 3*nd - 1) outfile << " ";
-   // //    }
-   // //    outfile << std::endl;
-   // // }
-   // // outfile << std::endl; // Add an extra line between matrices
-
-   // int ii,jj;
-   // int precision_out = 6;
-   // int width_out = precision_out + 6;
-   // for (int i = 0; i < 3*nd; ++i) 
-   // {
-   //    ii = i;
-   //    for (int j = 0; j < 3*nd; ++j) 
-   //    {
-   //       jj = j;
-   //       if (abs(elmat(ii,jj)) >= 1e-12) outfile << std::setw(width_out) << std::setprecision(precision_out) << elmat(ii,jj);
-   //       else outfile << std::setw(width_out) << std::setprecision(precision_out) << 0.0;
-   //       if (j < 3*nd - 1) outfile << " ";
-   //    }
-   //    outfile << std::endl;
-   // }
-   // outfile << std::endl; // Add an extra line between matrices
-
-
-   // // Close the file
-   // outfile.close();
-   // int temp_val = 0;
 }
 
 void ImmersedSolidIntegrator::AssembleMaterialStiffness(int &si,int &sk, const int &dim, const int &nd, double &af, DenseMatrix &elmat)

@@ -1,3 +1,4 @@
+// from https://kluge.in-chemnitz.de/opensource/spline/
 /*
  * spline.h
  *
@@ -22,9 +23,6 @@
  * ---------------------------------------------------------------------
  *
  */
-
-// from https://kluge.in-chemnitz.de/opensource/spline/
-
 
 #ifndef TK_SPLINE_H
 #define TK_SPLINE_H

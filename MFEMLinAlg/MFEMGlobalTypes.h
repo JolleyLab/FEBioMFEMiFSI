@@ -48,8 +48,6 @@ public:
 
    mfem::SparseMatrix *GetMfemMatrix() { return mfem_K; }
 
-   // void Assemble(const FEElementMatrix& ke) override;
-
    virtual ~MFEMGlobalMatrix() noexcept {};
 
 private:

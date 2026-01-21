@@ -80,7 +80,6 @@ void MFEMImmersedElasticDomain::PreSolveUpdate(const FETimeInfo& timeInfo)
     m_alpham = timeInfo.alpham;
     m_beta = timeInfo.beta;
 
-// #pragma omp parallel for
 	for (int i=0; i<Elements(); ++i)
 	{
 		FESolidElement& el = m_Elem[i];
@@ -103,7 +102,6 @@ void MFEMImmersedElasticDomain::Update(const FETimeInfo& tp)
 {
 	bool berr = false;
 	int NE = Elements();
-	// #pragma omp parallel for shared(NE, berr)
 	for (int i=0; i<NE; ++i)
 	{
 		try
@@ -116,7 +114,6 @@ void MFEMImmersedElasticDomain::Update(const FETimeInfo& tp)
 		}
 		catch (NegativeJacobian e)
 		{
-			// #pragma omp critical
 			{
             MFEM_ABORT("Negative jacobian detected in immersed solid domain");
 				// reset the logfile mode
@@ -130,7 +127,6 @@ void MFEMImmersedElasticDomain::Update(const FETimeInfo& tp)
 }
 
 //! Update element state data (mostly stresses, but some other stuff as well)
-//! \todo Remove the remodeling solid stuff
 void MFEMImmersedElasticDomain::UpdateElementStress(int iel, const FETimeInfo& tp)
 {
    double dt =tp.timeIncrement;
@@ -276,8 +272,7 @@ void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std:
 
       // get submesh element from parent
       // febio element id is 1-based, while mfem element id is 0-based
-      // so we need to subtract 1 when getting the mfem element id
-      
+      // so we need to subtract 1 when getting the mfem element id      
       int submesh_id = -1;
       if (solid_submesh)
       {
@@ -288,66 +283,9 @@ void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std:
       {
          // parallel
          submesh_id = el.GetID()-1;
-         // submesh_id = el.GetID();
       }
 
-      // const mfem::Array<int>& parent_elem_ids = solid_submesh->GetParentElementIDMap();
-      // int global_id = parent_elem_ids[submesh_id];
-
-      // // auto parent_mesh = solid_submesh->GetParent();
-      // // const_cast<mfem::Mesh*>(parent_mesh)->EnsureNodes();
-      // // auto mesh_space = parent_mesh->GetNodes()->FESpace();
-
-      // // print out nodal coordinates of each node on the mfem mesh
-      // auto Nodes = gfes->GetFE(global_id)->GetNodes();
-      // auto eltrans = gfes->GetElementTransformation(global_id);
-      // mfem::out << "MFEM Nodes = " << "\n";
-      // mfem::Vector curr_pos(3);
-      // for(int j=0; j<Nodes.GetNPoints(); ++j)
-      // {
-      //    auto ip_node = Nodes.IntPoint(j);
-      //    eltrans->SetIntPoint(&ip_node);
-      //    eltrans->Transform(ip_node, curr_pos);
-      //    mfem::out << std::setprecision(8) << "Node[" << j << "]=(" << curr_pos(0) << "," << curr_pos(1) << "," << curr_pos(2) << ")" << std::endl;
-      // }
-
-      // mfem::Array<int> elem_vert;
-      // gfes->GetElementVertices(global_id, elem_vert);
-      // elem_vert.Print();
-      // mfem::out << "MFEM Nodes = " << "\n";
-      // // mfem::Vector curr_pos(3);
-      // for(int j=0; j<elem_vert.Size(); ++j)
-      // {
-      //    double* node = gfes->GetMesh()->GetVertex(elem_vert[j]);
-      //    mfem::out << std::setprecision(8) << "Node[" << j << "]=(" << node[0] << "," << node[1] << "," << node[2] << ")" << std::endl;
-      // }
-
-      // // print out nodal coordinates of each node on the mfem mesh
-      // auto Nodes_mesh = mesh_space->GetFE(global_id)->GetNodes();
-      // auto eltrans_mesh = mesh_space->GetElementTransformation(global_id);
-      // mfem::out << "MFEM Mesh Nodes = " << "\n";
-      // for(int j=0; j<Nodes_mesh.GetNPoints(); ++j)
-      // {
-      //    auto ip_node = Nodes_mesh.IntPoint(j);
-      //    eltrans_mesh->SetIntPoint(&ip_node);
-      //    eltrans_mesh->Transform(ip_node, curr_pos);
-      //    mfem::out << "Node[" << j << "]=(" << curr_pos(0) << "," << curr_pos(1) << "," << curr_pos(2) << ")" << std::endl;
-      // }
-
-      // mfem::out << "Element id = " << submesh_id << std::endl;
-      // auto curr_elem = dfes->GetFE(submesh_id);
-      // auto trans = dfes->GetElementTransformation(submesh_id);
-      // auto Nodes = curr_elem->GetNodes();
-      // mfem::Vector curr_pos(3);
-      // for(int j=0; j<Nodes.GetNPoints(); ++j)
-      // {
-      //    auto ip_node = Nodes.IntPoint(j);
-      //    trans->SetIntPoint(&ip_node);
-      //    trans->Transform(ip_node, curr_pos);
-      //    mfem::out << std::setprecision(8) << "Node[" << j << "]=(" << curr_pos(0) << "," << curr_pos(1) << "," << curr_pos(2) << ")" << std::endl;
-      // }
-
-		if (el.isActive()) {
+      if (el.isActive()) {
 			// element force vector
 			vector<double> fe;
          // std::vector<int> lm;
@@ -369,62 +307,10 @@ void MFEMImmersedElasticDomain::AssembleDomainResidual(MFEMGlobalVector& R, std:
             ElementArtificialFluidForce(el, fe);
          }
 
-         // // get the element's LM vector
-			// UnpackLM(el, lm);
-         // mfem::out << "\nLM = ";
-         // for (int ii=0; ii<lm.size(); ++ii)
-         // {
-         //    mfem::out << lm[ii] << " ";
-         // }
-         // mfem::out << std::endl;
-
 			// assemble element 'fe'-vector into global R vector
          dfes->GetElementVDofs(submesh_id,vdofs);
          mfem::Array<int> vdofs_febio = TransformVDofs(vdofs,el.Nodes()); // reorder to match febio elem vector [xyz,xyz,xyz,...]
-
-         // // mfem::out << "\nVDOFS = ";
-         // // for (int ii=0; ii<vdofs_febio.Size(); ++ii)
-         // // {
-         // //    mfem::out << vdofs_febio[ii] << " ";
-         // // }
-         // // mfem::out << std::endl;
-
-         // // mfem::out << "Element Vector = " << std::endl;
-         // // mfem::Vector fe_temp(fe.data(),fe.size());
-         // // for (int ii=0; ii<el.Nodes(); ++ii)
-         // // {
-         // //    mfem::out << fe_temp(3*ii) << " ";
-         // //    mfem::out << fe_temp(3*ii + 1) << " ";
-         // //    mfem::out << fe_temp(3*ii + 2) << " ";
-         // //    mfem::out << std::endl;
-         // // }
-         // // mfem::Vector& fe_mfem = TransformElemVec(fe,ndof);
-         // // mfem::out << "Element Vector MFEM = " << std::endl;
-         // // for (int ii=0; ii<el.Nodes(); ++ii)
-         // // {
-         // //    mfem::out << fe_mfem(ii) << " ";
-         // //    mfem::out << fe_mfem(ii + ndof) << " ";
-         // //    mfem::out << fe_mfem(ii + 2*ndof) << " ";
-         // //    mfem::out << std::endl;
-         // // }
-
-         // // mfem::Vector& fe_mfem = TransformElemVec(fe,el.Nodes());
-
-         // mfem::out << "VDOFS = " << std::endl;
-         // vdofs.Print();
-         // for (int ii=0; ii<el.Nodes(); ++ii)
-         // {
-         //    mfem::out << "Node " << ii << " = (" << vdofs[ii] << ", " << vdofs[ii + el.Nodes()] << ", " << vdofs[ii + 2*el.Nodes()] << ")" << std::endl;
-         // }
-
-         // // mfem::out << "VDOFS_FEBIO = " << std::endl;
-         // // vdofs_febio.Print();
-         // // for (int ii=0; ii<el.Nodes(); ++ii)
-         // // {
-         // //    mfem::out << "Node " << ii << " = (" << vdofs_febio[3*ii] << ", " << vdofs_febio[3*ii + 1] << ", " << vdofs_febio[3*ii + 2] << ")" << std::endl;
-         // // }
-
-			R.Assemble(vdofs_febio,fe);
+         R.Assemble(vdofs_febio,fe);
 		}
 	}
 }
@@ -535,19 +421,6 @@ void MFEMImmersedElasticDomain::ElementArtificialFluidForce(FESolidElement& el, 
 
 	double*	gw = el.GaussWeights();
 
-   // // velocity gradient
-   // // TODO, create immersed material point class that computes gradv and viscous stress directly!
-   // vec3d v[FEElement::MAX_NODES];
-   // int dofVIMX = GetFEModel()->GetDOFIndex("im_vx");
-   // int dofVIMY = GetFEModel()->GetDOFIndex("im_vy");
-   // int dofVIMZ = GetFEModel()->GetDOFIndex("im_vz");
-   // for (int j=0; j<neln; ++j) 
-   // {
-   //    FENode& node = m_pMesh->Node(el.m_node[j]);
-   //    v[j] = node.get_vec3d(dofVIMX, dofVIMY, dofVIMZ) * m_alphaf + node.get_vec3d_prev(dofVIMX, dofVIMY, dofVIMZ) * (1.0-m_alphaf);
-   // }
-   // mat3d gradv;
-
    // strain rate
    mat3ds ev;
 
@@ -565,10 +438,6 @@ void MFEMImmersedElasticDomain::ElementArtificialFluidForce(FESolidElement& el, 
 		const double* Gr = el.Gr(n);
 		const double* Gs = el.Gs(n);
 		const double* Gt = el.Gt(n);
-
-      // // fluid viscous stress
-      // gradv = gradient(el, v, n, m_alphaf);
-      // ev = gradv.sym();
 
       // fluid viscous stress
       ev = pt.m_L.sym();
@@ -604,7 +473,6 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
    // repeat over all solid elements
 	int NE = Elements();
 	
-	// #pragma omp parallel for shared (NE)
 	for (int iel=0; iel<NE; ++iel)
 	{
 		FESolidElement& el = m_Elem[iel];
@@ -620,25 +488,9 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
       {
          // parallel
          submesh_id = el.GetID()-1;
-         // submesh_id = el.GetID();
       }
 
-      // mfem::out << "\n";
-      // mfem::out << "Element id = " << submesh_id << std::endl;
-      // auto curr_elem = dfes->GetFE(submesh_id);
-      // auto trans = dfes->GetElementTransformation(submesh_id);
-      // auto Nodes = curr_elem->GetNodes();
-      // mfem::Vector curr_pos(3);
-      // for(int j=0; j<Nodes.GetNPoints(); ++j)
-      // {
-      //    auto ip_node = Nodes.IntPoint(j);
-      //    trans->SetIntPoint(&ip_node);
-      //    trans->Transform(ip_node, curr_pos);
-      //    mfem::out << std::setprecision(8) << "Node[" << j << "]=(" << curr_pos(0) << "," << curr_pos(1) << "," << curr_pos(2) << ")" << std::endl;
-      // }
-   
-
-		if (el.isActive()) {
+      if (el.isActive()) {
 
 			// get the element's LM vector
 			vector<int> lm;
@@ -668,91 +520,10 @@ void MFEMImmersedElasticDomain::AssembleDomainStiffness(FEGlobalMatrix &K, doubl
          ElementSolidStiffness(iel, el, ke, af);
          ElementShapeDerivativeStiffness(el, ke, af, bfs);
 
-         // // Open a file to write the matrix
-         // std::ofstream outfile("matrix_ke.txt", std::ios::out);
-
-         // mfem::Array<int> febio_map(ndof);
-         // for (int i=0; i<el.Nodes(); ++i)
-         // {
-         //    febio_map[i] = 3*i;
-         //    febio_map[i+el.Nodes()] = 3*i+1;
-         //    febio_map[i+2*el.Nodes()] = 3*i+2;
-         // }
-
-         // // // febio_map.Print();
-
-         // int precision_out = 6;
-         // int width_out = precision_out + 6;
-
-         // // Print the matrix ke to the file
-         // for (int i = 0; i < ndof; ++i) 
-         // {
-         //    const int ii = febio_map[i];
-         //    for (int j = 0; j < ndof; ++j) 
-         //    {
-         //       const int jj = febio_map[j];
-         //       if (abs(ke(ii,jj)) >= 1e-12)
-         //       {
-         //          outfile << std::setw(width_out) << std::setprecision(precision_out) << ke(ii,jj);
-         //       }
-         //       else if (isnan(ke(ii,jj)))
-         //       {
-         //          outfile << std::setw(width_out) << std::setprecision(precision_out) << ke(ii,jj);
-         //       }
-         //       else
-         //       {  
-         //          outfile << std::setw(width_out) << std::setprecision(precision_out) << 0.0;
-         //       }                  
-         //       if (j < ndof - 1) outfile << " ";
-         //    }
-         //    outfile << std::endl;
-         // }
-         // outfile << std::endl; // Add an extra line between matrices
-
-         // // Close the file
-         // outfile.close();
-
-         // // check if any entry is NAN
-         // for (int i=0; i<ndof; ++i)
-         // {
-         //    const int ii = febio_map[i];
-         //    for (int j=0; j<ndof; ++j)
-         //    {
-         //       const int jj = febio_map[j];
-         //       if (isnan(ke(ii,jj)))
-         //       {
-         //          mfem::out << "-----------------------------------\n";
-         //          mfem::out << "Element stiffness matrix has a NAN!" << std::endl;
-         //          mfem::out << "Element id = " << submesh_id << std::endl;    
-         //          mfem::out << "Entry " << ii << " " << jj << " = " << ke(ii,jj) << std::endl;
-         //          mfem::out << "-----------------------------------\n";
-
-         //       }
-         //    }
-         // }
-         // double norm = ke.inf_norm();
-         // if(isnan(norm))
-         // {
-         //    mfem::out << "Element stiffness matrix has a NAN!" << std::endl;
-         // }
-
-
-
-			// assemble element matrix into global stiffness matrix
+         // assemble element matrix into global stiffness matrix
          mfem::SparseMatrix& mfemK = *dynamic_cast<MFEMGlobalMatrix*>(&K)->GetMfemMatrix();
-         // mfem::DenseMatrix mfem_elmat(vdofs_febio.Size());
-         // mfem_elmat = 0.0;
-         // for (int i = 0; i < vdofs_febio.Size(); ++i)
-         // {
-         //    for (int j = 0; j < vdofs_febio.Size(); ++j)
-         //    {
-         //       mfem_elmat(i,j) = ke(i,j);
-         //    }
-         // }
          mfem::DenseMatrix mfem_elmat(*ke, vdofs_febio.Size(), vdofs_febio.Size());
          mfemK.AddSubMatrix(vdofs_febio, vdofs_febio, mfem_elmat, 0);
-
-			// K.Assemble(ke);
 		}
 	}
 }
@@ -1096,7 +867,6 @@ void MFEMImmersedElasticDomain::ComputeNodallyAveragedVonMisesStress(GridFunctio
       {
          // parallel
          submesh_id = el.GetID()-1;
-         // submesh_id = el.GetID();
       }
 
       mfem::Array<int> vdofs;

@@ -113,7 +113,6 @@ void FluidNewtonSolver::PrintNorms() const
    if (Mpi::Root())
    {
       std::cout << setprecision(16);
-      // the first is not the L2 norm!!!
       std::cout << "|| u_h || = " << glob_vel_norm << "\n";
       std::cout << "|| p_h || = " << glob_p_norm << "\n";
    }
@@ -122,7 +121,6 @@ void FluidNewtonSolver::PrintNorms() const
    double glob_p_norm = mfem::InnerProduct(pnp1,pnp1);
 
    std::cout << setprecision(16);
-   // the first is not the L2 norm!!!
    std::cout << "|| u_h || = " << glob_vel_norm << "\n";
    std::cout << "|| p_h || = " << glob_p_norm << "\n";
    #endif   
@@ -227,40 +225,6 @@ void FluidNewtonSolver::FormLHS(Vector &y, Vector &ydot, double dt) const
    grad = &res_op->GetGradient_PC(y,ydot,dt,am,af);
    // reset linear solver operator (which is prec here)
    prec->SetOperator(*grad);
-
-   // // setup pre-preconditioning 
-   // if (jacobi_pre_precond)
-   // {
-   //    #ifdefdef MFEM_USE_MPI
-   //    MFEM_ASSERT(direct_solver == false, "Jacobi pre-preconditioner only works with iterative solvers");
-   //    BlockOperator *block_grad = dynamic_cast<BlockOperator *>(grad);
-   //    if (block_grad)
-   //    {
-   //       HypreParMatrix *A_stab = const_cast<HypreParMatrix *>(dynamic_cast<const HypreParMatrix *>(&grad_stab->GetBlock(0,0)));
-   //       HypreParMatrix *G_stab = const_cast<HypreParMatrix *>(dynamic_cast<const HypreParMatrix *>(&grad_stab->GetBlock(0,1)));
-   //       HypreParMatrix *D_stab = const_cast<HypreParMatrix *>(dynamic_cast<const HypreParMatrix *>(&grad_stab->GetBlock(1,0)));
-   //       HypreParMatrix *C_stab = nullptr;
-   //       if (equal_order) C_stab = const_cast<HypreParMatrix *>(dynamic_cast<const HypreParMatrix *>(&grad_stab->GetBlock(1,1)));
-         
-   //       // Get diagonal of A and C
-   //       Vector &Ad = res_op->GetADiagonal();
-   //       Vector &Cd = res_op->GetCDiagonal();
-
-   //       // Scale matrices
-   //       HypreParMatrixInvScaleRows(A_stab,Ad);
-   //       if (equal_order) HypreParMatrixInvScaleRows(C_stab,Cd);
-
-   //       HypreParMatrix Wm()
-
-   //    }
-   //    else
-   //    {
-   //       MFEM_ABORT("Jacobi pre-preconditioner only works with BlockOperator");
-   //    }
-   //    #else
-   //    MFEM_ABORT("TODO");
-   //    #endif
-   // }
 }
 
 void FluidNewtonSolver::SolveLinearSystem() const

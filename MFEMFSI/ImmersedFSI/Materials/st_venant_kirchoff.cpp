@@ -8,13 +8,6 @@ void StVK::EvalPK2Stress(DenseMatrix &stress)
 {
    stress.SetSize(vdim);
 
-   // Compute S = lamdba*tr(E)I + 2*mu*E
-   // stress = Identity_Mat;
-   // stress *= lambda->Eval(T,ip);
-   // double trE = E.Trace();
-   // stress *= trE;
-   // stress.Add(2.0 * mu->Eval(T,ip),E);
-
    stress.Set(2.0 * mu_val,E);
    double trE = E.Trace();
    stress(0,0) += lambda_val * trE;
@@ -25,14 +18,6 @@ void StVK::EvalPK2Stress(DenseMatrix &stress)
 void StVK::EvalCauchyStress(DenseMatrix &stress)
 {
    stress.SetSize(vdim);
-
-   // compute sigma = 1/J * (lam * trE - mu)*b + mu/J b^2
-   // Mult(b,b,b2);
-   // b2 *= mu_val / J;
-   // stress = b2;
-   // double trE = E.Trace();
-   // double factor = (lambda_val * trE - mu_val) / J;
-   // stress.Add(factor,b);
 
    Mult(b,b,b2);
    stress.Set(mu_val/J,b2);

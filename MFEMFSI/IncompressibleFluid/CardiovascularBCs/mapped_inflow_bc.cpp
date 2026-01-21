@@ -33,22 +33,7 @@ ApproxInflowRate::ApproxInflowRate(string &filename_, int interp_, int N_) : fil
       q_array.emplace_back(q_curr);
 
    } while (getline(file_reader,data));
-   // } while (!file_reader.eof());
    file_reader.close();
-
-   // while (true)
-   // {
-   //    // read first col
-   //    double t_curr;
-   //    file_reader >> t_curr;
-   //    if (file_reader.eof()) break;
-   //    t_array.emplace_back(t_curr);
-
-   //    double q_curr;
-   //    file_reader >> q_curr;
-   //    q_array.emplace_back(q_curr);
-   // }
-   // file_reader.close();
 
    // build the approx
    BuildFlowRateApprox();
@@ -109,19 +94,6 @@ dim(dim_), pmesh(pmesh_), mesh(mesh_), inflow_attr(inflow_attr_)
    // create submesh for inflow surface
    SubMesh surface_mesh = SubMesh::CreateFromBoundary(*mesh,inflow_attr);
 
-   // // now extract boundary of inflow surface // DOESNT WORK FOR HIGHER ORDER MESHES
-   // Array<int> inflow_bdr_attr(surface_mesh.bdr_attributes.Max());
-   // inflow_bdr_attr = 1.0;
-   // SubMesh inflow_boundary_mesh = SubMesh::CreateFromBoundary(surface_mesh,inflow_bdr_attr);
-
-   // make refined mesh with uniform points to extract boundary_nodes
-   // auto boundary_mesh_refined = inflow_boundary_mesh.MakeRefined(inflow_boundary_mesh,2,BasisType::ClosedUniform); // closed uniform works better
-   // boundary_mesh_refined.EnsureNodes();
-   // boundary_mesh_refined.SetCurvature(2);
-   // boundary_nodes = boundary_mesh_refined.GetNodes(); //
-   // auto refined_mesh_uniform = surface_mesh.MakeRefined(surface_mesh,2,BasisType::ClosedUniform);
-
-
    auto refined_mesh_uniform = surface_mesh.MakeRefined(surface_mesh,1,BasisType::ClosedUniform);
    refined_mesh_uniform.EnsureNodes();
    refined_mesh_uniform.SetCurvature(2);
@@ -139,13 +111,10 @@ dim(dim_), pmesh(pmesh_), mesh(mesh_), inflow_attr(inflow_attr_)
    {
       // get bdr element vdofs
       auto bdr_elem = refined_mesh_uniform.GetBdrElement(e);
-      // auto dof_trans = uniform_mesh_space->GetBdrElementDofs(e,dofs);
       auto dof_trans = uniform_mesh_space->GetBdrElementVDofs(e,vdofs);
 
       // get coords from nodes gf
-      // vdofs.Print();
       uniform_nodes->GetSubVector(vdofs,curr_coords);
-      // curr_coords.Print();
 
       // // store in data (ordering by vdim)
       int np = vdofs.Size() / dim;
@@ -155,13 +124,7 @@ dim(dim_), pmesh(pmesh_), mesh(mesh_), inflow_attr(inflow_attr_)
          {
             data.emplace_back(curr_coords(p + d*dim));
          }
-      }
-
-      // std::cout << "----------\n" << std::endl;
-      // std::cout << data[3] << std::endl;
-      // std::cout << data[4] << std::endl;
-      // std::cout << data[5] << std::endl;
-      
+      }      
    }
    // copy data to coords vector
    {
@@ -174,7 +137,6 @@ dim(dim_), pmesh(pmesh_), mesh(mesh_), inflow_attr(inflow_attr_)
    }
 
    // make refined version with gauss lobatto nodes to compute centroid
-   // auto refined_mesh = surface_mesh.MakeRefined(surface_mesh,2,BasisType::GaussLobatto);
    auto refined_mesh = surface_mesh.MakeRefined(surface_mesh,1,BasisType::GaussLobatto);
    refined_mesh.EnsureNodes();
    refined_mesh.SetCurvature(2);
@@ -193,7 +155,6 @@ dim(dim_), pmesh(pmesh_), mesh(mesh_), inflow_attr(inflow_attr_)
    local_sum = 0.0;
    Vector temp(dim);
    temp = 0.0;
-   // for (int e = 0; e < pmesh->GetNE(); e++)
    for (int e = 0; e < refined_mesh.GetNE(); e++)
    {
       // compute element area
@@ -266,13 +227,6 @@ dim(dim_), pmesh(pmesh_), mesh(mesh_), inflow_attr(inflow_attr_)
       MFEM_ABORT("Error: Computation of centroid in 1D not implemented");
    }
 
-   // if (Mpi::Root())
-   // {
-   //    std::cout << "x_centroid = " << x_c << std::endl;
-   //    std::cout << "y_centroid = " << y_c << std::endl;
-   //    std::cout << "z_centroid = " << y_c << std::endl;
-   // }
-
    // compute area using linear form
    // much more accurate area calculation !!!!!
    ConstantCoefficient onecoeff(1.0);
@@ -291,8 +245,6 @@ dim(dim_), pmesh(pmesh_), mesh(mesh_), inflow_attr(inflow_attr_)
    r_avg = sqrt(area / M_PI);
 
    // build kdtree
-   // probably need list of boundary nodes on each processor, build kdtree on each processor? (YES)
-   // finder = new KDTreeClosestPointFinder(*boundary_nodes,dim,bbmin,bbmax);
    finder = new KDTreeClosestPointFinder(coords,Ordering::byVDIM,dim,bbmin,bbmax);
 
    // clear mesh data
@@ -389,9 +341,6 @@ void MappedInflowCoefficient::Eval(Vector &V, ElementTransformation &T, const In
    nor *= 1/normag;
 
    // set output
-   // V = nor;
-   // V *= -1.0; // since inflow normal points opposite of flow direction
-   // V *= normal_velocity;
    V.Set(-normal_velocity,nor);
 }
 

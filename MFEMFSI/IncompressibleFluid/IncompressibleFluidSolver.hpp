@@ -281,33 +281,12 @@ public:
    }
 
    //////////////// Mixed BCs or Alias Names ////////////////
-   // void AddSymmetryBC(mfem::Array<int> &attr)
-   // {
-   //    AddLocalNormalVelDirichletBC(0.0,attr);
-   //    // traction free in tangential directions (do nothing)
-   // };
-   // void AddSlipBC(mfem::Array<int> &attr)
-   // {
-   //    AddLocalNormalVelDirichletBC(0.0,attr);
-   //    // traction free in tangential directions (do nothing)
-   // };
    void AddPressureBC(mfem::Coefficient *coeff, mfem::Array<int> &attr)
    {
       AddNormalTractionBC(coeff,attr,true);
       // do nothing in other components
    };
-   // void AddPressureBCwithNormalOutflow(mfem::Coefficient *coeff, mfem::Array<int> &attr)
-   // {
-   //    AddNormalTractionBC(coeff,attr);
-   //    AddLocalTangentialVelDirichletBC(0.0,0.0,attr);
-   // };
-   // void AddNormalOutflowBC(mfem::Array<int> &attr)
-   // {
-   //    // do nothing condition in normal direction
-   //    // zero out velocities in tangential directions
-   //    AddLocalTangentialVelDirichletBC(0.0,0.0,attr);
-   // };
-
+   
    //////////////// Body Forces ////////////////
    /// Add an body force to the RHS of the equation.
    /**

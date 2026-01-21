@@ -8,13 +8,6 @@ void NearlyIncompressibleNeoHookean::ComputeS_iso(DenseMatrix &stress)
 {
    stress.SetSize(vdim);
 
-   // Compute S = mu (detC)^(-1/d) (I - 1/d * trC Cinv) + kappa*(J-1)*J*Cinv
-   // isochoric part
-   // stress = Cinv;
-   // stress *= -1.0/d * trC;
-   // stress += Identity_Mat;
-   // stress *= mu_val * pow(detC,-1.0/d);
-
    double fac = -mu_val * pow(detC,-1.0/d) * 1.0/d * trC;
    stress.Set(fac,Cinv);
    stress(0,0) += mu_val * pow(detC,-1.0/d);
@@ -25,15 +18,7 @@ void NearlyIncompressibleNeoHookean::ComputeS_iso(DenseMatrix &stress)
 void NearlyIncompressibleNeoHookean::ComputeSigma_iso(DenseMatrix &stress)
 {
    stress.SetSize(vdim);
-   // Compute sigma = sigma_iso + sigma_vol
-   // = mu*J^(-5/3)*(b - 1/3 * trb I) + kappa*(J-1)I
-
-   // sigma_iso
-   // stress = Identity_Mat;
-   // stress *= -1.0/d * b.Trace();
-   // stress += b;
-   // stress *= mu_val * pow(J,-(2.0 + d)/d);
-   
+      
    stress.Set(mu_val * pow(J,-(2.0 + d)/d),b);
    stress(0,0) -= mu_val * pow(J,-(2.0 + d)/d) * 1.0/d * b.Trace();
    stress(1,1) -= mu_val * pow(J,-(2.0 + d)/d) * 1.0/d * b.Trace();

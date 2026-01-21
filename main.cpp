@@ -63,11 +63,6 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 
    #ifdef MFEM_USE_MPI
    // initialize MPI and Hypre libraries
-   
-   // int argc;
-   // char** argv;
-   // fecore.GetCommandLineInput(argc,argv);
-   // mfem::Mpi::Init(argc, argv);
 
    // works for most MPI implementations
    mfem::Mpi::Init(nullptr, nullptr);
@@ -78,14 +73,13 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 	// create the new module
 	const char* info = \
 		"{ "
-		"   \"title\" : \"MFEM-iFSI\","
-		"   \"info\"  : \"Interface to MFEM based iFSI solver\","
+		"   \"title\" : \"FEBioMFEM-iFSI\","
+		"   \"info\"  : \"Interface to an MFEM based immersed FSI solver\","
 		"   \"author\": \"Ryan Black, Steve Maas\","
 		"   \"version\": \"1.0\""
 		"}";
 
 	fecore.CreateModule(new FEMFEMiFSI, "mfemifsi", info);
-   // fecore.AddModuleDependency("solid");
 
 	// analyis classes (default type must match module name!)
 	REGISTER_FECORE_CLASS(MFEMAnalysis, "mfemifsi");

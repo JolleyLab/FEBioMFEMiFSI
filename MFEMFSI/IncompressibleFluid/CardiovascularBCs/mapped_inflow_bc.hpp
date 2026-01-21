@@ -39,7 +39,7 @@ protected:
    // arrays for storing file contents
    std::vector<double> t_array, q_array;
 
-   // periodic?
+   // periodic
    bool periodic = false;
    double period; // last time val in file
 

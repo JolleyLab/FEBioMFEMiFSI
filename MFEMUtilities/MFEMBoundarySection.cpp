@@ -81,21 +81,6 @@ void MFEMBoundarySection::ParseMFEMBC(XMLTag& tag)
 
 		// read required surface attribute
 		const char* surfaceName = tag.AttributeValue("surface");
-		// FEFacetSet* pface = mesh.FindFacetSet(surfaceName);
-		// if (pface == 0) throw XMLReader::InvalidAttributeValue(tag, "surface", surfaceName);
-
-      // // create dummy facet set
-      // FEFacetSet* pface = new FEFacetSet(0); // with 0 facets
-      // mesh.AddFacetSet(pface); // pface is deleted by the mesh
-
-		// // create a surface from this facet set
-		// FESurface* psurf = fecore_alloc(FESurface, fem);
-		// GetBuilder()->BuildSurface(*psurf, *pface);
-
-		// // assign it
-		// mesh.AddSurface(psurf);
-		// sbc->SetSurface(psurf);
-
       mfem_bc->SetSurfaceName(surfaceName);
 	}
 

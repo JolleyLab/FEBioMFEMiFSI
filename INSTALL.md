@@ -90,26 +90,25 @@ The script creates the following build directory structure:
 
 ```
 .
-├── Software/                      # Third-party libraries and dependencies
-│   ├── mfem/                      # MFEM source and build
-│   │   ├── build/            # MFEM build directory
+├── Software/                      
+│   ├── mfem/                      
+│   │   ├── build/                 
 │   │   └── [MFEM source files]
-│   ├── gslib/                     # GSLIB source and build
-│   │   ├── build/                 # GSLIB build directory
+│   ├── gslib/                     
+│   │   ├── build/                 
 │   │   └── [GSLIB source files]
-│   ├── hypre/                     # HYPRE source and build (autotools, in-place)
-│   │   ├── src/                   # HYPRE source with libHYPRE.a built in-place
+│   ├── hypre/                     
+│   │   ├── src/                   
 │   │   └── [HYPRE configuration]
-│   ├── metis-5.1.0/               # METIS 5 extracted source
-│   │   ├── include/               # METIS headers (metis.h)
-│   │   ├── lib/                   # Built METIS static library location
-│   │   │   └── libmetis.a
+│   ├── metis-5.1.0/               
+│   │   ├── include/               
+│   │   ├── lib/                   
 │   │   └── [METIS source files]
 │   └── metis → metis-5.1.0        # Symlink to current METIS version
 ├── build/                         # FEBioMFEMiFSI build
-│   ├── lib/                       # Built plugin library
+│   ├── lib/                       
 │   └── CMakeFiles/
-├── MFEMFSI/                       # iFSI subtree (git managed)
+├── MFEMFSI/                       # iFSI subtree
 │   └── [iFSI source files]
 └── [Other project files]
 ```

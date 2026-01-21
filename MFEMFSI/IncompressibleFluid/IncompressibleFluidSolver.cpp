@@ -63,21 +63,6 @@ IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int
    if (orderv == orderp)
    {
       equal_order = true;
-      // if (orderv == 1 && !immersed_flag)
-      // {
-      //    // works for quads, tris, tets, hexes, wedges, pyramids
-      //    // pyramids don't have calchessian so shut that computation off in integrator if needed!
-      //    vfec = new LinearFECollectionExt();
-      //    pfec = new LinearFECollectionExt();
-      // }
-      // else 
-      // {
-      //    // setting to this and then setting this mesh to this space will allow for 
-      //    // higher order quads, tris, tets, hexes, wedges, NOT pyramids!
-      //    vfec = new H1_FECollection(orderv, pmesh->Dimension());
-      //    pfec = new H1_FECollection(orderp, pmesh->Dimension());
-      // }
-
       // For restarting, need to use H1_FECollection for all cases
       vfec = new H1_FECollection(orderv, pmesh->Dimension());
       pfec = new H1_FECollection(orderp, pmesh->Dimension());  
@@ -99,11 +84,7 @@ IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int
 
    vdim = pmesh->Dimension();
 
-   // for isoparametric mapping, o.w. mesh element transformations
-   // use LinearFECollection elements which do NOT have CalcHessian implemented
-   // in general. So, if someone was to H1_FECollection and not SetNodalFESpace to that same FEC
-   // and call CalcPhysLaplacian() within that function it trys to compute hessian of the element transformation
-   // which is not implemented. E.G p=2 H1_FECollection without the next line implemented.
+   // for isoparametric mapping
    pmesh->SetNodalFESpace(vfes); 
 
    // Check if fully periodic mesh

@@ -72,7 +72,6 @@ void BackflowStabIntegrator::AssembleElementVector(const FiniteElement &el,
       }
       double u_dot_n = u_bf * nor;
       // check if backflow
-      // u_dot_n = u_dot_n < 0.0 ? u_dot_n : 0.0;
       u_dot_n = std::min(u_dot_n, 0.0);
 
       // (u - uhat) dot n * u
@@ -159,7 +158,6 @@ void BackflowStabIntegrator::AssembleElementGrad(const FiniteElement &el,
       }
       double u_dot_n = u_bf * nor;
       // check if backflow
-      // u_dot_n = u_dot_n < 0.0 ? u_dot_n : 0.0;
       u_dot_n = std::min(u_dot_n, 0.0);
 
       w = ip.weight*trans.Weight();
@@ -209,9 +207,6 @@ void BlockBackflowStabIntegrator::AssembleElementVector(const Array<const Finite
    const IntegrationRule *ir = nullptr;
    if (ir == nullptr)
    {
-      // int order = el[0]->GetOrder()*3 + Tr.OrderW();
-      // ir = &IntRules.Get(el[0]->GetGeomType(), order);
-      // int order = 2*el[0]->GetOrder() + 3;
       int order = 2*el[0]->GetOrder(); // exact integration for linear terms
       ir = &IntRules.Get(el[0]->GetGeomType(), order);
    }
@@ -250,15 +245,12 @@ void BlockBackflowStabIntegrator::AssembleElementVector(const Array<const Finite
       u_bf = u;
       if (ale)
       {
-         // mesh_velo->GetVectorValue(Tr,ip,uhat);
          mesh_velo->Eval(uhat,Tr,ip);
          u_bf -= uhat;
       }
       double u_dot_n = u_bf * nor;
       // check if backflow
-      // u_dot_n = u_dot_n < 0.0 ? u_dot_n : 0.0;
-      u_dot_n = std::min(u_dot_n, 0.0);
-      // if (u_dot_n == 0.0) continue;      
+      u_dot_n = std::min(u_dot_n, 0.0);  
 
       // (u - uhat) dot n * u
       un_u.Set(u_dot_n,u);
@@ -274,9 +266,6 @@ void BlockBackflowStabIntegrator::AssembleElementVector(const Array<const Finite
          if (dim == 3) (*elvec[0])(a + 2*dof) += w * shape(a) * un_u(2);
       }
    }
-
-   // cout << "elvec = " ;
-   // (*elvec[0]).Print(cout,10);
 }
 
 void BlockBackflowStabIntegrator::AssembleElementGrad(const Array<const FiniteElement*> &el,
@@ -299,9 +288,6 @@ void BlockBackflowStabIntegrator::AssembleElementGrad(const Array<const FiniteEl
    const IntegrationRule *ir = nullptr;
    if (ir == nullptr)
    {
-      // int order = el[0]->GetOrder()*3 + Tr.OrderW();
-      // ir = &IntRules.Get(el[0]->GetGeomType(), order);
-      // int order = 2*el[0]->GetOrder() + 3;
       int order = 2*el[0]->GetOrder(); // exact integration for linear terms
       ir = &IntRules.Get(el[0]->GetGeomType(), order);
    }
@@ -348,15 +334,12 @@ void BlockBackflowStabIntegrator::AssembleElementGrad(const Array<const FiniteEl
       u_bf = u;
       if (ale)
       {
-         // mesh_velo->GetVectorValue(Tr,ip,uhat);
          mesh_velo->Eval(uhat,Tr,ip);
          u_bf -= uhat;
       }
       double u_dot_n = u_bf * nor;
       // check if backflow
-      // u_dot_n = u_dot_n < 0.0 ? u_dot_n : 0.0;
-      u_dot_n = std::min(u_dot_n, 0.0);    
-      // if (u_dot_n == 0.0) continue; 
+      u_dot_n = std::min(u_dot_n, 0.0);
 
       w = ip.weight*Tr.Weight();
       if (coeff) { w *= coeff->Eval(Tr,ip); } // for density
