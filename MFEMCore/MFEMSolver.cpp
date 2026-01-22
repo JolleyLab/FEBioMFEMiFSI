@@ -1719,6 +1719,58 @@ void MFEMSolver::FinalizeSolid()
    }
 
    m.sdc->Save();
+
+   if (m.immersed_solid && m.track_node)
+   {
+      std::string node_filename = m.fname + "/node_pos.txt";
+      
+      m.coord.SetSize(3);
+      m.coord = 0.0;
+      m.disp.SetSize(3);
+      m.disp = 0.0;
+
+      auto immersed_solidsolver = m.flowsolver->GetImmersedSolid();
+      MFEM_ASSERT(m.m_track_node_pos.isConst(), "Node position must be a constant");
+      vec3d &node_pos = m.m_track_node_pos.constValue();
+      m.coord(0) = node_pos.x;
+      m.coord(1) = node_pos.y;
+      m.coord(2) = node_pos.z;
+
+      immersed_solidsolver->TrackNodalDisplacement(m.coord,m.disp);
+      #ifdef MFEM_USE_MPI
+      if(Mpi::Root()) {
+      #endif
+      m.f = fopen(node_filename.c_str(), "w");
+      fprintf(m.f, "====================================================================================================================================\n");
+      fprintf(m.f, "        Time               Tip Displacement X          Tip Displacement Y          Tip Displacement Z         |Tip Displacement|\n");
+      fprintf(m.f, "%20.16e     %20.16e      %20.16e      %20.16e     %20.16e\n",0.0,m.disp(0),m.disp(1),m.disp(2),m.disp.Norml2());
+      fflush(m.f);
+      fflush(stdout);
+      #ifdef MFEM_USE_MPI
+      }
+      #endif
+   }
+
+   if (m.immersed_solid && m.output_avg_velocity)
+   {
+      std::string avg_velo_filename = m.fname + "/avg_velocity.txt";
+      m.avg_velo.SetSize(3);
+      m.avg_velo = 0.0;
+
+      ComputeAverageVelocity(m.form_type,*m.d_gf,*m.vib_gf,m.avg_velo,m.volume);
+
+      #ifdef MFEM_USE_MPI
+      if(Mpi::Root()) {
+      #endif
+      m.avg_velo_file = fopen(avg_velo_filename.c_str(), "w");
+      fprintf(m.avg_velo_file, "        Time                  Average Velocity X         Average Velocity Y         Average Velocity Z               Volume\n");
+      fprintf(m.avg_velo_file, "%20.16e     %20.16e     %20.16e     %20.16e     %20.16e\n",0.0,m.avg_velo(0),m.avg_velo(1),m.avg_velo(2),m.volume);  
+      fflush(m.avg_velo_file);
+      fflush(stdout);
+      #ifdef MFEM_USE_MPI
+      }
+      #endif
+   }
 }
 
 bool MFEMSolver::SolveStep()

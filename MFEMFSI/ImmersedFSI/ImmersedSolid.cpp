@@ -513,62 +513,85 @@ void ImmersedSolid::TrackNodalDisplacement(Vector &coord, Vector &disp, double t
    if (find_node)
    {
       // find the node number with position provided by coords
+      #ifdef MFEM_USE_GSLIB
+      #ifdef MFEM_USE_MPI
+      FindPointsGSLIB finder(dfes->GetComm());
+      #else
+      FindPtsGSLIB finder;
+      #endif
+      finder.FindPoints(*pmesh,coord);
+      Array<int> code = finder.GetCode();
+      Array<int> elem_ids_gslib = finder.GetElem();
+      Array<int> proc_ids_gslib = finder.GetProc();
+      MFEM_ASSERT(code[0] != 2, "Error: node to track was not found!");
+      int elem_num = elem_ids_gslib[0];
+      int proc_id = proc_ids_gslib[0];
+      #else
       DenseMatrix point_mat(pmesh->Dimension(),1);
       point_mat.SetCol(0,coord);
+      point_mat.Print();
       Array<int> elem_ids;
       Array<IntegrationPoint> ips;
       int npts_found = pmesh->FindPoints(point_mat,elem_ids,ips);
       MFEM_ASSERT(npts_found == 1, "Error: node to track was not found!");
       int elem_num = elem_ids[0];
+      #endif
+
       local_node_num = -1;
-      int dim = pmesh->Dimension();
-      Vector curr_ip(dim);
-      if (elem_num > -1)
+      #ifdef MFEM_USE_GSLIB
+      if (proc_id == my_rank)
       {
-         const FiniteElement *pfe = dfes->GetFE(elem_num);
-         ElementTransformation *eltrans = dfes->GetElementTransformation(elem_num);
-         Array<int> dofs;
-         auto doftrans = dfes->GetElementDofs(elem_num,dofs);
-         // integration rule = nodes of element
-         // i.e. int point 0 = node 0
-         const IntegrationRule *ir = &pfe->GetNodes();
-
-         double diff_x = 1.0;
-         double diff_y = 1.0;
-         double diff_z = 1.0;
-
-         for (int j = 0; j < ir->GetNPoints(); j++)
+      #endif
+         int dim = pmesh->Dimension();
+         Vector curr_ip(dim);
+         if (elem_num > -1)
          {
-            const IntegrationPoint &ip = ir->IntPoint(j);
+            const FiniteElement *pfe = dfes->GetFE(elem_num);
+            ElementTransformation *eltrans = dfes->GetElementTransformation(elem_num);
+            Array<int> dofs;
+            auto doftrans = dfes->GetElementDofs(elem_num,dofs);
+            // integration rule = nodes of element
+            // i.e. int point 0 = node 0
+            const IntegrationRule *ir = &pfe->GetNodes();
 
-            eltrans->Transform(ip,curr_ip);
+            double diff_x = 1.0;
+            double diff_y = 1.0;
+            double diff_z = 1.0;
 
-            // compare nodes with coords
-            diff_x = abs(curr_ip(0) - coord(0));
-            diff_y = abs(curr_ip(1) - coord(1));
-            if (dim == 3) diff_z = abs(curr_ip(2) - coord(2));
-
-            if (diff_x <= tol && diff_y <= tol)
+            for (int j = 0; j < ir->GetNPoints(); j++)
             {
-               if (dim == 3)
+               const IntegrationPoint &ip = ir->IntPoint(j);
+
+               eltrans->Transform(ip,curr_ip);
+
+               // compare nodes with coords
+               diff_x = abs(curr_ip(0) - coord(0));
+               diff_y = abs(curr_ip(1) - coord(1));
+               if (dim == 3) diff_z = abs(curr_ip(2) - coord(2));
+
+               if (diff_x <= tol && diff_y <= tol)
                {
-                  if (diff_z <= tol)
+                  if (dim == 3)
+                  {
+                     if (diff_z <= tol)
+                     {
+                        local_node_num = dofs[j];
+                        break;
+                     }
+                  }
+                  else
                   {
                      local_node_num = dofs[j];
                      break;
                   }
                }
-               else
-               {
-                  local_node_num = dofs[j];
-                  break;
-               }
             }
+
+            MFEM_VERIFY(local_node_num > -1, "Error: node not found!");
          }
-
-         MFEM_VERIFY(local_node_num > -1, "Error: node not found!");
+      #ifdef MFEM_USE_GSLIB
       }
-
+      #endif
       find_node = false;
    }
 
@@ -591,7 +614,7 @@ void ImmersedSolid::TrackNodalDisplacement(Vector &coord, Vector &disp, double t
 
 
    #ifdef MFEM_USE_MPI
-   // communication
+   // communication to get to root proc
    MPI_Allreduce(&x,&x_glob,1,MPI_DOUBLE,MPI_SUM,dfes->GetComm());
    MPI_Allreduce(&y,&y_glob,1,MPI_DOUBLE,MPI_SUM,dfes->GetComm());
    if (dim == 3) MPI_Allreduce(&z,&z_glob,1,MPI_DOUBLE,MPI_SUM,dfes->GetComm());
@@ -896,7 +919,12 @@ GridFunction *ImmersedSolid::ComputeNodallyAveragedVonMisesStress(GridFunction &
 
    for (int i = 0; i < d_gf.FESpace()->GetNE(); i++)
    {
+      #ifdef MFEM_USE_MPI
+      auto par_d_gf = dynamic_cast<ParGridFunction *>(&d_gf);
+      fe = par_d_gf->ParFESpace()->GetFE(i);
+      #else
       fe = d_gf.FESpace()->GetFE(i);
+      #endif
       Tr = d_gf.FESpace()->GetElementTransformation(i);
       d_gf.FESpace()->GetElementVDofs(i,vdofs);
       nodal_stress_gf.FESpace()->GetElementVDofs(i,vdofs_stress);
