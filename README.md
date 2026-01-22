@@ -4,7 +4,15 @@ This project aims to couple FEBio with an MFEM-based FSI solver ([iFSI](https://
 Please see INSTALL.md for instructions on building the plugin. 
 
 ## Linking to FEBio
-To load the plugin into the FEBio solver, please update your febio.xml file to import the plugin library.
+To load the plugin into the FEBio solver, please update your febio.xml file to import the plugin library. For example,
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<febio_config version="3.0">
+	<default_linear_solver type="pardiso"></default_linear_solver>
+	<import>libFEBioChem.dylib</import>
+	<import>libFEBioHeat.dylib</import>
+	<import>/Path/to/plugin/library/libFEBioMFEMiFSI.dylib</import>
+</febio_config>
 
 ## Linking to FEBio Studio
 The plugin can then be linked to FEBio Studio via the plugin repository. Click the Plugin Repository button in FEBio Studio, then Load Local Plugin and point to the plugin library.
