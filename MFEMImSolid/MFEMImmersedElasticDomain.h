@@ -3,6 +3,7 @@
 #include <FEBioMech/FEElasticMaterial.h>
 #include "../MFEMCore/MFEMLoad.h"
 #include "../MFEMUtilities/MFEMTools.h"
+#include "MFEMNodalAverageOutputs.h"
 #include <mfem.hpp>
 
 class MFEMGlobalVector;
@@ -110,7 +111,8 @@ public:
 
 public:
    // output
-   virtual void ComputeNodallyAveragedVonMisesStress(mfem::GridFunction &stress_gf, mfem::Array<int> &zones_per_vdof);
+   virtual void ComputeNodallyAveragedStress(mfem::GridFunction &stress_gf, mfem::Array<int> &zones_per_vdof, nodal_avg::StressQuantity measure);
+   virtual void ComputeNodallyAveragedStrain(mfem::GridFunction &strain_gf, mfem::Array<int> &zones_per_vdof, nodal_avg::StrainQuantity measure);
 
 protected:
    FEDofList	m_dof;		// total dof list

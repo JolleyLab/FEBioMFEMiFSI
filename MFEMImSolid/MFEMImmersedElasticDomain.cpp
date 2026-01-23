@@ -143,7 +143,8 @@ void MFEMImmersedElasticDomain::UpdateElementStress(int iel, const FETimeInfo& t
 	// nodal coordinates
    const int NELN = FEElement::MAX_NODES;
    vec3d r[NELN], v[NELN], a[NELN];
-	GetCurrentNodalCoordinates(el, r, m_alphaf);
+	// GetCurrentNodalCoordinates(el, r, m_alphaf);
+   GetCurrentNodalCoordinates(el, r, tp.alphaf);
 
 	// update dynamic quantities
 	if (m_update_dynamic)
@@ -155,8 +156,12 @@ void MFEMImmersedElasticDomain::UpdateElementStress(int iel, const FETimeInfo& t
 		for (int j = 0; j<neln; ++j)
 		{
 			FENode& node = m_pMesh->Node(el.m_node[j]);
-			v[j] = node.get_vec3d(dofVIMX, dofVIMY, dofVIMZ)*m_alphaf + node.m_vp*(1 - m_alphaf);
-			a[j] = node.m_at*m_alpham + node.m_ap*(1 - m_alpham);
+
+			// v[j] = node.get_vec3d(dofVIMX, dofVIMY, dofVIMZ)*m_alphaf + node.m_vp*(1 - m_alphaf);
+			// a[j] = node.m_at*m_alpham + node.m_ap*(1 - m_alpham);
+
+         v[j] = node.get_vec3d(dofVIMX, dofVIMY, dofVIMZ)*tp.alphaf + node.m_vp*(1 - tp.alphaf);
+			a[j] = node.m_at*tp.alpham + node.m_ap*(1 - tp.alpham);
 		}
 	}
 
@@ -175,20 +180,23 @@ void MFEMImmersedElasticDomain::UpdateElementStress(int iel, const FETimeInfo& t
       mat3d Ft, Fp;
       Jt = defgrad(el, Ft, n);
       defgradp(el, Fp, n);
-		if (m_alphaf == 1.0)
+		// if (m_alphaf == 1.0)
+      if (tp.alphaf == 1.0)
 		{
 			pt.m_F = Ft;
          pt.m_J = Jt;
 		}
 		else
 		{
-			pt.m_F = Ft*m_alphaf + Fp*(1-m_alphaf);
+			// pt.m_F = Ft*m_alphaf + Fp*(1-m_alphaf);
+         pt.m_F = Ft*tp.alphaf + Fp*(1-tp.alphaf);
          pt.m_J = pt.m_F.det();
 		}
 
       // mat3d Fi = pt.m_F.inverse();
       // pt.m_L = (Ft - Fp)*Fi / dt;
-      pt.m_L = gradient(el, v, n, m_alphaf); // gradv at int point at the midpoint
+      // pt.m_L = gradient(el, v, n, m_alphaf); // gradv at int point at the midpoint
+      pt.m_L = gradient(el, v, n, tp.alphaf); // gradv at int point at the midpoint
 		if (m_update_dynamic)
 		{
          // sets current velocity and acceleration at int point to midpoints
@@ -204,7 +212,8 @@ void MFEMImmersedElasticDomain::UpdateElementStress(int iel, const FETimeInfo& t
         
       // adjust stress for strain energy conservation
 		// (Apply only for mid-point rule)
-		if (m_alphaf == 0.5)
+		// if (m_alphaf == 0.5)
+      if (tp.alphaf == 0.5)
 		{
          MFEM_ABORT("TO DO");
 			FEElasticMaterial* pme = dynamic_cast<FEElasticMaterial*>(m_pMat);
@@ -846,38 +855,70 @@ void MFEMImmersedElasticDomain::BuildMatrixProfile(FEGlobalMatrix& M)
 	}
 }
 
-void MFEMImmersedElasticDomain::ComputeNodallyAveragedVonMisesStress(GridFunction &stress_gf, Array<int> &zones_per_vdof)
+void MFEMImmersedElasticDomain::ComputeNodallyAveragedStress(GridFunction &stress_gf, Array<int> &zones_per_vdof, nodal_avg::StressQuantity measure)
 {
-   auto sfes = stress_gf.FESpace();
+	auto sfes = stress_gf.FESpace();
 
-   // loop over elements
-   int NE = Elements();
-   for (int iel=0; iel<NE; ++iel)
-   {
-      FESolidElement& el = m_Elem[iel];
+	// loop over elements
+	int NE = Elements();
+	for (int iel=0; iel<NE; ++iel)
+	{
+		FESolidElement& el = m_Elem[iel];
 
-      // get mfem submesh element id
-      int submesh_id = -1;
-      if (solid_submesh)
-      {
-         // serial
-         submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
-      }         
-      else
-      {
-         // parallel
-         submesh_id = el.GetID()-1;
-      }
+		// get mfem submesh element id
+		int submesh_id = -1;
+		if (solid_submesh)
+		{
+			// serial
+			submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
+		}
+		else
+		{
+			// parallel
+			submesh_id = el.GetID()-1;
+		}
 
-      mfem::Array<int> vdofs;
-      sfes->GetElementVDofs(submesh_id,vdofs);
+		mfem::Array<int> vdofs;
+		sfes->GetElementVDofs(submesh_id,vdofs);
 
-      computeNodalProjectedValues<double>(el, stress_gf, zones_per_vdof, vdofs,
-         [=](const FEMaterialPoint& mp)
-         {
-            const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
-            mat3ds s = pt.m_s;
-            return s.effective_norm();
-         });
-   }
+		computeNodalProjectedValues<double>(el, stress_gf, zones_per_vdof, vdofs,
+			[=](const FEMaterialPoint& mp)
+			{
+				const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+				mat3ds s = pt.m_s;
+				return nodal_avg::StressMeasureValue(s, measure);
+			});
+	}
+}
+
+void MFEMImmersedElasticDomain::ComputeNodallyAveragedStrain(GridFunction &strain_gf, Array<int> &zones_per_vdof, nodal_avg::StrainQuantity measure)
+{
+	auto sfes = strain_gf.FESpace();
+
+	int NE = Elements();
+	for (int iel=0; iel<NE; ++iel)
+	{
+		FESolidElement& el = m_Elem[iel];
+
+		int submesh_id = -1;
+		if (solid_submesh)
+		{
+			submesh_id = solid_submesh->GetSubMeshElementFromParent(el.GetID()-1);
+		}
+		else
+		{
+			submesh_id = el.GetID()-1;
+		}
+
+		mfem::Array<int> vdofs;
+		sfes->GetElementVDofs(submesh_id,vdofs);
+
+		computeNodalProjectedValues<double>(el, strain_gf, zones_per_vdof, vdofs,
+			[=](const FEMaterialPoint& mp)
+			{
+				const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+				mat3ds E = pt.Strain();
+				return nodal_avg::StrainMeasureValue(E, measure);
+			});
+	}
 }

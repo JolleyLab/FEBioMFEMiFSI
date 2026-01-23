@@ -46,7 +46,8 @@ public:
    void UpdateFEBioDataFromRestart();
 
    // output
-   mfem::GridFunction *ComputeNodallyAveragedVonMisesStress(mfem::GridFunction &d_gf) override;
+   mfem::GridFunction *ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, mfem::GridFunction &d_gf) override;
+   mfem::GridFunction *ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, mfem::GridFunction &d_gf) override;
 
    // destructor
    virtual ~ImmersedFEBioSolid();

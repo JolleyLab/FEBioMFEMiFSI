@@ -1,4 +1,5 @@
 #include "ImmersedSolid.hpp"
+#include "NodalAverageOutputs.h"
 #include <general/forall.hpp>
 #include "../Utilities/linear_element_ext.hpp"
 #ifdef MFEM_USE_MPI
@@ -879,7 +880,7 @@ void ImmersedSolid::BuildInitTransformation(ElementTransformation &T, const Inte
    init_trans->SetIntPoint(&ip);
 }
 
-GridFunction *ImmersedSolid::ComputeNodallyAveragedVonMisesStress(GridFunction &d_gf)
+GridFunction *ImmersedSolid::ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, GridFunction &d_gf)
 {
    const FiniteElement *fe;
    ElementTransformation *Tr;
@@ -908,13 +909,19 @@ GridFunction *ImmersedSolid::ComputeNodallyAveragedVonMisesStress(GridFunction &
       #else
       nodal_stress_fes = new FiniteElementSpace(pmesh, nodal_stress_fec);
       #endif
-      nodal_stress_gf.SetSpace(nodal_stress_fes);
    }
-   nodal_stress_gf = 0.0;
+
+   // get or initialize the target field for this measure
+   NodalField &nodal_field = nodal_stress_fields[measure];
+   if (nodal_field.FESpace() == nullptr)
+   {
+      nodal_field.SetSpace(nodal_stress_fes);
+   }
+   nodal_field = 0.0;
 
    // AccumulateAndCountZones.
    Array<int> zones_per_vdof;
-   zones_per_vdof.SetSize(nodal_stress_gf.FESpace()->GetVSize());
+   zones_per_vdof.SetSize(nodal_field.FESpace()->GetVSize());
    zones_per_vdof = 0;
 
    for (int i = 0; i < d_gf.FESpace()->GetNE(); i++)
@@ -927,7 +934,7 @@ GridFunction *ImmersedSolid::ComputeNodallyAveragedVonMisesStress(GridFunction &
       #endif
       Tr = d_gf.FESpace()->GetElementTransformation(i);
       d_gf.FESpace()->GetElementVDofs(i,vdofs);
-      nodal_stress_gf.FESpace()->GetElementVDofs(i,vdofs_stress);
+      nodal_field.FESpace()->GetElementVDofs(i,vdofs_stress);
 
       int nd = fe->GetDof();
 
@@ -984,19 +991,9 @@ GridFunction *ImmersedSolid::ComputeNodallyAveragedVonMisesStress(GridFunction &
          // compute stress
          mat_type->EvalCauchyStress(stress);
 
-         // compute stress type
-         double stress_val = 0.0;
-         // compute sigma_dev
-         double dev = stress.Trace() * 1.0/(double) dim;
+         double stress_val = StressMeasureValue(stress, measure, dim);
 
-         stress(0,0) -= dev;
-         stress(1,1) -= dev;
-         if (dim == 3) stress(2,2) -= dev;
-
-         // von mises = sqrt(3/2 * s_dev : s_dev)
-         stress_val = sqrt(1.5 * stress.FNorm2());
-
-         nodal_stress_gf(vdofs_stress[j]) += stress_val;
+         nodal_field(vdofs_stress[j]) += stress_val;
          zones_per_vdof[vdofs_stress[j]]++;
       }
    }
@@ -1004,26 +1001,169 @@ GridFunction *ImmersedSolid::ComputeNodallyAveragedVonMisesStress(GridFunction &
    #ifdef MFEM_USE_MPI
    // average across processors
    // Count the zones globally.
-   GroupCommunicator &gcomm = nodal_stress_gf.ParFESpace()->GroupComm();
+   GroupCommunicator &gcomm = nodal_field.ParFESpace()->GroupComm();
    gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
    gcomm.Bcast(zones_per_vdof);
 
    // Accumulate for all vdofs.
-   gcomm.Reduce<double>(nodal_stress_gf.GetData(), GroupCommunicator::Sum);
-   gcomm.Bcast<double>(nodal_stress_gf.GetData());
+   gcomm.Reduce<double>(nodal_field.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(nodal_field.GetData());
    #endif
 
    // Compute means.
-   for (int i = 0; i < nodal_stress_gf.Size(); i++)
+   for (int i = 0; i < nodal_field.Size(); i++)
    {
       const int nz = zones_per_vdof[i];
       if (nz)
       {
-         nodal_stress_gf(i) /= nz;
+         nodal_field(i) /= nz;
       }
    }
 
-   return &nodal_stress_gf;
+   return &nodal_field;
+}
+
+GridFunction *ImmersedSolid::ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, GridFunction &d_gf)
+{
+   const FiniteElement *fe;
+   ElementTransformation *Tr;
+   DenseMatrix gradu;
+   int intorder;
+   int dim = d_gf.FESpace()->GetMesh()->SpaceDimension();
+   Vector u(dim);
+   u = 0.0;
+   gradu.SetSize(dim);
+   gradu = 0.0;
+
+   DenseMatrix strain(dim);
+   strain = 0.0;
+
+   Vector shape, local_dat;
+   DenseMatrix dshape, dshapedx, EF;
+
+   Array<int> vdofs, vdofs_strain;
+
+   if (nodal_strain_fec == nullptr)
+   {
+      // create a linear fes for strain output
+      nodal_strain_fec = new H1_FECollection(orderd, dim);
+      #ifdef MFEM_USE_MPI
+      nodal_strain_fes = new ParFiniteElementSpace(pmesh, nodal_strain_fec);
+      #else
+      nodal_strain_fes = new FiniteElementSpace(pmesh, nodal_strain_fec);
+      #endif
+   }
+
+   // get or initialize the target field for this measure
+   NodalField &nodal_field = nodal_strain_fields[measure];
+   if (nodal_field.FESpace() == nullptr)
+   {
+      nodal_field.SetSpace(nodal_strain_fes);
+   }
+   nodal_field = 0.0;
+
+   // AccumulateAndCountZones.
+   Array<int> zones_per_vdof;
+   zones_per_vdof.SetSize(nodal_field.FESpace()->GetVSize());
+   zones_per_vdof = 0;
+
+   for (int i = 0; i < d_gf.FESpace()->GetNE(); i++)
+   {
+      #ifdef MFEM_USE_MPI
+      auto par_d_gf = dynamic_cast<ParGridFunction *>(&d_gf);
+      fe = par_d_gf->ParFESpace()->GetFE(i);
+      #else
+      fe = d_gf.FESpace()->GetFE(i);
+      #endif
+      Tr = d_gf.FESpace()->GetElementTransformation(i);
+      d_gf.FESpace()->GetElementVDofs(i,vdofs);
+      nodal_field.FESpace()->GetElementVDofs(i,vdofs_strain);
+
+      int nd = fe->GetDof();
+
+      shape.SetSize(nd);
+      dshape.SetSize(nd, dim);
+      dshapedx.SetSize(nd, dim);
+
+      local_dat.SetSize(nd*dim);
+      d_gf.GetSubVector(vdofs,local_dat);
+      EF.UseExternalData(local_dat.GetData(), nd, dim);
+
+      // loop over nodes
+      const IntegrationRule *ir = &fe->GetNodes();
+      for (int j = 0; j < ir->GetNPoints(); j++)
+      {
+         const IntegrationPoint &ip = ir->IntPoint(j);
+         Tr->SetIntPoint(&ip);
+
+         fe->CalcShape(ip, shape);
+         fe->CalcDShape(ip, dshape);
+
+         // compute dshapedx using appropriate transformation for computing du/dX and F = dx/dX
+         if (formulation_type == form_type::TotalLagrangian)
+         {
+            Mult(dshape, Tr->InverseJacobian(), dshapedx); // (dN/dX)
+         }
+         else if (formulation_type == form_type::UpdatedLagrangian)
+         {
+            BuildInitTransformation(*Tr,ip);
+            Mult(dshape, init_trans->InverseJacobian(), dshapedx); // (dN/dX)
+         }
+         else
+         {
+            MFEM_ABORT("Error: Unsupported formulation type");
+         }
+
+         MultAtB(EF, dshapedx, gradu); // dudX
+         EF.MultTranspose(shape, u); // u
+         
+         // compute strain measures, material properties at the current integration point, stored for all operations later on
+         if (formulation_type == form_type::TotalLagrangian)
+         {
+            mat_type->SetStrainMeasures(u,gradu,ip,*Tr);
+         }
+         else if (formulation_type == form_type::UpdatedLagrangian)
+         {
+            mat_type->SetStrainMeasures(u,gradu,ip,*init_trans);
+         }
+         else
+         {
+            MFEM_ABORT("Error: Unsupported formulation type");
+         }      
+
+         // compute strain
+         strain = mat_type->GetE();
+
+         double strain_val = StrainMeasureValue(strain, measure, dim);
+
+         nodal_field(vdofs_strain[j]) += strain_val;
+         zones_per_vdof[vdofs_strain[j]]++;
+      }
+   }
+
+   #ifdef MFEM_USE_MPI
+   // average across processors
+   // Count the zones globally.
+   GroupCommunicator &gcomm = nodal_field.ParFESpace()->GroupComm();
+   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+   gcomm.Bcast(zones_per_vdof);
+
+   // Accumulate for all vdofs.
+   gcomm.Reduce<double>(nodal_field.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(nodal_field.GetData());
+   #endif
+
+   // Compute means.
+   for (int i = 0; i < nodal_field.Size(); i++)
+   {
+      const int nz = zones_per_vdof[i];
+      if (nz)
+      {
+         nodal_field(i) /= nz;
+      }
+   }
+
+   return &nodal_field;
 }
 
 ImmersedSolid::~ImmersedSolid()
@@ -1049,5 +1189,7 @@ ImmersedSolid::~ImmersedSolid()
    delete init_trans;
    delete nodal_stress_fec;
    delete nodal_stress_fes;
+   delete nodal_strain_fec;
+   delete nodal_strain_fes;
    
 }

@@ -109,6 +109,7 @@ private:
    void PostProcessOutput();
    void FinalizeSolid();
    void RestartFiles();
+   void UpdateSolidNodalOutputs();
 
    #ifdef MFEM_USE_MPI
    void PartitionMesh();

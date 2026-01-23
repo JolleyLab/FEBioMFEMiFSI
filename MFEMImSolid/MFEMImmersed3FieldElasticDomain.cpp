@@ -360,16 +360,21 @@ void MFEMImmersed3FieldElasticDomain::UpdateElementStress(int iel, const FETimeI
 	{
       FENode& node = m_pMesh->Node(el.m_node[j]);
       r0[j] = node.m_r0;
-      r[j] = node.m_rt*m_alphaf + node.m_rp*(1-m_alphaf);
-      vel[j] = node.get_vec3d(dofVIMX, dofVIMY, dofVIMZ)*m_alphaf + node.m_vp*(1-m_alphaf);
-      acc[j] = node.m_at*m_alpham + node.m_ap*(1-m_alpham);
+      // r[j] = node.m_rt*m_alphaf + node.m_rp*(1-m_alphaf);
+      // vel[j] = node.get_vec3d(dofVIMX, dofVIMY, dofVIMZ)*m_alphaf + node.m_vp*(1-m_alphaf);
+      // acc[j] = node.m_at*m_alpham + node.m_ap*(1-m_alpham);
+
+      r[j] = node.m_rt*tp.alphaf + node.m_rp*(1-tp.alphaf);
+      vel[j] = node.get_vec3d(dofVIMX, dofVIMY, dofVIMZ)*tp.alphaf + node.m_vp*(1-tp.alphaf);
+      acc[j] = node.m_at*tp.alpham + node.m_ap*(1-tp.alpham);
 	}
 
 	// calculate the average dilatation and pressure
 	double v = 0, vt = 0, V = 0;
 	for (int n=0; n<nint; ++n)
 	{
-		v += detJt(el, n, m_alphaf)*gw[n];
+		// v += detJt(el, n, m_alphaf)*gw[n];
+      v += detJt(el, n, tp.alphaf)*gw[n];
       vt+= detJt(el, n)*gw[n];
 		V += detJ0(el, n)*gw[n];
 	}
@@ -404,11 +409,13 @@ void MFEMImmersed3FieldElasticDomain::UpdateElementStress(int iel, const FETimeI
       mat3d Ft, Fp;
       Jt = defgrad(el, Ft, n);
       Jp = defgradp(el, Fp, n);
-      pt.m_F = (m_alphaf==1.0? Ft : Ft*m_alphaf + Fp*(1-m_alphaf));
+      // pt.m_F = (m_alphaf==1.0? Ft : Ft*m_alphaf + Fp*(1-m_alphaf));
+      pt.m_F = (tp.alphaf==1.0? Ft : Ft*tp.alphaf + Fp*(1-tp.alphaf));
       pt.m_J = pt.m_F.det();
       // mat3d Fi = pt.m_F.inverse();
       // pt.m_L = (Ft - Fp)*Fi / dt;
-      pt.m_L = gradient(el, vel, n, m_alphaf); // gradv at int point at the midpoint
+      // pt.m_L = gradient(el, vel, n, m_alphaf); // gradv at int point at the midpoint
+      pt.m_L = gradient(el, vel, n, tp.alphaf); // gradv at int point at the midpoint
       pt.m_v = el.Evaluate(vel, n);
       pt.m_a = el.Evaluate(acc, n);
 
@@ -424,7 +431,8 @@ void MFEMImmersed3FieldElasticDomain::UpdateElementStress(int iel, const FETimeI
 		pt.m_s = mat.DevStress(mp);
         
       // adjust stress for strain energy conservation
-      if (m_alphaf == 0.5) 
+      // if (m_alphaf == 0.5) 
+      if (tp.alphaf == 0.5)
 		{
 			// evaluate deviatoric strain energy at current and previous time
 			mat3d Ftmp = pt.m_F;

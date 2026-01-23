@@ -413,6 +413,21 @@ void ImmersedFEBioSolid::Update()
       finder_fluid->TransferIndicator(solid_bdr_nodes,*s_gf_fluid,dfes->GetOrdering());
       #endif
    }
+
+   // update material point data to np1 for post-processing
+   // store timeinfo
+   FETimeInfo& tp = fem->GetTime();
+   FETimeInfo old_tp = tp; // save old time info
+   tp.timeIncrement = dt;
+   tp.alpham = 1.0;
+   tp.alphaf = 1.0;
+   tp.beta = 1.0;
+   tp.gamma = 9.0/16.0;
+   
+   fem->Update();
+
+   // restore time info
+   tp = old_tp;
 }
 
 void ImmersedFEBioSolid::ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambda_fsi_vec)
@@ -923,7 +938,7 @@ void ImmersedFEBioSolid::UpdateFEBioDataFromRestart()
    // }
 }
 
-GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedVonMisesStress(GridFunction &d_gf)
+GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, GridFunction &d_gf)
 {
    if (nodal_stress_fec == nullptr)
    {
@@ -935,51 +950,112 @@ GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedVonMisesStress(GridFunct
       #else
       nodal_stress_fes = new FiniteElementSpace(pmesh, nodal_stress_fec);
       #endif
-      nodal_stress_gf.SetSpace(nodal_stress_fes);
    }
-   nodal_stress_gf = 0.0;
 
-   // AccumulateAndCountZones.
+   // get or initialize the target field for this measure
+   NodalField &nodal_field = nodal_stress_fields[measure];
+   if (nodal_field.FESpace() == nullptr)
+   {
+      nodal_field.SetSpace(nodal_stress_fes);
+   }
+   nodal_field = 0.0;
+
+   // Accumulate and count zones
    Array<int> zones_per_vdof;
-   zones_per_vdof.SetSize(nodal_stress_gf.FESpace()->GetVSize());
+   zones_per_vdof.SetSize(nodal_field.FESpace()->GetVSize());
    zones_per_vdof = 0;
 
    FEMesh& mesh = fem->GetMesh();
-   for (int i=0; i<mesh.Domains(); ++i) 
-	{
-		FEDomain& dom = mesh.Domain(i);
+   for (int i=0; i<mesh.Domains(); ++i)
+   {
+      FEDomain& dom = mesh.Domain(i);
       MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
       if (mfd)
       {
-         mfd->ComputeNodallyAveragedVonMisesStress(nodal_stress_gf, zones_per_vdof);
-      }	
-	}
+         mfd->ComputeNodallyAveragedStress(nodal_field, zones_per_vdof, measure);
+      }
+   }
 
    #ifdef MFEM_USE_MPI
    // average across processors
-   // Count the zones globally
-   auto par_nodal_stress_gf = dynamic_cast<ParGridFunction*>(&nodal_stress_gf);
-   MFEM_ASSERT(par_nodal_stress_gf != nullptr, "Expected a ParGridFunction.");
-   GroupCommunicator &gcomm = par_nodal_stress_gf->ParFESpace()->GroupComm();
+   auto par_nodal_gf = dynamic_cast<ParGridFunction*>(&nodal_field);
+   MFEM_ASSERT(par_nodal_gf != nullptr, "Expected a ParGridFunction.");
+   GroupCommunicator &gcomm = par_nodal_gf->ParFESpace()->GroupComm();
    gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
    gcomm.Bcast(zones_per_vdof);
-
-   // Accumulate for all vdofs
-   gcomm.Reduce<double>(nodal_stress_gf.GetData(), GroupCommunicator::Sum);
-   gcomm.Bcast<double>(nodal_stress_gf.GetData());
+   gcomm.Reduce<double>(nodal_field.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(nodal_field.GetData());
    #endif
 
    // Compute means
-   for (int i = 0; i < nodal_stress_gf.Size(); i++)
+   for (int i = 0; i < nodal_field.Size(); i++)
    {
       const int nz = zones_per_vdof[i];
       if (nz)
       {
-         nodal_stress_gf(i) /= nz;
+         nodal_field(i) /= nz;
       }
    }
 
-   return &nodal_stress_gf;
+   return &nodal_field;
+}
+
+GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, GridFunction &d_gf)
+{
+   if (nodal_stress_fec == nullptr)
+   {
+      int dim = pmesh->Dimension();
+      nodal_stress_fec = new H1_FECollection(orderd, dim);
+      #ifdef MFEM_USE_MPI
+      nodal_stress_fes = new ParFiniteElementSpace(pmesh, nodal_stress_fec);
+      #else
+      nodal_stress_fes = new FiniteElementSpace(pmesh, nodal_stress_fec);
+      #endif
+   }
+
+   // get or initialize the target field for this measure
+   NodalField &nodal_field = nodal_strain_fields[measure];
+   if (nodal_field.FESpace() == nullptr)
+   {
+      nodal_field.SetSpace(nodal_stress_fes);
+   }
+   nodal_field = 0.0;
+
+   Array<int> zones_per_vdof;
+   zones_per_vdof.SetSize(nodal_field.FESpace()->GetVSize());
+   zones_per_vdof = 0;
+
+   FEMesh& mesh = fem->GetMesh();
+   for (int i=0; i<mesh.Domains(); ++i)
+   {
+      FEDomain& dom = mesh.Domain(i);
+      MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+      if (mfd)
+      {
+         mfd->ComputeNodallyAveragedStrain(nodal_field, zones_per_vdof, measure);
+      }
+   }
+
+   #ifdef MFEM_USE_MPI
+   auto par_nodal_gf = dynamic_cast<ParGridFunction*>(&nodal_field);
+   MFEM_ASSERT(par_nodal_gf != nullptr, "Expected a ParGridFunction.");
+   GroupCommunicator &gcomm = par_nodal_gf->ParFESpace()->GroupComm();
+   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+   gcomm.Bcast(zones_per_vdof);
+   gcomm.Reduce<double>(nodal_field.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(nodal_field.GetData());
+   #endif
+
+   for (int i = 0; i < nodal_field.Size(); i++)
+   {
+      const int nz = zones_per_vdof[i];
+      if (nz)
+      {
+         nodal_field(i) /= nz;
+      }
+   }
+
+   return &nodal_field;
 }
 
 ImmersedFEBioSolid::~ImmersedFEBioSolid()

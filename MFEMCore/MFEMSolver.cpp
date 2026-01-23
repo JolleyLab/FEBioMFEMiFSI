@@ -13,6 +13,7 @@
 #include "../MFEMLinAlg/FEBioLinearSolver.h"
 #include "../MFEMImSolid/MFEMImmersedElasticDomain.h"
 #include "../MFEMImSolid/MFEMImmersedFEBioSolid.h"
+#include "../MFEMImSolid/MFEMNodalAverageOutputs.h"
 #include "../MFEMUtilities/MFEMOutputTimeSeries.h"
 #include "../MFEMUtilities/MFEMParFEMeshBuilder.h"
 
@@ -25,6 +26,8 @@
 #include <filesystem>
 #include <sstream>
 #include <iomanip>
+#include <map>
+#include <memory>
 
 using namespace ifs_solver;
 using namespace std;
@@ -146,7 +149,14 @@ public:
    ParMesh* solid_pmesh = nullptr;
    #endif
    std::map<FESolidDomain*, int> dom_attr_map; // map from immersed solid domain to mfem attribute
-   GridFunction *vonMisesStress_gf = nullptr; // von Mises stress grid function
+
+   // nodally averaged outputs, see MFEMImSolid/MFEMNodalAverageOutputs.h for available quantities
+   std::string stress_nodal_outputs; // comma separated requested solid stress measures
+   std::string strain_nodal_outputs; // comma separated requested solid strain measures
+   std::vector<nodal_avg::StressQuantity> stress_nodal_quantities;
+   std::vector<nodal_avg::StrainQuantity> strain_nodal_quantities;
+   std::map<nodal_avg::StressQuantity, GridFunction*> stress_nodal_fields; // non-owning, managed by immersed solid
+   std::map<nodal_avg::StrainQuantity, GridFunction*> strain_nodal_fields; // non-owning, managed by immersed solid
 
    // Output
    std::string fname = "results_mfem_solver";
@@ -264,9 +274,6 @@ public:
    FILE *avg_velo_file = nullptr;
    Vector avg_velo;
    double volume = 0.0;
-
-   // output additional immersed solid fields
-   bool vonMisesStress = false;
 public:
    // Custom stream buffer for writing to the log file
    CustomStreamBuffer customBuffer;
@@ -278,6 +285,27 @@ public:
 };
 
 MFEMSolver::Imp* MFEMSolver::Imp::This = nullptr;
+
+void MFEMSolver::UpdateSolidNodalOutputs()
+{
+   if (!m.immersed_solid) return;
+
+   auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
+   if (!immersed_solid_solver) return;
+
+   for (auto q : m.stress_nodal_quantities)
+   {
+      GridFunction *gf = immersed_solid_solver->ComputeNodallyAveragedStress(q, *m.d_gf);
+      m.stress_nodal_fields[q] = gf;
+   }
+
+   for (auto q : m.strain_nodal_quantities)
+   {
+      GridFunction *gf = immersed_solid_solver->ComputeNodallyAveragedStrain(q, *m.d_gf);
+      m.strain_nodal_fields[q] = gf;
+   }
+}
+
 
 // Add solver parameters
 BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
@@ -306,7 +334,8 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.track_node, "Track_node");
       ADD_PARAMETER(m.m_track_node_pos, "Track_node_position");
       ADD_PARAMETER(m.output_avg_velocity, "Output_avg_velocity");
-      ADD_PARAMETER(m.vonMisesStress, "Save_Von_Mises_Stress");
+      ADD_PARAMETER(m.stress_nodal_outputs, "Stress_nodal_outputs");
+      ADD_PARAMETER(m.strain_nodal_outputs, "Strain_nodal_outputs");
    END_PARAM_GROUP();
 
    // Time Stepping Options
@@ -1533,6 +1562,7 @@ void MFEMSolver::PostProcessOutput()
       ComputeQCriterion(*m.u_gf,m.q_criterion_gf);
       m.pvdc->RegisterField("Q-Criterion", &m.q_criterion_gf);
    }
+
 	m.pvdc->Save();
 
    if (m.immersed_solid)
@@ -1711,11 +1741,27 @@ void MFEMSolver::FinalizeSolid()
    if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio) m.immersed_febio_solid->SetupFEDomains();
 
    // additional solid post processing output
-   if (m.vonMisesStress)
+
+   // Parse requested solid nodal outputs
+   m.stress_nodal_quantities = ParseStressQuantityList(m.stress_nodal_outputs);
+   m.strain_nodal_quantities = ParseStrainQuantityList(m.strain_nodal_outputs);
+   if (!m.stress_nodal_quantities.empty() || !m.strain_nodal_quantities.empty())
    {
-      auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
-      m.vonMisesStress_gf = immersed_solid_solver->ComputeNodallyAveragedVonMisesStress(*m.d_gf);
-      m.sdc->RegisterField("VonMisesStress", m.vonMisesStress_gf);
+      UpdateSolidNodalOutputs();
+      for (auto q : m.stress_nodal_quantities)
+      {
+         if (m.stress_nodal_fields[q])
+         {
+            m.sdc->RegisterField(StressQuantityLabel(q), m.stress_nodal_fields[q]);
+         }
+      }
+      for (auto q : m.strain_nodal_quantities)
+      {
+         if (m.strain_nodal_fields[q])
+         {
+            m.sdc->RegisterField(StrainQuantityLabel(q), m.strain_nodal_fields[q]);
+         }
+      }
    }
 
    m.sdc->Save();
@@ -1847,11 +1893,7 @@ bool MFEMSolver::SolveStep()
       m.pvdc->Save();
       if (m.immersed_solid)
       {
-         if (m.vonMisesStress)
-         {
-            auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
-            m.vonMisesStress_gf = immersed_solid_solver->ComputeNodallyAveragedVonMisesStress(*m.d_gf);
-         }
+         if (!m.stress_nodal_quantities.empty() || !m.strain_nodal_quantities.empty()) UpdateSolidNodalOutputs();
 
          m.sdc->SetCycle(timeStep);
          m.sdc->SetTime(t);
