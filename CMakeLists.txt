@@ -75,7 +75,7 @@ else()
 endif()
 
 if (MFEM_FOUND)
-   message(STATUS "Found MFEM config in: ${MFEM_DIR} (version ${MFEM_VERSION})")
+   message(STATUS "Found MFEM in: ${MFEM_DIR} (version ${MFEM_VERSION})")
 else()
    message(FATAL_ERROR "Could not find MFEM. Set MFEM_DIR to the folder containing MFEMConfig.cmake or add its install prefix to CMAKE_PREFIX_PATH.")
 endif()

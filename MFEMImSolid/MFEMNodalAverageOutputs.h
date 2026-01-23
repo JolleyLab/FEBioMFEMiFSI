@@ -4,11 +4,8 @@
 #include <vector>
 #include <FECore/mat3d.h>
 
-// Include MFEM-specific nodal averaging utilities (enums, eigenvalues, DenseMatrix overloads)
 #include "../MFEMFSI/ImmersedFSI/NodalAverageOutputs.h"
 
-// Extends the MFEM-specific nodal averaging with FEBio mat3ds overloads
-// and provides parsing helpers for requested quantities.
 namespace nodal_avg
 {
    // FEBio mat3ds overloads for stress/strain measures
