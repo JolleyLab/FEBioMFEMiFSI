@@ -881,13 +881,60 @@ void MFEMImmersedElasticDomain::ComputeNodallyAveragedStress(GridFunction &stres
 		mfem::Array<int> vdofs;
 		sfes->GetElementVDofs(submesh_id,vdofs);
 
-		computeNodalProjectedValues<double>(el, stress_gf, zones_per_vdof, vdofs,
-			[=](const FEMaterialPoint& mp)
-			{
-				const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
-				mat3ds s = pt.m_s;
-				return nodal_avg::StressMeasureValue(s, measure);
-			});
+		if (measure == nodal_avg::StressQuantity::CauchyXX ||
+			 measure == nodal_avg::StressQuantity::CauchyYY ||
+			 measure == nodal_avg::StressQuantity::CauchyZZ ||
+			 measure == nodal_avg::StressQuantity::CauchyXY ||
+			 measure == nodal_avg::StressQuantity::CauchyYZ ||
+			 measure == nodal_avg::StressQuantity::CauchyXZ)
+		{
+			computeNodalProjectedValues<double>(el, stress_gf, zones_per_vdof, vdofs,
+				[=](const FEMaterialPoint& mp)
+				{
+					const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+					mat3ds s = pt.m_s;
+					return nodal_avg::StressMeasureValue(s, measure);
+				});
+
+         // const mfem::FiniteElement* fe = sfes->GetFE(submesh_id);
+         // computeNodalPolynomialFittedValues<double>(el, *fe, stress_gf, zones_per_vdof, vdofs, 1,
+         //    [=](const FEMaterialPoint& mp)
+         //    {
+         //       const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+			// 		mat3ds s = pt.m_s;
+			// 		return nodal_avg::StressMeasureValue(s, measure);
+         //    });
+		}
+		else
+		{
+			// project tensor components to nodes, then compute measure
+			computeNodalProjectedTensorMeasureValues<double>(
+				el, stress_gf, zones_per_vdof, vdofs,
+				[](const FEMaterialPoint& mp)
+				{
+					const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+					return pt.m_s;
+				},
+				[=](const mat3ds& S) 
+            { 
+               return nodal_avg::StressMeasureValue(S, measure); 
+            }
+			);
+
+         // const mfem::FiniteElement* fe = sfes->GetFE(submesh_id);
+         // computeNodalPolynomialFittedTensorMeasureValues<double>(
+			// 	el, *fe, stress_gf, zones_per_vdof, vdofs, 1,
+			// 	[](const FEMaterialPoint& mp)
+			// 	{
+			// 		const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+			// 		return pt.m_s;
+			// 	},
+			// 	[=](const mat3ds& S) 
+         //    { 
+         //       return nodal_avg::StressMeasureValue(S, measure); 
+         //    }
+			// );
+		}      
 	}
 }
 
@@ -913,12 +960,59 @@ void MFEMImmersedElasticDomain::ComputeNodallyAveragedStrain(GridFunction &strai
 		mfem::Array<int> vdofs;
 		sfes->GetElementVDofs(submesh_id,vdofs);
 
-		computeNodalProjectedValues<double>(el, strain_gf, zones_per_vdof, vdofs,
-			[=](const FEMaterialPoint& mp)
-			{
-				const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
-				mat3ds E = pt.Strain();
-				return nodal_avg::StrainMeasureValue(E, measure);
-			});
+		if (measure == nodal_avg::StrainQuantity::Exx ||
+			 measure == nodal_avg::StrainQuantity::Eyy ||
+			 measure == nodal_avg::StrainQuantity::Ezz ||
+			 measure == nodal_avg::StrainQuantity::Exy ||
+			 measure == nodal_avg::StrainQuantity::Eyz ||
+			 measure == nodal_avg::StrainQuantity::Exz)
+		{
+			computeNodalProjectedValues<double>(el, strain_gf, zones_per_vdof, vdofs,
+				[=](const FEMaterialPoint& mp)
+				{
+					const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+					mat3ds E = pt.Strain();
+					return nodal_avg::StrainMeasureValue(E, measure);
+				});
+
+         // const mfem::FiniteElement* fe = sfes->GetFE(submesh_id);
+         // computeNodalPolynomialFittedValues<double>(el, *fe, strain_gf, zones_per_vdof, vdofs, 1,
+         //    [=](const FEMaterialPoint& mp)
+         //    {
+         //       const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+         //       mat3ds E = pt.Strain();
+         //       return nodal_avg::StrainMeasureValue(E, measure);
+         //    });
+		}
+		else
+		{
+        // project tensor components to nodes, then compute measure
+			computeNodalProjectedTensorMeasureValues<double>(
+				el, strain_gf, zones_per_vdof, vdofs,
+				[](const FEMaterialPoint& mp)
+				{
+					const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+					return pt.Strain();
+				},
+				[=](const mat3ds& E) 
+            { 
+               return nodal_avg::StrainMeasureValue(E, measure); 
+            }
+			);
+
+         // const mfem::FiniteElement* fe = sfes->GetFE(submesh_id);
+         // computeNodalPolynomialFittedTensorMeasureValues<double>(
+			// 	el, *fe, strain_gf, zones_per_vdof, vdofs, 1,
+			// 	[](const FEMaterialPoint& mp)
+			// 	{
+			// 		const FEElasticMaterialPoint& pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+			// 		return pt.Strain();
+			// 	},
+			// 	[=](const mat3ds& E) 
+         //    { 
+         //       return nodal_avg::StrainMeasureValue(E, measure); 
+         //    }
+			// );
+		}
 	}
 }
