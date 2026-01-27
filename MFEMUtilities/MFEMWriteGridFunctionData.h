@@ -377,7 +377,7 @@ void computeNodalPolynomialFittedTensorMeasureValues(
    std::vector<double> ATy_yz = build_ATy(y_yz);
    std::vector<double> ATy_xz = build_ATy(y_xz);
 
-   // Solve for coefficients per component (copy ATA since solver mutates it)
+   // Solve for coefficients per component
    std::vector<double> c_xx, c_yy, c_zz, c_xy, c_yz, c_xz;
    {
       auto M = ATA; if (!solve_linear_system(M, ATy_xx, c_xx)) MFEM_ABORT("Polynomial fit failed (xx)");
