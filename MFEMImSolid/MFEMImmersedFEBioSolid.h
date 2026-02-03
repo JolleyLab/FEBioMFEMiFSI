@@ -46,8 +46,17 @@ public:
    void UpdateFEBioDataFromRestart();
 
    // output
-   mfem::GridFunction *ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, mfem::GridFunction &d_gf) override;
-   mfem::GridFunction *ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, mfem::GridFunction &d_gf) override;
+   mfem::GridFunction *ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, mfem::GridFunction &d_gf, bool elemental_avg = false) override;
+   mfem::GridFunction *ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, mfem::GridFunction &d_gf, bool elemental_avg = false) override;
+
+   // Derived measures computed from already computed nodal component fields
+   mfem::GridFunction *ComputeDerivedNodalStressMeasureFromComponents(nodal_avg::StressQuantity measure, bool elemental_avg = false);
+   mfem::GridFunction *ComputeDerivedNodalStrainMeasureFromComponents(nodal_avg::StrainQuantity measure, bool elemental_avg = false);
+
+   // void BuildGaussPointSpace();
+   // void UpdateGaussPointFields();
+   // mfem::QuadratureFunction *GetGaussPointStressComponent(nodal_avg::StressQuantity comp);
+   // mfem::QuadratureFunction *GetGaussPointStrainComponent(nodal_avg::StrainQuantity comp);
 
    // destructor
    virtual ~ImmersedFEBioSolid();
@@ -92,7 +101,28 @@ public:
 
 private:
    // flag for recomputing sparse matrix profile
-   bool reshape_stiffness = true; 
+   bool reshape_stiffness = true;
+
+   // Recovered nodal fields
+   #ifdef MFEM_USE_MPI
+   using NodalField = mfem::ParGridFunction;
+   #else
+   using NodalField = mfem::GridFunction;
+   #endif
+   // Nodal projection-based recovered fields
+   std::map<nodal_avg::StressQuantity, NodalField> nodalproj_stress_fields;
+   std::map<nodal_avg::StrainQuantity, NodalField> nodalproj_strain_fields;
+   // Elemental-averaged recovered fields
+   std::map<nodal_avg::StressQuantity, NodalField> elemental_stress_fields;
+   std::map<nodal_avg::StrainQuantity, NodalField> elemental_strain_fields;
+
+   // // Gauss-point output storage
+   // mfem::QuadratureSpace *solid_qspace = nullptr; // owned
+   // int solid_qorder = 0;
+   // std::map<nodal_avg::StressQuantity, mfem::QuadratureFunction*> gp_stress_fields; // owned
+   // std::map<nodal_avg::StrainQuantity, mfem::QuadratureFunction*> gp_strain_fields; // owned
+
+   int PickQuadratureOrderForSolidMesh();
 };
 
 

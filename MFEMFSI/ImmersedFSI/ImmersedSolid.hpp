@@ -143,8 +143,8 @@ public:
 
    // Output
    // compute nodally averaged stress/strain, returned as scalar gridfunctions
-   virtual mfem::GridFunction *ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, mfem::GridFunction &d_gf);
-   virtual mfem::GridFunction *ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, mfem::GridFunction &d_gf);
+   virtual mfem::GridFunction *ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, mfem::GridFunction &d_gf, bool elemental_avg = false);
+   virtual mfem::GridFunction *ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, mfem::GridFunction &d_gf, bool elemental_avg = false);
    void BuildInitTransformation(mfem::ElementTransformation &T, const mfem::IntegrationPoint &ip);
 
    virtual ~ImmersedSolid();

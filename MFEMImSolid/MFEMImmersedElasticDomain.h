@@ -5,6 +5,7 @@
 #include "../MFEMUtilities/MFEMTools.h"
 #include "MFEMNodalAverageOutputs.h"
 #include <mfem.hpp>
+#include <functional>
 
 class MFEMGlobalVector;
 
@@ -110,9 +111,19 @@ public:
 	void BuildMatrixProfile(FEGlobalMatrix& M) override;
 
 public:
-   // output
-   virtual void ComputeNodallyAveragedStress(mfem::GridFunction &stress_gf, mfem::Array<int> &zones_per_vdof, nodal_avg::StressQuantity measure);
-   virtual void ComputeNodallyAveragedStrain(mfem::GridFunction &strain_gf, mfem::Array<int> &zones_per_vdof, nodal_avg::StrainQuantity measure);
+   // OUTPUT
+
+   // Compute stress/strain at nodes using either nodal projection or elemental averaging.
+   // When elemental_avg=true, use elemental averaging from Gauss points to element, then distribute to nodes.
+   // When elemental_avg=false, project Gauss point values directly to nodes.
+   // tensor_at_ip: returns the tensor at an integration point.
+   // eval_component: evaluates desired scalar component from the tensor.
+   virtual void ComputeNodallyAveragedTensor(
+      mfem::GridFunction &tensor_comp_gf,
+      mfem::Array<int> &zones_per_vdof,
+      std::function<mat3ds(const FEMaterialPoint&)> tensor_at_ip,
+      std::function<double(const mat3ds&)> eval_component,
+      bool elemental_avg = false);
 
 protected:
    FEDofList	m_dof;		// total dof list

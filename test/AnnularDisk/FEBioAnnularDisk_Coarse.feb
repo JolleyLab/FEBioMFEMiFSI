@@ -42,6 +42,10 @@
 			<Track_node>0</Track_node>
 			<Track_node_position>0,0,0</Track_node_position>
 			<Output_avg_velocity>0</Output_avg_velocity>
+			<StressRecovery_NodalProjection>1</StressRecovery_NodalProjection>
+			<StressRecovery_Elemental>1</StressRecovery_Elemental>
+			<Stress_measure_nodal_outputs>vm,p1,p2,p3</Stress_measure_nodal_outputs>
+			<Strain_measure_nodal_outputs>vm,p1,p2,p3</Strain_measure_nodal_outputs>
 			<time_stepping_method>GenAlpha</time_stepping_method>
 			<rho_inf>0.5</rho_inf>
 			<step_save>1</step_save>
@@ -60,6 +64,9 @@
 			<Save_Wall_Shear_Stress>0</Save_Wall_Shear_Stress>
 			<Save_Vorticity>0</Save_Vorticity>
 			<Save_Q_Criterion>0</Save_Q_Criterion>
+			<Output_surface_pressures>0</Output_surface_pressures>
+			<Output_surface_flow_rates>0</Output_surface_flow_rates>
+			<HDF5_output>1</HDF5_output>
 			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-06</atol>
 			<rtol>0.001</rtol>
@@ -3329,6 +3336,7 @@
 		<bc name="PrescribedVelocityComponent2" surface="PrescribedVelocityComponent2" type="prescribed velocity component">
 			<dof>vz</dof>
 			<value>0</value>
+			<zero_boundary>0</zero_boundary>
 		</bc>
 	</Boundary>
 	<Output>

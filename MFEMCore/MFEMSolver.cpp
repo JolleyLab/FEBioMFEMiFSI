@@ -14,6 +14,7 @@
 #include "../MFEMImSolid/MFEMImmersedElasticDomain.h"
 #include "../MFEMImSolid/MFEMImmersedFEBioSolid.h"
 #include "../MFEMImSolid/MFEMNodalAverageOutputs.h"
+#include "../MFEMImSolid/MFEMImFEBio_enum.h"
 #include "../MFEMUtilities/MFEMOutputTimeSeries.h"
 #include "../MFEMUtilities/MFEMParFEMeshBuilder.h"
 
@@ -150,13 +151,25 @@ public:
    #endif
    std::map<FESolidDomain*, int> dom_attr_map; // map from immersed solid domain to mfem attribute
 
-   // nodally averaged outputs, see MFEMImSolid/MFEMNodalAverageOutputs.h for available quantities
-   std::string stress_nodal_outputs; // comma separated requested solid stress measures
-   std::string strain_nodal_outputs; // comma separated requested solid strain measures
-   std::vector<nodal_avg::StressQuantity> stress_nodal_quantities;
-   std::vector<nodal_avg::StrainQuantity> strain_nodal_quantities;
-   std::map<nodal_avg::StressQuantity, GridFunction*> stress_nodal_fields; // non-owning, managed by immersed solid
-   std::map<nodal_avg::StrainQuantity, GridFunction*> strain_nodal_fields; // non-owning, managed by immersed solid
+   // Stress/strain recovery and measure outputs (FEBio-only path uses both variants)
+   // Requested measures (e.g., VonMises, Principal stresses) to output, see MFEMImSolid/MFEMNodalAverageOutputs.h for available quantities
+   std::string stress_measure_outputs; // comma separated requested solid stress measures at nodes
+   std::string strain_measure_outputs; // comma separated requested solid strain measures at nodes
+   std::vector<nodal_avg::StressQuantity> stress_measure_quantities;
+   std::vector<nodal_avg::StrainQuantity> strain_measure_quantities;
+   // Recovery options
+   bool output_nodal_projection = true; // project Gauss-point values to nodes
+   bool output_elemental_average = false; // average on element, then distribute to nodes
+
+   // Registered solid scalar fields to refresh each save
+   struct SolidFieldSpec {
+      febio_im_solid::SolidFieldKind kind;
+      int quantity; // cast to StressQuantity or StrainQuantity based on kind
+      bool elemental; // true => Elemental, false => NodalProjection
+      std::string label;
+      GridFunction* gf; // non-owning; managed by ImmersedSolid
+   };
+   std::vector<SolidFieldSpec> solid_field_specs;
 
    // Output
    std::string fname = "results_mfem_solver";
@@ -286,27 +299,6 @@ public:
 
 MFEMSolver::Imp* MFEMSolver::Imp::This = nullptr;
 
-void MFEMSolver::UpdateSolidNodalOutputs()
-{
-   if (!m.immersed_solid) return;
-
-   auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
-   if (!immersed_solid_solver) return;
-
-   for (auto q : m.stress_nodal_quantities)
-   {
-      GridFunction *gf = immersed_solid_solver->ComputeNodallyAveragedStress(q, *m.d_gf);
-      m.stress_nodal_fields[q] = gf;
-   }
-
-   for (auto q : m.strain_nodal_quantities)
-   {
-      GridFunction *gf = immersed_solid_solver->ComputeNodallyAveragedStrain(q, *m.d_gf);
-      m.strain_nodal_fields[q] = gf;
-   }
-}
-
-
 // Add solver parameters
 BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
    // Discretization Options
@@ -334,8 +326,10 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.track_node, "Track_node");
       ADD_PARAMETER(m.m_track_node_pos, "Track_node_position");
       ADD_PARAMETER(m.output_avg_velocity, "Output_avg_velocity");
-      ADD_PARAMETER(m.stress_nodal_outputs, "Stress_nodal_outputs");
-      ADD_PARAMETER(m.strain_nodal_outputs, "Strain_nodal_outputs");
+      ADD_PARAMETER(m.output_nodal_projection, "StressRecovery_NodalProjection");
+      ADD_PARAMETER(m.output_elemental_average, "StressRecovery_Elemental");
+      ADD_PARAMETER(m.stress_measure_outputs, "Stress_measure_nodal_outputs");
+      ADD_PARAMETER(m.strain_measure_outputs, "Strain_measure_nodal_outputs");
    END_PARAM_GROUP();
 
    // Time Stepping Options
@@ -1369,16 +1363,13 @@ bool MFEMSolver::SetupSolid()
    {
       MFEM_ASSERT(fem->Materials() < 3, "MFEM solid solver only supports one material");
 
+      if (m.output_elemental_average) MFEM_ABORT("TODO: Elemental averaging not implemented for immersed MFEM solid solver");
+
       #ifdef MFEM_USE_MPI
       m.flowsolver->AddImmersedSolid(m.solid_pmesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
       #else
       m.flowsolver->AddImmersedSolid(m.solid_mesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
       #endif
-
-      // immersed solid grid functions
-      m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
-      m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
-      m.a_gf = m.flowsolver->GetImmersedSolidAcceleration();
    }
    else if (m.solidsolvertype == SolidSolverType::FEBio)
    {
@@ -1395,11 +1386,6 @@ bool MFEMSolver::SetupSolid()
 
       // add immersed solid to the flow solver
       m.flowsolver->AddImmersedSolid(m.immersed_febio_solid,m.stabs_scale);
-
-      // immersed solid grid functions
-      m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
-      m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
-      m.a_gf = m.flowsolver->GetImmersedSolidAcceleration();
    }
    else
    {
@@ -1412,6 +1398,7 @@ bool MFEMSolver::SetupSolid()
 
    // Create transfer maps and global functions 
    #ifndef MFEM_USE_MPI
+   MFEM_ABORT("TODO");
    int vdim = m.flowsolver->GetCurrentVelocity()->FESpace()->GetVDim();
    int ordering = m.flowsolver->GetCurrentVelocity()->FESpace()->GetOrdering();
    auto vfec = m.flowsolver->GetCurrentVelocity()->FESpace()->FEColl();
@@ -1583,9 +1570,6 @@ void MFEMSolver::PostProcessOutput()
       m.sdc->SetLevelsOfDetail(m.orderd);
       m.sdc->SetCompression(true);
       m.sdc->SetCompressionLevel(m.compression_level);
-      m.sdc->RegisterField("Displacement", m.d_gf);
-      m.sdc->RegisterField("Velocity", m.vib_gf);
-      m.sdc->RegisterField("Acceleration", m.a_gf);
 
       m.sdc->SetCycle(curr_step);
       m.sdc->SetTime(curr_time);
@@ -1740,26 +1724,156 @@ void MFEMSolver::FinalizeSolid()
    // ensure new febio solid domain has proper data after building parallel mesh
    if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio) m.immersed_febio_solid->SetupFEDomains();
 
-   // additional solid post processing output
+   // Register nodal fields (gridfunctions)
+   m.d_gf = m.flowsolver->GetImmersedSolidDisplacement();
+   m.vib_gf = m.flowsolver->GetImmersedSolidVelocity();
+   m.a_gf = m.flowsolver->GetImmersedSolidAcceleration();
+   m.sdc->RegisterField("Displacement", m.d_gf);
+   m.sdc->RegisterField("Velocity", m.vib_gf);
+   m.sdc->RegisterField("Acceleration", m.a_gf);
 
-   // Parse requested solid nodal outputs
-   m.stress_nodal_quantities = ParseStressQuantityList(m.stress_nodal_outputs);
-   m.strain_nodal_quantities = ParseStrainQuantityList(m.strain_nodal_outputs);
-   if (!m.stress_nodal_quantities.empty() || !m.strain_nodal_quantities.empty())
+   // additional solid post processing output
+   if (m.immersed_solid && m.solidsolvertype == SolidSolverType::FEBio)
    {
-      UpdateSolidNodalOutputs();
-      for (auto q : m.stress_nodal_quantities)
+      // TODO: need to check gauss pts in FEBio match MFEM for given element and order
+      // // Register gauss-pt fields (QuadratureFunctions) for stress/strain components
+      // m.immersed_febio_solid->BuildGaussPointSpace();
+      // m.immersed_febio_solid->UpdateGaussPointFields();
+      // m.sdc->RegisterQField("Stress_xx_gp", m.immersed_febio_solid->GetGaussPointStressComponent(nodal_avg::StressQuantity::CauchyXX));
+      // m.sdc->RegisterQField("Stress_yy_gp", m.immersed_febio_solid->GetGaussPointStressComponent(nodal_avg::StressQuantity::CauchyYY));
+      // m.sdc->RegisterQField("Stress_zz_gp", m.immersed_febio_solid->GetGaussPointStressComponent(nodal_avg::StressQuantity::CauchyZZ));
+      // m.sdc->RegisterQField("Stress_xy_gp", m.immersed_febio_solid->GetGaussPointStressComponent(nodal_avg::StressQuantity::CauchyXY));
+      // m.sdc->RegisterQField("Stress_yz_gp", m.immersed_febio_solid->GetGaussPointStressComponent(nodal_avg::StressQuantity::CauchyYZ));
+      // m.sdc->RegisterQField("Stress_xz_gp", m.immersed_febio_solid->GetGaussPointStressComponent(nodal_avg::StressQuantity::CauchyXZ));
+
+      // m.sdc->RegisterQField("Strain_xx_gp", m.immersed_febio_solid->GetGaussPointStrainComponent(nodal_avg::StrainQuantity::Exx));
+      // m.sdc->RegisterQField("Strain_yy_gp", m.immersed_febio_solid->GetGaussPointStrainComponent(nodal_avg::StrainQuantity::Eyy));
+      // m.sdc->RegisterQField("Strain_zz_gp", m.immersed_febio_solid->GetGaussPointStrainComponent(nodal_avg::StrainQuantity::Ezz));
+      // m.sdc->RegisterQField("Strain_xy_gp", m.immersed_febio_solid->GetGaussPointStrainComponent(nodal_avg::StrainQuantity::Exy));
+      // m.sdc->RegisterQField("Strain_yz_gp", m.immersed_febio_solid->GetGaussPointStrainComponent(nodal_avg::StrainQuantity::Eyz));
+      // m.sdc->RegisterQField("Strain_xz_gp", m.immersed_febio_solid->GetGaussPointStrainComponent(nodal_avg::StrainQuantity::Exz));
+
+      // Build default component lists
+      const nodal_avg::StressQuantity stress_components[] = {
+         nodal_avg::StressQuantity::CauchyXX,
+         nodal_avg::StressQuantity::CauchyYY,
+         nodal_avg::StressQuantity::CauchyZZ,
+         nodal_avg::StressQuantity::CauchyXY,
+         nodal_avg::StressQuantity::CauchyYZ,
+         nodal_avg::StressQuantity::CauchyXZ
+      };
+      const nodal_avg::StrainQuantity strain_components[] = {
+         nodal_avg::StrainQuantity::Exx,
+         nodal_avg::StrainQuantity::Eyy,
+         nodal_avg::StrainQuantity::Ezz,
+         nodal_avg::StrainQuantity::Exy,
+         nodal_avg::StrainQuantity::Eyz,
+         nodal_avg::StrainQuantity::Exz
+      };
+
+      auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
+
+      // Helper lambdas for labels and registration
+      auto stress_label = [&](nodal_avg::StressQuantity q, bool elemental){
+         std::string base = StressQuantityLabel(q);
+         return elemental ? base : std::string("Nodal_") + base;
+      };
+      auto strain_label = [&](nodal_avg::StrainQuantity q, bool elemental){
+         std::string base = StrainQuantityLabel(q);
+         return elemental ? base : std::string("Nodal_") + base;
+      };
+
+      // Default: output all components via selected recovery options
+      if (m.output_nodal_projection)
       {
-         if (m.stress_nodal_fields[q])
+         for (auto q : stress_components)
          {
-            m.sdc->RegisterField(StressQuantityLabel(q), m.stress_nodal_fields[q]);
+            auto *gf = immersed_solid_solver->ComputeNodallyAveragedStress(q, *m.d_gf, false);
+            std::string label = stress_label(q, false);
+            m.sdc->RegisterField(label.c_str(), gf);
+            m.solid_field_specs.push_back(MFEMSolver::Imp::SolidFieldSpec{febio_im_solid::SolidFieldKind::Stress, (int)q, false, label, gf});
+         }
+         for (auto q : strain_components)
+         {
+            auto *gf = immersed_solid_solver->ComputeNodallyAveragedStrain(q, *m.d_gf, false);
+            std::string label = strain_label(q, false);
+            m.sdc->RegisterField(label.c_str(), gf);
+            m.solid_field_specs.push_back(MFEMSolver::Imp::SolidFieldSpec{febio_im_solid::SolidFieldKind::Strain, (int)q, false, label, gf});
          }
       }
-      for (auto q : m.strain_nodal_quantities)
+      if (m.output_elemental_average)
       {
-         if (m.strain_nodal_fields[q])
+         for (auto q : stress_components)
          {
-            m.sdc->RegisterField(StrainQuantityLabel(q), m.strain_nodal_fields[q]);
+            auto *gf = immersed_solid_solver->ComputeNodallyAveragedStress(q, *m.d_gf, true);
+            std::string label = stress_label(q, true);
+            m.sdc->RegisterField(label.c_str(), gf);
+            m.solid_field_specs.push_back(MFEMSolver::Imp::SolidFieldSpec{febio_im_solid::SolidFieldKind::Stress, (int)q, true, label, gf});
+         }
+         for (auto q : strain_components)
+         {
+            auto *gf = immersed_solid_solver->ComputeNodallyAveragedStrain(q, *m.d_gf, true);
+            std::string label = strain_label(q, true);
+            m.sdc->RegisterField(label.c_str(), gf);
+            m.solid_field_specs.push_back(MFEMSolver::Imp::SolidFieldSpec{febio_im_solid::SolidFieldKind::Strain, (int)q, true, label, gf});
+         }
+      }
+
+      // Parse requested measure outputs and register for selected recovery options
+      m.stress_measure_quantities = ParseStressQuantityList(m.stress_measure_outputs);
+      m.strain_measure_quantities = ParseStrainQuantityList(m.strain_measure_outputs);
+      for (auto q : m.stress_measure_quantities)
+      {
+         if (m.output_nodal_projection)
+         {
+            auto *gf = m.immersed_febio_solid->ComputeDerivedNodalStressMeasureFromComponents(q, false);
+            std::string label = stress_label(q, false);
+            m.sdc->RegisterField(label.c_str(), gf);
+            m.solid_field_specs.push_back(MFEMSolver::Imp::SolidFieldSpec{febio_im_solid::SolidFieldKind::Stress, (int)q, false, label, gf});
+         }
+         if (m.output_elemental_average)
+         {
+            auto *gf = m.immersed_febio_solid->ComputeDerivedNodalStressMeasureFromComponents(q, true);
+            std::string label = stress_label(q, true);
+            m.sdc->RegisterField(label.c_str(), gf);
+            m.solid_field_specs.push_back(MFEMSolver::Imp::SolidFieldSpec{febio_im_solid::SolidFieldKind::Stress, (int)q, true, label, gf});
+         }
+      }
+      for (auto q : m.strain_measure_quantities)
+      {
+         if (m.output_nodal_projection)
+         {
+            auto *gf = m.immersed_febio_solid->ComputeDerivedNodalStrainMeasureFromComponents(q, false);
+            std::string label = strain_label(q, false);
+            m.sdc->RegisterField(label.c_str(), gf);
+            m.solid_field_specs.push_back(MFEMSolver::Imp::SolidFieldSpec{febio_im_solid::SolidFieldKind::Strain, (int)q, false, label, gf});
+         }
+         if (m.output_elemental_average)
+         {
+            auto *gf = m.immersed_febio_solid->ComputeDerivedNodalStrainMeasureFromComponents(q, true);
+            std::string label = strain_label(q, true);
+            m.sdc->RegisterField(label.c_str(), gf);
+            m.solid_field_specs.push_back(MFEMSolver::Imp::SolidFieldSpec{febio_im_solid::SolidFieldKind::Strain, (int)q, true, label, gf});
+         }
+      }
+   }
+   else
+   {
+      // Non-FEBio path
+      m.stress_measure_quantities = ParseStressQuantityList(m.stress_measure_outputs);
+      m.strain_measure_quantities = ParseStrainQuantityList(m.strain_measure_outputs);
+      if (!m.stress_measure_quantities.empty() || !m.strain_measure_quantities.empty())
+      {
+         // UpdateSolidOutputs();
+         for (auto q : m.stress_measure_quantities)
+         {
+            auto gf = m.flowsolver->GetImmersedSolid()->ComputeNodallyAveragedStress(q, *m.d_gf, false);
+            m.sdc->RegisterField(StressQuantityLabel(q), gf);
+         }
+         for (auto q : m.strain_measure_quantities)
+         {
+            auto gf = m.flowsolver->GetImmersedSolid()->ComputeNodallyAveragedStrain(q, *m.d_gf, false);
+            m.sdc->RegisterField(StrainQuantityLabel(q), gf);
          }
       }
    }
@@ -1816,6 +1930,82 @@ void MFEMSolver::FinalizeSolid()
       #ifdef MFEM_USE_MPI
       }
       #endif
+   }
+}
+
+void MFEMSolver::UpdateSolidOutputs()
+{
+   if (!m.immersed_solid) return;
+
+   auto immersed_solid_solver = m.flowsolver->GetImmersedSolid();
+   if (!immersed_solid_solver) return;
+   
+   if (m.solidsolvertype == SolidSolverType::FEBio)
+   {
+      // Default components: compute/update both nodal projection and elemental averages if enabled
+      const nodal_avg::StressQuantity stress_components[] = {
+         nodal_avg::StressQuantity::CauchyXX,
+         nodal_avg::StressQuantity::CauchyYY,
+         nodal_avg::StressQuantity::CauchyZZ,
+         nodal_avg::StressQuantity::CauchyXY,
+         nodal_avg::StressQuantity::CauchyYZ,
+         nodal_avg::StressQuantity::CauchyXZ
+      };
+      const nodal_avg::StrainQuantity strain_components[] = {
+         nodal_avg::StrainQuantity::Exx,
+         nodal_avg::StrainQuantity::Eyy,
+         nodal_avg::StrainQuantity::Ezz,
+         nodal_avg::StrainQuantity::Exy,
+         nodal_avg::StrainQuantity::Eyz,
+         nodal_avg::StrainQuantity::Exz
+      };
+
+      if (m.output_nodal_projection)
+      {
+         for (auto q : stress_components) { immersed_solid_solver->ComputeNodallyAveragedStress(q, *m.d_gf, false); }
+         for (auto q : strain_components) { immersed_solid_solver->ComputeNodallyAveragedStrain(q, *m.d_gf, false); }
+      }
+      if (m.output_elemental_average)
+      {
+         for (auto q : stress_components) { immersed_solid_solver->ComputeNodallyAveragedStress(q, *m.d_gf, true); }
+         for (auto q : strain_components) { immersed_solid_solver->ComputeNodallyAveragedStrain(q, *m.d_gf, true); }
+      }
+
+      // Requested measures: compute from nodal components in a separate call
+      for (auto q : m.stress_measure_quantities)
+      {
+         if (m.output_nodal_projection)
+         {
+            m.immersed_febio_solid->ComputeDerivedNodalStressMeasureFromComponents(q, false);
+         }
+         if (m.output_elemental_average)
+         {
+            m.immersed_febio_solid->ComputeDerivedNodalStressMeasureFromComponents(q, true);
+         }
+      }
+      for (auto q : m.strain_measure_quantities)
+      {
+         if (m.output_nodal_projection)
+         {
+            m.immersed_febio_solid->ComputeDerivedNodalStrainMeasureFromComponents(q, false);
+         }
+         if (m.output_elemental_average)
+         {
+            m.immersed_febio_solid->ComputeDerivedNodalStrainMeasureFromComponents(q, true);
+         }
+      }
+   }
+   else
+   {
+      // Non-FEBio path: keep requested measure outputs via nodal projection
+      for (auto q : m.stress_measure_quantities)
+      {
+         immersed_solid_solver->ComputeNodallyAveragedStress(q, *m.d_gf, false);
+      }
+      for (auto q : m.strain_measure_quantities)
+      {
+         immersed_solid_solver->ComputeNodallyAveragedStrain(q, *m.d_gf, false);
+      }
    }
 }
 
@@ -1893,7 +2083,11 @@ bool MFEMSolver::SolveStep()
       m.pvdc->Save();
       if (m.immersed_solid)
       {
-         if (!m.stress_nodal_quantities.empty() || !m.strain_nodal_quantities.empty()) UpdateSolidNodalOutputs();
+         if ((m.solidsolvertype == SolidSolverType::FEBio && !m.solid_field_specs.empty()) ||
+            (m.solidsolvertype != SolidSolverType::FEBio && (!m.stress_measure_quantities.empty() || !m.strain_measure_quantities.empty())))
+         {
+            UpdateSolidOutputs();
+         }
 
          m.sdc->SetCycle(timeStep);
          m.sdc->SetTime(t);

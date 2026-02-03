@@ -3,11 +3,9 @@
 #include <algorithm>
 #include <cmath>
 
-// Forward declaration for MFEM types
 namespace mfem { class DenseMatrix; }
 
 // MFEM-specific nodal averaging utilities for stress/strain outputs.
-// This file is self-contained for the MFEMFSI module.
 namespace nodal_avg
 {
    enum class StressQuantity

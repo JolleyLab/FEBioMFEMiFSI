@@ -880,8 +880,13 @@ void ImmersedSolid::BuildInitTransformation(ElementTransformation &T, const Inte
    init_trans->SetIntPoint(&ip);
 }
 
-GridFunction *ImmersedSolid::ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, GridFunction &d_gf)
+GridFunction *ImmersedSolid::ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, GridFunction &d_gf, bool elemental_avg)
 {
+   if (elemental_avg)
+   {
+      MFEM_ABORT("Error: Elemental averaging not implemented yet for ImmersedSolid");
+   }
+
    const FiniteElement *fe;
    ElementTransformation *Tr;
    DenseMatrix gradu;
@@ -1023,8 +1028,13 @@ GridFunction *ImmersedSolid::ComputeNodallyAveragedStress(nodal_avg::StressQuant
    return &nodal_field;
 }
 
-GridFunction *ImmersedSolid::ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, GridFunction &d_gf)
+GridFunction *ImmersedSolid::ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, GridFunction &d_gf, bool elemental_avg)
 {
+   if (elemental_avg)
+   {
+      MFEM_ABORT("Error: Elemental averaging not implemented yet for ImmersedSolid");
+   }
+   
    const FiniteElement *fe;
    ElementTransformation *Tr;
    DenseMatrix gradu;

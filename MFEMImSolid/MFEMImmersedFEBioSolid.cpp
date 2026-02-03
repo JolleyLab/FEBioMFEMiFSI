@@ -7,6 +7,8 @@
 #include "../MFEMImSolid/MFEMImmersedElasticDomain.h"
 #include "mfem.hpp"
 #include <general/forall.hpp>
+#include "../MFEMImSolid/MFEMNodalAverageOutputs.h"
+#include "../MFEMFSI/ImmersedFSI/NodalAverageOutputs.h"
 
 
 
@@ -938,12 +940,12 @@ void ImmersedFEBioSolid::UpdateFEBioDataFromRestart()
    // }
 }
 
-GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, GridFunction &d_gf)
+GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, GridFunction &d_gf, bool elemental_avg)
 {
-   if (nodal_stress_fec == nullptr)
+   // Initialize output space on first use
+   const int dim = d_gf.FESpace()->GetMesh()->SpaceDimension();
+   if (!nodal_stress_fec)
    {
-      // create a linear fes for stress output
-      int dim = pmesh->Dimension();
       nodal_stress_fec = new H1_FECollection(orderd, dim);
       #ifdef MFEM_USE_MPI
       nodal_stress_fes = new ParFiniteElementSpace(pmesh, nodal_stress_fec);
@@ -952,59 +954,131 @@ GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedStress(nodal_avg::Stress
       #endif
    }
 
-   // get or initialize the target field for this measure
-   NodalField &nodal_field = nodal_stress_fields[measure];
-   if (nodal_field.FESpace() == nullptr)
+   // Select target field map
+   NodalField &out_field = elemental_avg ? elemental_stress_fields[measure]
+                                         : nodalproj_stress_fields[measure];
+   if (out_field.FESpace() == nullptr)
    {
-      nodal_field.SetSpace(nodal_stress_fes);
+      out_field.SetSpace(nodal_stress_fes);
    }
-   nodal_field = 0.0;
+   out_field = 0.0;
 
-   // Accumulate and count zones
+   // Zones-per-vdof accumulator
    Array<int> zones_per_vdof;
-   zones_per_vdof.SetSize(nodal_field.FESpace()->GetVSize());
+   zones_per_vdof.SetSize(out_field.FESpace()->GetVSize());
    zones_per_vdof = 0;
 
-   FEMesh& mesh = fem->GetMesh();
-   for (int i=0; i<mesh.Domains(); ++i)
+   // Loop over FEBio solid domains and accumulate
+   FEMesh &mesh = fem->GetMesh();
+   for (int i = 0; i < mesh.Domains(); ++i)
    {
-      FEDomain& dom = mesh.Domain(i);
-      MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
-      if (mfd)
-      {
-         mfd->ComputeNodallyAveragedStress(nodal_field, zones_per_vdof, measure);
-      }
+      FEDomain &dom = mesh.Domain(i);
+      auto *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+      if (!mfd) continue;
+
+      auto tensor_at_ip = [](const FEMaterialPoint &mp) -> mat3ds {
+         FEElasticMaterialPoint &pt = *const_cast<FEMaterialPoint&>(mp).ExtractData<FEElasticMaterialPoint>();
+         return pt.m_s; // Cauchy stress
+      };
+      auto eval_component = [measure](const mat3ds &S) -> double {
+         return nodal_avg::StressMeasureValue(S, measure);
+      };
+
+      mfd->ComputeNodallyAveragedTensor(out_field, zones_per_vdof, tensor_at_ip, eval_component, elemental_avg);
    }
 
+   // Parallel averaging across processors
    #ifdef MFEM_USE_MPI
-   // average across processors
-   auto par_nodal_gf = dynamic_cast<ParGridFunction*>(&nodal_field);
-   MFEM_ASSERT(par_nodal_gf != nullptr, "Expected a ParGridFunction.");
-   GroupCommunicator &gcomm = par_nodal_gf->ParFESpace()->GroupComm();
+   GroupCommunicator &gcomm = out_field.ParFESpace()->GroupComm();
    gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
    gcomm.Bcast(zones_per_vdof);
-   gcomm.Reduce<double>(nodal_field.GetData(), GroupCommunicator::Sum);
-   gcomm.Bcast<double>(nodal_field.GetData());
+   gcomm.Reduce<double>(out_field.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(out_field.GetData());
    #endif
 
-   // Compute means
-   for (int i = 0; i < nodal_field.Size(); i++)
+   // Compute means per vdof
+   for (int i = 0; i < out_field.Size(); i++)
    {
       const int nz = zones_per_vdof[i];
-      if (nz)
-      {
-         nodal_field(i) /= nz;
-      }
+      if (nz) out_field(i) /= nz;
    }
 
-   return &nodal_field;
+   return &out_field;
 }
 
-GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, GridFunction &d_gf)
+GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, GridFunction &d_gf, bool elemental_avg)
 {
-   if (nodal_stress_fec == nullptr)
+   // Initialize output space on first use
+   const int dim = d_gf.FESpace()->GetMesh()->SpaceDimension();
+   if (!nodal_strain_fec)
    {
-      int dim = pmesh->Dimension();
+      nodal_strain_fec = new H1_FECollection(orderd, dim);
+      #ifdef MFEM_USE_MPI
+      nodal_strain_fes = new ParFiniteElementSpace(pmesh, nodal_strain_fec);
+      #else
+      nodal_strain_fes = new FiniteElementSpace(pmesh, nodal_strain_fec);
+      #endif
+   }
+
+   // Select target field map
+   NodalField &out_field = elemental_avg ? elemental_strain_fields[measure]
+                                         : nodalproj_strain_fields[measure];
+   if (out_field.FESpace() == nullptr)
+   {
+      out_field.SetSpace(nodal_strain_fes);
+   }
+   out_field = 0.0;
+
+   // Zones-per-vdof accumulator
+   Array<int> zones_per_vdof;
+   zones_per_vdof.SetSize(out_field.FESpace()->GetVSize());
+   zones_per_vdof = 0;
+
+   // Loop over FEBio solid domains and accumulate
+   FEMesh &mesh = fem->GetMesh();
+   for (int i = 0; i < mesh.Domains(); ++i)
+   {
+      FEDomain &dom = mesh.Domain(i);
+      auto *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+      if (!mfd) continue;
+
+      auto tensor_at_ip = [](const FEMaterialPoint &mp) -> mat3ds {
+         FEElasticMaterialPoint &pt = *const_cast<FEMaterialPoint&>(mp).ExtractData<FEElasticMaterialPoint>();
+         return pt.Strain(); // Green-Lagrange strain
+      };
+      auto eval_component = [measure](const mat3ds &E) -> double {
+         return nodal_avg::StrainMeasureValue(E, measure);
+      };
+
+      mfd->ComputeNodallyAveragedTensor(out_field, zones_per_vdof, tensor_at_ip, eval_component, elemental_avg);
+   }
+
+   // Parallel averaging across processors
+   #ifdef MFEM_USE_MPI
+   GroupCommunicator &gcomm = out_field.ParFESpace()->GroupComm();
+   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+   gcomm.Bcast(zones_per_vdof);
+   gcomm.Reduce<double>(out_field.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(out_field.GetData());
+   #endif
+
+   // Compute means per vdof
+   for (int i = 0; i < out_field.Size(); i++)
+   {
+      const int nz = zones_per_vdof[i];
+      if (nz) out_field(i) /= nz;
+   }
+
+   return &out_field;
+}
+
+// Derived nodal measures from existing nodal component fields
+GridFunction *ImmersedFEBioSolid::ComputeDerivedNodalStressMeasureFromComponents(nodal_avg::StressQuantity measure, bool elemental_avg)
+{
+   // Ensure target output field exists
+   const int dim = pmesh->Dimension();
+   if (!nodal_stress_fec)
+   {
       nodal_stress_fec = new H1_FECollection(orderd, dim);
       #ifdef MFEM_USE_MPI
       nodal_stress_fes = new ParFiniteElementSpace(pmesh, nodal_stress_fec);
@@ -1012,50 +1086,77 @@ GridFunction *ImmersedFEBioSolid::ComputeNodallyAveragedStrain(nodal_avg::Strain
       nodal_stress_fes = new FiniteElementSpace(pmesh, nodal_stress_fec);
       #endif
    }
+   NodalField &out_field = elemental_avg ? elemental_stress_fields[measure]
+                                         : nodalproj_stress_fields[measure];
+   if (out_field.FESpace() == nullptr) out_field.SetSpace(nodal_stress_fes);
+   out_field = 0.0;
 
-   // get or initialize the target field for this measure
-   NodalField &nodal_field = nodal_strain_fields[measure];
-   if (nodal_field.FESpace() == nullptr)
-   {
-      nodal_field.SetSpace(nodal_stress_fes);
+   // Fetch component fields (must share same FESpace)
+   NodalField &sxx = elemental_avg ? elemental_stress_fields[nodal_avg::StressQuantity::CauchyXX]
+                                   : nodalproj_stress_fields[nodal_avg::StressQuantity::CauchyXX];
+   NodalField &syy = elemental_avg ? elemental_stress_fields[nodal_avg::StressQuantity::CauchyYY]
+                                   : nodalproj_stress_fields[nodal_avg::StressQuantity::CauchyYY];
+   NodalField &szz = elemental_avg ? elemental_stress_fields[nodal_avg::StressQuantity::CauchyZZ]
+                                   : nodalproj_stress_fields[nodal_avg::StressQuantity::CauchyZZ];
+   NodalField &sxy = elemental_avg ? elemental_stress_fields[nodal_avg::StressQuantity::CauchyXY]
+                                   : nodalproj_stress_fields[nodal_avg::StressQuantity::CauchyXY];
+   NodalField &syz = elemental_avg ? elemental_stress_fields[nodal_avg::StressQuantity::CauchyYZ]
+                                   : nodalproj_stress_fields[nodal_avg::StressQuantity::CauchyYZ];
+   NodalField &sxz = elemental_avg ? elemental_stress_fields[nodal_avg::StressQuantity::CauchyXZ]
+                                   : nodalproj_stress_fields[nodal_avg::StressQuantity::CauchyXZ];
+
+   MFEM_ASSERT(sxx.FESpace() != nullptr && syy.FESpace() != nullptr && szz.FESpace() != nullptr,
+               "Stress component fields must be computed before measures");
+
+   const int n = out_field.Size();
+   for (int i = 0; i < n; ++i)
+   {      
+      mat3ds S(sxx(i), syy(i), szz(i), sxy(i), syz(i), sxz(i));
+      out_field(i) = nodal_avg::StressMeasureValue(S, measure);
    }
-   nodal_field = 0.0;
+   return &out_field;
+}
 
-   Array<int> zones_per_vdof;
-   zones_per_vdof.SetSize(nodal_field.FESpace()->GetVSize());
-   zones_per_vdof = 0;
-
-   FEMesh& mesh = fem->GetMesh();
-   for (int i=0; i<mesh.Domains(); ++i)
+GridFunction *ImmersedFEBioSolid::ComputeDerivedNodalStrainMeasureFromComponents(nodal_avg::StrainQuantity measure, bool elemental_avg)
+{
+   const int dim = pmesh->Dimension();
+   if (!nodal_strain_fec)
    {
-      FEDomain& dom = mesh.Domain(i);
-      MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
-      if (mfd)
-      {
-         mfd->ComputeNodallyAveragedStrain(nodal_field, zones_per_vdof, measure);
-      }
+      nodal_strain_fec = new H1_FECollection(orderd, dim);
+      #ifdef MFEM_USE_MPI
+      nodal_strain_fes = new ParFiniteElementSpace(pmesh, nodal_strain_fec);
+      #else
+      nodal_strain_fes = new FiniteElementSpace(pmesh, nodal_strain_fec);
+      #endif
    }
+   NodalField &out_field = elemental_avg ? elemental_strain_fields[measure]
+                                         : nodalproj_strain_fields[measure];
+   if (out_field.FESpace() == nullptr) out_field.SetSpace(nodal_strain_fes);
+   out_field = 0.0;
 
-   #ifdef MFEM_USE_MPI
-   auto par_nodal_gf = dynamic_cast<ParGridFunction*>(&nodal_field);
-   MFEM_ASSERT(par_nodal_gf != nullptr, "Expected a ParGridFunction.");
-   GroupCommunicator &gcomm = par_nodal_gf->ParFESpace()->GroupComm();
-   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
-   gcomm.Bcast(zones_per_vdof);
-   gcomm.Reduce<double>(nodal_field.GetData(), GroupCommunicator::Sum);
-   gcomm.Bcast<double>(nodal_field.GetData());
-   #endif
+   NodalField &exx = elemental_avg ? elemental_strain_fields[nodal_avg::StrainQuantity::Exx]
+                                   : nodalproj_strain_fields[nodal_avg::StrainQuantity::Exx];
+   NodalField &eyy = elemental_avg ? elemental_strain_fields[nodal_avg::StrainQuantity::Eyy]
+                                   : nodalproj_strain_fields[nodal_avg::StrainQuantity::Eyy];
+   NodalField &ezz = elemental_avg ? elemental_strain_fields[nodal_avg::StrainQuantity::Ezz]
+                                   : nodalproj_strain_fields[nodal_avg::StrainQuantity::Ezz];
+   NodalField &exy = elemental_avg ? elemental_strain_fields[nodal_avg::StrainQuantity::Exy]
+                                   : nodalproj_strain_fields[nodal_avg::StrainQuantity::Exy];
+   NodalField &eyz = elemental_avg ? elemental_strain_fields[nodal_avg::StrainQuantity::Eyz]
+                                   : nodalproj_strain_fields[nodal_avg::StrainQuantity::Eyz];
+   NodalField &exz = elemental_avg ? elemental_strain_fields[nodal_avg::StrainQuantity::Exz]
+                                   : nodalproj_strain_fields[nodal_avg::StrainQuantity::Exz];
 
-   for (int i = 0; i < nodal_field.Size(); i++)
+   MFEM_ASSERT(exx.FESpace() != nullptr && eyy.FESpace() != nullptr && ezz.FESpace() != nullptr,
+               "Strain component fields must be computed before measures");
+
+   const int n = out_field.Size();
+   for (int i = 0; i < n; ++i)
    {
-      const int nz = zones_per_vdof[i];
-      if (nz)
-      {
-         nodal_field(i) /= nz;
-      }
+      mat3ds E(exx(i), eyy(i), ezz(i), exy(i), eyz(i), exz(i));
+      out_field(i) = nodal_avg::StrainMeasureValue(E, measure);
    }
-
-   return &nodal_field;
+   return &out_field;
 }
 
 ImmersedFEBioSolid::~ImmersedFEBioSolid()
@@ -1073,4 +1174,149 @@ ImmersedFEBioSolid::~ImmersedFEBioSolid()
    #ifdef MFEM_USE_MPI
    pK.Clear();
    #endif
+
+   // // Clean up GP output storage
+   // for (auto &kv : gp_stress_fields) { delete kv.second; kv.second = nullptr; }
+   // for (auto &kv : gp_strain_fields) { delete kv.second; kv.second = nullptr; }
+   // if (solid_qspace) { delete solid_qspace; solid_qspace = nullptr; }
 }
+
+// int ImmersedFEBioSolid::PickQuadratureOrderForSolidMesh()
+// {
+//    // Try to match FEBio element Gauss point count for typical element
+//    FEModel &fe = *fem;
+//    FEMesh &mesh = fe.GetMesh();
+//    for (int i = 0; i < mesh.Domains(); ++i)
+//    {
+//       FEDomain &dom = mesh.Domain(i);
+//       MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+//       if (!mfd) continue;
+//       // Find first active element
+//       for (int j = 0; j < mfd->Elements(); ++j)
+//       {
+//          FESolidElement &el = mfd->Element(j);
+//          if (!el.isActive()) continue;
+//          int ipcount = el.GaussPoints();
+//          // Map to associated MFEM element index
+//          int submesh_id = el.GetID() - 1;
+//          auto geom = pmesh->GetElementGeometry(submesh_id);
+//          // Search an order whose integration rule matches ipcount
+//          for (int ord = 1; ord <= 20; ++ord)
+//          {
+//             const mfem::IntegrationRule &ir = mfem::IntRules.Get(geom, ord);
+//             if (ir.GetNPoints() == ipcount) { return ord; }
+//          }
+//          // Fallback: typical 2*order
+//          return 2 * orderd;
+//       }
+//    }
+//    return std::max(1, 2 * orderd);
+// }
+
+// void ImmersedFEBioSolid::BuildGaussPointSpace()
+// {
+//    if (solid_qspace != nullptr) return;
+//    solid_qorder = PickQuadratureOrderForSolidMesh();
+//    // Build quadrature space using global IntRules at selected order
+//    solid_qspace = new mfem::QuadratureSpace(pmesh, solid_qorder);
+// }
+
+// mfem::QuadratureFunction *ImmersedFEBioSolid::GetGaussPointStressComponent(nodal_avg::StressQuantity comp)
+// {
+//    BuildGaussPointSpace();
+//    auto it = gp_stress_fields.find(comp);
+//    if (it == gp_stress_fields.end())
+//    {
+//       auto *qf = new mfem::QuadratureFunction(*solid_qspace, 1);
+//       *qf = 0.0;
+//       gp_stress_fields[comp] = qf;
+//    }
+//    return gp_stress_fields[comp];
+// }
+
+// mfem::QuadratureFunction *ImmersedFEBioSolid::GetGaussPointStrainComponent(nodal_avg::StrainQuantity comp)
+// {
+//    BuildGaussPointSpace();
+//    auto it = gp_strain_fields.find(comp);
+//    if (it == gp_strain_fields.end())
+//    {
+//       auto *qf = new mfem::QuadratureFunction(*solid_qspace, 1);
+//       *qf = 0.0;
+//       gp_strain_fields[comp] = qf;
+//    }
+//    return gp_strain_fields[comp];
+// }
+
+// void ImmersedFEBioSolid::UpdateGaussPointFields()
+// {
+//    BuildGaussPointSpace();
+//    // Ensure all component fields are allocated
+//    const nodal_avg::StressQuantity s_comps[] = {
+//       nodal_avg::StressQuantity::CauchyXX,
+//       nodal_avg::StressQuantity::CauchyYY,
+//       nodal_avg::StressQuantity::CauchyZZ,
+//       nodal_avg::StressQuantity::CauchyXY,
+//       nodal_avg::StressQuantity::CauchyYZ,
+//       nodal_avg::StressQuantity::CauchyXZ
+//    };
+//    const nodal_avg::StrainQuantity e_comps[] = {
+//       nodal_avg::StrainQuantity::Exx,
+//       nodal_avg::StrainQuantity::Eyy,
+//       nodal_avg::StrainQuantity::Ezz,
+//       nodal_avg::StrainQuantity::Exy,
+//       nodal_avg::StrainQuantity::Eyz,
+//       nodal_avg::StrainQuantity::Exz
+//    };
+//    for (auto c : s_comps) { (void)GetGaussPointStressComponent(c); }
+//    for (auto c : e_comps) { (void)GetGaussPointStrainComponent(c); }
+
+//    // Zero fields before accumulation
+//    for (auto &kv : gp_stress_fields) { *kv.second = 0.0; }
+//    for (auto &kv : gp_strain_fields) { *kv.second = 0.0; }
+
+//    // Loop FEBio domains/elements and fill values into QuadratureFunctions
+//    FEMesh &mesh = fem->GetMesh();
+//    for (int i = 0; i < mesh.Domains(); ++i)
+//    {
+//       FEDomain &dom = mesh.Domain(i);
+//       MFEMImmersedElasticDomain *mfd = dynamic_cast<MFEMImmersedElasticDomain*>(&dom);
+//       if (!mfd) continue;
+//       for (int j = 0; j < mfd->Elements(); ++j)
+//       {
+//          FESolidElement &el = mfd->Element(j);
+//          if (!el.isActive()) continue;
+//          int submesh_id = el.GetID() - 1;
+//          const int offset = solid_qspace->Offset(submesh_id);
+//          const mfem::IntegrationRule &ir = solid_qspace->GetElementIntRule(submesh_id);
+//          const int nq = ir.GetNPoints();
+
+//          // Fill stress components
+//          for (int n = 0; n < nq; ++n)
+//          {
+//             FEMaterialPoint &mp = *el.GetMaterialPoint(n);
+//             const FEElasticMaterialPoint &pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+//             const mat3ds &S = pt.m_s;
+//             gp_stress_fields[nodal_avg::StressQuantity::CauchyXX]->GetData()[offset + n] = S.xx();
+//             gp_stress_fields[nodal_avg::StressQuantity::CauchyYY]->GetData()[offset + n] = S.yy();
+//             gp_stress_fields[nodal_avg::StressQuantity::CauchyZZ]->GetData()[offset + n] = S.zz();
+//             gp_stress_fields[nodal_avg::StressQuantity::CauchyXY]->GetData()[offset + n] = S.xy();
+//             gp_stress_fields[nodal_avg::StressQuantity::CauchyYZ]->GetData()[offset + n] = S.yz();
+//             gp_stress_fields[nodal_avg::StressQuantity::CauchyXZ]->GetData()[offset + n] = S.xz();
+//          }
+
+//          // Fill strain components
+//          for (int n = 0; n < nq; ++n)
+//          {
+//             FEMaterialPoint &mp = *el.GetMaterialPoint(n);
+//             const FEElasticMaterialPoint &pt = *(mp.ExtractData<FEElasticMaterialPoint>());
+//             const mat3ds E = pt.Strain();
+//             gp_strain_fields[nodal_avg::StrainQuantity::Exx]->GetData()[offset + n] = E.xx();
+//             gp_strain_fields[nodal_avg::StrainQuantity::Eyy]->GetData()[offset + n] = E.yy();
+//             gp_strain_fields[nodal_avg::StrainQuantity::Ezz]->GetData()[offset + n] = E.zz();
+//             gp_strain_fields[nodal_avg::StrainQuantity::Exy]->GetData()[offset + n] = E.xy();
+//             gp_strain_fields[nodal_avg::StrainQuantity::Eyz]->GetData()[offset + n] = E.yz();
+//             gp_strain_fields[nodal_avg::StrainQuantity::Exz]->GetData()[offset + n] = E.xz();
+//          }
+//       }
+//    }
+// }
