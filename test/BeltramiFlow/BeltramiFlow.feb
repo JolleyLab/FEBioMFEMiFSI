@@ -35,7 +35,6 @@
 			<Track_node>0</Track_node>
 			<Track_node_position>0,0,0</Track_node_position>
 			<Output_avg_velocity>0</Output_avg_velocity>
-			<Save_Von_Mises_Stress>0</Save_Von_Mises_Stress>
 			<time_stepping_method>GenAlpha</time_stepping_method>
 			<rho_inf>0.5</rho_inf>
 			<step_save>1</step_save>

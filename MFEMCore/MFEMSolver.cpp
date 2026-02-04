@@ -159,7 +159,7 @@ public:
    std::vector<nodal_avg::StrainQuantity> strain_measure_quantities;
    // Recovery options
    bool output_nodal_projection = true; // project Gauss-point values to nodes
-   bool output_elemental_average = false; // average on element, then distribute to nodes
+   bool output_elemental_average = true; // average on element, then distribute to nodes
 
    // Registered solid scalar fields to refresh each save
    struct SolidFieldSpec {
@@ -326,8 +326,8 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.track_node, "Track_node");
       ADD_PARAMETER(m.m_track_node_pos, "Track_node_position");
       ADD_PARAMETER(m.output_avg_velocity, "Output_avg_velocity");
-      ADD_PARAMETER(m.output_nodal_projection, "StressRecovery_NodalProjection");
-      ADD_PARAMETER(m.output_elemental_average, "StressRecovery_Elemental");
+      ADD_PARAMETER(m.output_nodal_projection, "NodeRecovery_NodalProjection");
+      ADD_PARAMETER(m.output_elemental_average, "NodeRecovery_Elemental");
       ADD_PARAMETER(m.stress_measure_outputs, "Stress_measure_nodal_outputs");
       ADD_PARAMETER(m.strain_measure_outputs, "Strain_measure_nodal_outputs");
    END_PARAM_GROUP();
@@ -1513,6 +1513,8 @@ void MFEMSolver::PostProcessOutput()
 	m.pvdc->SetLevelsOfDetail(m.orderv);
    m.pvdc->SetCompression(true);
    m.pvdc->SetCompressionLevel(m.compression_level);
+   m.pvdc->UseRestartMode(true);
+
 	m.pvdc->SetCycle(curr_step);
 	m.pvdc->SetTime(curr_time);
 	m.pvdc->RegisterField("Velocity", m.u_gf);
@@ -1570,6 +1572,7 @@ void MFEMSolver::PostProcessOutput()
       m.sdc->SetLevelsOfDetail(m.orderd);
       m.sdc->SetCompression(true);
       m.sdc->SetCompressionLevel(m.compression_level);
+      m.sdc->UseRestartMode(true);
 
       m.sdc->SetCycle(curr_step);
       m.sdc->SetTime(curr_time);
