@@ -776,14 +776,10 @@ void IncompressibleFluidSolver::Step(double &time, double dt, int current_step,
    UpdateParameters(time,dt,current_step); 
 
    // Predictor Step //
-   sw_predictors.Start();
    Predictors(dt);
-   sw_predictors.Stop();
 
    // Set Essential BCs //
-   sw_essbcs.Start();
    SetEssentialBCs(time); // time = t_n+1
-   sw_essbcs.Stop();
 
    // Newton Iterations //
    sw_solve.Start();
@@ -797,21 +793,77 @@ void IncompressibleFluidSolver::Step(double &time, double dt, int current_step,
    static_cast<FluidNewtonSolver *>(newton_solver)->GetResiduals(norm,rel_norm,norm_mom,rel_norm_mom,norm_mass,rel_norm_mass);
 
    // Update variables //
-   sw_updates.Start();
    UpdateVariables(time,dt);
-   sw_updates.Stop();
 
    // Output to screen and save data //
 
    // Write restarts
    if (write_restarts && (current_step % restart_save_step == 0) && !provisional)
    {
-      sw_restarts.Start();
       writeRestarts(current_step,dt,time);
-      sw_restarts.Stop();
    }
 
    sw_step.Stop();
+}
+
+bool IncompressibleFluidSolver::Step(double &time, double dt, int current_step)
+{
+   if (verbose && my_rank == 0)
+   {
+      if (current_step == 1)
+      {
+         mfem::out << "---------------------------------------" << std::endl;
+         mfem::out << "             TIME STEPPING             " << std::endl;
+         mfem::out << "---------------------------------------" << std::endl;
+      }
+
+      if (restarting && current_step == restart_step + 1)
+      {
+         mfem::out << "--------------------------------------------------------------" << std::endl;
+         mfem::out << "RESTARTING SIMULATION FROM:" << std::endl;
+         mfem::out << "    TIME = " << time - dt << std::endl;
+         mfem::out << "    STEP = " << restart_step << std::endl;
+      }
+
+      if (current_step != 1)
+      {
+         mfem::out << "--------------------------------------------------------------" << std::endl;
+      }
+      mfem::out << std::setw(6) << "Step " << std::setw(6) << current_step << std::setw(8) << " Time " << std::setw(8) << " dt " << "\n";
+      
+      mfem::out << std::setw(15) << "           " << std::setw(3) << std::setprecision(2)
+                << std::scientific << time << "  " << std::setw(4) << dt << "\n";
+   }
+
+   sw_step.Start();
+
+   // Update parameters //
+   UpdateParameters(time,dt,current_step); 
+
+   // Predictor Step //
+   Predictors(dt);
+
+   // Set Essential BCs //
+   SetEssentialBCs(time); // time = t_n+1
+
+   // Newton Iterations //
+   sw_solve.Start();
+   newton_solver->NewtonSolve(dt,time);
+   sw_solve.Stop();
+   if (newton_solver->GetConverged() == false)
+   {
+      return false;
+   }
+   iter_solve = newton_solver->GetNumIterations();
+   res_solve = newton_solver->GetFinalNorm();
+   rel_res_solve = newton_solver->GetFinalRelNorm();
+
+   // Get residuals
+   static_cast<FluidNewtonSolver *>(newton_solver)->GetResiduals(norm,rel_norm,norm_mom,rel_norm_mom,norm_mass,rel_norm_mass);
+
+   sw_step.Stop();
+
+   return true;
 }
 
 void IncompressibleFluidSolver::UpdateParameters(double time, double dt, int current_step_)
@@ -827,6 +879,7 @@ void IncompressibleFluidSolver::UpdateParameters(double time, double dt, int cur
 
 void IncompressibleFluidSolver::Predictors(double dt)
 {
+   sw_predictors.Start();
    ynp1 = yn;
    ydotnp1.Set((gamma - 1.0)/gamma,ydotn);
 
@@ -845,10 +898,12 @@ void IncompressibleFluidSolver::Predictors(double dt)
 
       im_solid->Predictors(vnp1,vdotnp1);
    }
+   sw_predictors.Stop();
 }
 
 void IncompressibleFluidSolver::SetEssentialBCs(const double &time)
 {
+   sw_essbcs.Start();
    Vector &vnp1 = ynp1.GetBlock(0);
    Vector &pnp1 = ynp1.GetBlock(1);
 
@@ -952,15 +1007,18 @@ void IncompressibleFluidSolver::SetEssentialBCs(const double &time)
 
       im_solid->SetEssentialBCs(time);
    }
+   sw_essbcs.Stop();
 }
 
 void IncompressibleFluidSolver::UpdateVariables(double &time, double &dt)
 {
+   sw_updates.Start();
    if (windkessel_bc) UpdateWindkesselParameters();
    
    UpdateTimestepHistory(time-dt,dt);
 
    if (IFEM) im_solid->Update();
+   sw_updates.Stop();
 }
 
 void IncompressibleFluidSolver::UpdateTimestepHistory(const double &time, double &dt)
@@ -2491,94 +2549,65 @@ double IncompressibleFluidSolver::ComputeIntegralDivV(const GridFunction &v_gf)
 }
 
 // method for adaptive time stepping based on CFL_Crit
-double IncompressibleFluidSolver::est_dt()
+double IncompressibleFluidSolver::estimate_convective_cfl_dt()
 {
-   MFEM_ABORT("TO DO");
-   FiniteElementSpace *fes = vn_gf.FESpace();
-   int vdim = fes->GetVDim();
+   int vdim = vfes->GetVDim();
 
-   Vector ux, uy, uz;
-   Vector ur, us, ut;
-   double min_val = mfem::infinity();
+   Vector vx, vy, vz;
+   real_t dt_x = mfem::infinity();
+   real_t dt_y = mfem::infinity();
+   real_t dt_z = mfem::infinity();
+   real_t dt_min_local = mfem::infinity();
+   real_t dt_min = mfem::infinity();
+   real_t u_eps = 1e-10;
 
-   for (int e = 0; e < fes->GetNE(); ++e)
+   for (int e = 0; e < vfes->GetNE(); ++e)
    {
-      const FiniteElement *fe = fes->GetFE(e);
+      const FiniteElement *fe = vfes->GetFE(e);
       const IntegrationRule &ir = IntRules.Get(fe->GetGeomType(),
                                                fe->GetOrder());
-      ElementTransformation *tr = fes->GetElementTransformation(e);
+      ElementTransformation *tr = vfes->GetElementTransformation(e);
 
-      vn_gf.GetValues(e, ir, ux, 1);
-      ur.SetSize(ux.Size());
-      vn_gf.GetValues(e, ir, uy, 2);
-      us.SetSize(uy.Size());
+      vn_gf.GetValues(e, ir, vx, 1);
+      vn_gf.GetValues(e, ir, vy, 2);
       if (vdim == 3)
       {
-         vn_gf.GetValues(e, ir, uz, 3);
-         ut.SetSize(uz.Size());
+         vn_gf.GetValues(e, ir, vz, 3);
       }
 
-      double est = 0.0;
+      real_t hmin = pmesh->GetElementSize(e, 1) /
+                    (real_t) orderv;
+
       for (int i = 0; i < ir.GetNPoints(); ++i)
       {
-         const IntegrationPoint &ip = ir.IntPoint(i);
-         tr->SetIntPoint(&ip);
-         const DenseMatrix &invJ = tr->InverseJacobian();
-         const double detJinv = 1.0 / tr->Jacobian().Det();
-
-         double mag_u_ent_by_h = 0.0;
-         if (vdim == 2)
+         dt_x = CFL_crit * hmin / (fabs(vx(i)) + u_eps);
+         dt_y = CFL_crit * hmin / (fabs(vy(i)) + u_eps);
+         if (vdim == 3)
          {
-            // ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)) * detJinv;
-            // us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)) * detJinv;
-
-            // ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0));
-            // us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1));
-
-            ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(0, 1));
-            us(i) = (ux(i) * invJ(1, 0) + uy(i) * invJ(1, 1));
-
-            mag_u_ent_by_h = sqrt(ur(i)*ur(i) + us(i)*us(i));
-         }
-         else if (vdim == 3)
-         {
-            // ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)
-            //          + uz(i) * invJ(2, 0))
-            //         * detJinv;
-            // us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)
-            //          + uz(i) * invJ(2, 1))
-            //         * detJinv;
-            // ut(i) = (ux(i) * invJ(0, 2) + uy(i) * invJ(1, 2)
-            //          + uz(i) * invJ(2, 2))
-            //         * detJinv;
-
-            // ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)
-            //          + uz(i) * invJ(2, 0));
-            // us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)
-            //          + uz(i) * invJ(2, 1));
-            // ut(i) = (ux(i) * invJ(0, 2) + uy(i) * invJ(1, 2)
-            //          + uz(i) * invJ(2, 2));
-
-            ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(0, 1)
-                     + uz(i) * invJ(0, 2));
-            us(i) = (ux(i) * invJ(1, 0) + uy(i) * invJ(1, 1)
-                     + uz(i) * invJ(1, 2));
-            ut(i) = (ux(i) * invJ(2, 0) + uy(i) * invJ(2, 1)
-                     + uz(i) * invJ(2, 2));
-
-            mag_u_ent_by_h = sqrt(ur(i)*ur(i) + us(i)*us(i) + ut(i)*ut(i));
+            dt_z = CFL_crit * hmin / (fabs(vz(i)) + u_eps);
          }
 
-         est = CFL_crit / pow(orderv,1.5) / mag_u_ent_by_h;
-         min_val = min_val >= est ? est : min_val;
+         dt_min_local = std::min({dt_x,dt_y,dt_z});
+         if (dt_min_local < dt_min) 
+         {
+            dt_min = dt_min_local;
+         }      
       }
    }
 
    #ifdef MFEM_USE_MPI
-   MPI_Allreduce(MPI_IN_PLACE, &min_val, 1, MPITypeMap<real_t>::mpi_type, MPI_MIN, vfes->GetComm());
+   real_t dtmin_global = 0.0;
+   MPI_Allreduce(&dt_min,
+                 &dtmin_global,
+                 1,
+                 MPITypeMap<real_t>::mpi_type,
+                 MPI_MIN,
+                 vfes->GetComm());
+   #elif
+   real_t dtmin_global = dt_min;
    #endif
 
-   return min_val;
+   return dtmin_global;
 }
 
 void IncompressibleFluidSolver::ComputeWSS(GridFunction &u, GridFunction &p, int avg_type)
@@ -3209,6 +3238,7 @@ void IncompressibleFluidSolver::writeRestartFiles(std::string restart_folder_, i
 
 void IncompressibleFluidSolver::writeRestarts(int step, double dt, double time)
 {
+   sw_restarts.Start();
    // Create directory structure if it doesn't exist
    if (my_rank == 0)
    {      
@@ -3354,6 +3384,8 @@ void IncompressibleFluidSolver::writeRestarts(int step, double dt, double time)
    {
       im_solid->writeRestarts(sout, solidmname, dname, ddotname, d2dotname);
    }
+
+   sw_restarts.Start();
 }
 
 void IncompressibleFluidSolver::readRestarts(int &step, double &dt, double &time, bool read_bcs)

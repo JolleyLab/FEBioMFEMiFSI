@@ -4,6 +4,7 @@
 #include <FECore/FEAnalysis.h>
 #include <FECore/log.h>
 #include <FEBioLib/FEBioModel.h>
+#include <FECore/FETimeStepController.h>
 
 #include "MFEMMesh.h"
 #include "MFEMInitialCondition.h"
@@ -17,6 +18,9 @@
 #include "../MFEMImSolid/MFEMImFEBio_enum.h"
 #include "../MFEMUtilities/MFEMOutputTimeSeries.h"
 #include "../MFEMUtilities/MFEMParFEMeshBuilder.h"
+#include "../MFEMUtilities/MFEMCallbacks.h"
+#include "MFEMTimeStepController.h"
+#include "../MFEMUtilities/MFEMTools.h"
 
 #include "../MFEMFSI/IncompressibleFluid/IncompressibleFluidSolver.hpp"
 #include "../MFEMFSI/IncompressibleFluid/ifs_solver_enum.hpp"
@@ -158,7 +162,7 @@ public:
    std::vector<nodal_avg::StressQuantity> stress_measure_quantities;
    std::vector<nodal_avg::StrainQuantity> strain_measure_quantities;
    // Recovery options
-   bool output_nodal_projection = true; // project Gauss-point values to nodes
+   bool output_nodal_projection = false; // project Gauss-point values to nodes
    bool output_elemental_average = true; // average on element, then distribute to nodes
 
    // Registered solid scalar fields to refresh each save
@@ -189,6 +193,15 @@ public:
    int restart_step = 1;
    double restart_t = 0.0;
    double restart_dt = 0.0;
+
+   // Must-point schedules (time-based) for output and restarts when dt is not forced
+   enum save_mode { TimeBased = 0, StepBased = 1 }; // determine save frequency based on steps or time based computed from initial dt and steps
+   int save_mode_option = save_mode::TimeBased;
+   std::vector<double> output_must_points;
+   std::vector<double> restart_must_points;
+   size_t output_must_idx = 0;
+   size_t restart_must_idx = 0;
+   double must_point_tol = 1e-12;
 
    // Starting at a specific time and step
    bool start_from_specific_time = false;
@@ -234,9 +247,14 @@ public:
    int steady_state_step_save = 1; // frequency of storing data after steady state
    double steady_state_time = 0.0;
    bool steady_state_save = false;
+   // auto time stepping options
+   MFEMTimeStepController time_step_controller;
+   bool use_mfem_step_controller = false;
+   bool convective_cfl = false;
+   double c_cfl = 2.0; // convective cfl
 
    // Nonlinear Solver Options
-   int minIt = 3;
+   int minIt = 1;
    int maxIt = 10;
    double atol = 1.0e-10;
    double rtol = 1.0e-3;
@@ -326,8 +344,8 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.track_node, "Track_node");
       ADD_PARAMETER(m.m_track_node_pos, "Track_node_position");
       ADD_PARAMETER(m.output_avg_velocity, "Output_avg_velocity");
-      ADD_PARAMETER(m.output_nodal_projection, "NodeRecovery_NodalProjection");
-      ADD_PARAMETER(m.output_elemental_average, "NodeRecovery_Elemental");
+      // ADD_PARAMETER(m.output_nodal_projection, "NodeRecovery_NodalProjection");
+      // ADD_PARAMETER(m.output_elemental_average, "NodeRecovery_Elemental");
       ADD_PARAMETER(m.stress_measure_outputs, "Stress_measure_nodal_outputs");
       ADD_PARAMETER(m.strain_measure_outputs, "Strain_measure_nodal_outputs");
    END_PARAM_GROUP();
@@ -336,6 +354,9 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
    BEGIN_PARAM_GROUP("Time Stepping");
       ADD_PARAMETER(m.ts_method, "time_stepping_method")->setEnums("GenAlpha\0BackwardEuler\0");
       ADD_PARAMETER(m.rhoinf, FE_RANGE_CLOSED(0.0,1.0), "rho_inf");
+      ADD_PARAMETER(m.convective_cfl, "convective_cfl_time_step_controller");
+      ADD_PARAMETER(m.c_cfl, FE_RANGE_GREATER_OR_EQUAL(0.0), "convective_cfl");
+      ADD_PARAMETER(m.save_mode_option, "save_mode")->setEnums("TimeBased\0StepBased\0");
       ADD_PARAMETER(m.step_save, FE_RANGE_GREATER_OR_EQUAL(1), "step_save");
       ADD_PARAMETER(m.steady_state_save, "steady_state_save");
       ADD_PARAMETER(m.steady_state_step_save, FE_RANGE_GREATER_OR_EQUAL(1), "steady_state_step_save");
@@ -357,7 +378,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.hdf5_output, "HDF5_output");
    END_PARAM_GROUP();
 
-   // // Nonlinear Solver Options
+   // Nonlinear Solver Options
    BEGIN_PARAM_GROUP("Nonlinear Solver");
       ADD_PARAMETER(m.ns_no_error_nonconvergence, "no_error_nonconvergence");
       ADD_PARAMETER(m.atol, FE_RANGE_GREATER_OR_EQUAL(0.0), "atol");
@@ -394,6 +415,10 @@ MFEMSolver::MFEMSolver(FEModel* fem) : FESolver(fem), m(*(new MFEMSolver::Imp))
    // block log output not on root process
    if (!Mpi::Root()) fem->BlockLog();
    #endif
+
+   // Callbacks
+   fem->AddCallback(timing_callback, CB_SOLVED, nullptr);
+   fem->AddCallback(time_step_callback, CB_UPDATE_TIME, nullptr);
 }
 
 MFEMSolver::~MFEMSolver()
@@ -1468,6 +1493,13 @@ void MFEMSolver::SetupSolvers()
    FEModel *fem = GetFEModel();
    double dt = fem->GetTime().timeIncrement;
 	m.flowsolver->Setup(dt);
+
+   // time step estimators in addition to FEBio time step controller
+   if (m.convective_cfl)
+   {
+      m.use_mfem_step_controller = true;
+      m.time_step_controller.AddEstimator(std::make_unique<MFEMConvectiveCFLTimeStepEstimator>(m.flowsolver, m.c_cfl));
+   }
 }
 
 void MFEMSolver::PostProcessOutput()
@@ -1663,6 +1695,111 @@ void MFEMSolver::PostProcessOutput()
                            (m.start_from_specific_time ? m.start_sim_time : 0.0);
          m.surf_flow_ts->Append(start_time);
       }
+   }
+
+   // Setup must points for auto time stepper
+   FEModel &fem = *GetFEModel();
+   FEAnalysis* analysis = fem.GetCurrentStep();
+   auto fe_time_step_controller = analysis->m_timeController;
+   if (fe_time_step_controller && m.save_mode_option == Imp::save_mode::TimeBased)
+   {
+      const double dt = fem.GetTime().timeIncrement;
+      const double start_time = 0.0;
+
+      // Base list from controller
+      std::vector<double> base = fe_time_step_controller->m_must_points;
+      double horizon_end = analysis->m_dt0*analysis->m_ntime;
+
+      // If steady-state is enabled and the steady_state_time is beyond start
+      const bool use_ss = m.steady_state_save && (m.steady_state_time > start_time);
+      const double ss_time = m.steady_state_time;
+
+      std::vector<double> extra;
+      std::vector<double> extra_restart;
+      if (dt > 0.0)
+      {
+         // Helper to append points on a uniform grid (k * step_stride)
+         auto append_points = [&](std::vector<double>& dest, double t0, double t1, int step_stride)
+         {
+            if (t1 <= t0 || step_stride <= 0) return;
+            const double stride = dt * static_cast<double>(step_stride);
+            double k0 = std::ceil((t0 - start_time) / stride);
+            if (!std::isfinite(k0)) k0 = 0.0;
+            for (double k = k0; ; ++k)
+            {
+               double tk = start_time + k * stride;
+               if (tk > t1 + 1e-12) break;
+               dest.push_back(tk);
+               if (dest.size() > 500000) break;
+            }
+         };
+
+         if (use_ss)
+         {
+            append_points(extra, start_time, ss_time, m.step_save);
+            if (horizon_end > ss_time)
+            {
+               append_points(extra, ss_time, horizon_end, m.steady_state_step_save);
+            }
+         }
+         else
+         {
+            append_points(extra, start_time, horizon_end, m.step_save);
+         }
+
+         // Restart save points (independent schedule) up to horizon_end
+         if (m.write_restarts && m.restart_step_save > 0)
+         {
+            append_points(extra_restart, start_time, horizon_end, m.restart_step_save);
+         }
+      }
+
+      // Merge: controller base + extra, then sort and unique
+      base.insert(base.end(), extra.begin(), extra.end());
+      std::sort(base.begin(), base.end());
+      std::vector<double> merged;
+      merged.reserve(base.size());
+      const double tol = 1e-12;
+      for (double t : base)
+      {
+         if (merged.empty() || std::fabs(t - merged.back()) > tol)
+         {
+            merged.push_back(t);
+         }
+      }
+      // Remove t = 0 and the next entry
+      if (!merged.empty())
+      {
+         const double tol0 = 1e-12;
+         if (std::fabs(merged.front() - start_time) <= tol0)
+         {
+            merged.erase(merged.begin());
+         }
+         if (!merged.empty())
+         {
+            merged.erase(merged.begin());
+         }
+      }
+      fe_time_step_controller->m_must_points.swap(merged);
+
+      // Store per-schedule lists (sorted, unique) for efficient checks when dt is not forced
+      auto uniq = [&](std::vector<double> &v)
+      {
+         std::sort(v.begin(), v.end());
+         std::vector<double> u;
+         u.reserve(v.size());
+         for (double tt : v)
+         {
+            if (u.empty() || std::fabs(tt - u.back()) > tol) { u.push_back(tt); }
+         }
+         v.swap(u);
+      };
+      uniq(extra);
+      uniq(extra_restart);
+      m.output_must_points = std::move(extra);
+      m.restart_must_points = std::move(extra_restart);
+      m.output_must_idx = 0;
+      m.restart_must_idx = 0;
    }
 }
 
@@ -2065,16 +2202,57 @@ bool MFEMSolver::SolveStep()
       timeStep = analysis->m_ntimesteps + 1; // current time step number
    }
 
-   // solve a time step
-	m.flowsolver->Step(t, dt, timeStep);
-   
-	// save data
-   int curr_step_save = m.step_save;
-   if (m.steady_state_save && t >= m.steady_state_time)
+   // Solve a time step
+	bool conv = m.flowsolver->Step(t, dt, timeStep);
+   int newton_iter = 0;
+   double newton_res = 0.0, newton_relres = 0.0;
+   m.flowsolver->GetNewtonSolverConvergenceInfo(newton_iter, newton_res, newton_relres);
+   (*this).m_niter = newton_iter;
+   (*this).m_ntotref = newton_iter; // using full newton
+   (*this).m_nrhs = newton_iter; // using full newton
+   if (!conv)
    {
-      curr_step_save = m.steady_state_step_save;
-   }   
-   if ((timeStep) % curr_step_save == 0)
+      return false;
+   }
+
+   // Update variables //
+   m.flowsolver->sw_step.Start();
+   m.flowsolver->UpdateVariables(t,dt);
+   m.flowsolver->sw_step.Stop();
+
+   // Determine whether to save output and/or write restarts
+   bool dtforce = abs(analysis->m_dt0 - dt) < 1e-10 ? true : false;
+   bool do_save_output = false;
+   bool do_write_restart = false;
+   if (!dtforce && m.save_mode_option == Imp::save_mode::TimeBased)
+   {
+      // Use must-point lists (time-based), with tolerance
+      const double tol = m.must_point_tol;
+      while (m.output_must_idx < m.output_must_points.size() && (t + tol >= m.output_must_points[m.output_must_idx]))
+      {
+         do_save_output = true;
+         ++m.output_must_idx;
+      }
+      while (m.restart_must_idx < m.restart_must_points.size() && (t + tol >= m.restart_must_points[m.restart_must_idx]))
+      {
+         do_write_restart = true;
+         ++m.restart_must_idx;
+      }
+   }
+   else
+   {
+      int curr_step_save = m.step_save;
+      if (m.steady_state_save && t >= m.steady_state_time) { curr_step_save = m.steady_state_step_save; }
+      do_save_output = ((timeStep) % curr_step_save == 0);
+      do_write_restart = m.write_restarts && (timeStep % m.restart_step_save == 0);
+   }
+
+   if (do_write_restart)
+   {
+      m.flowsolver->writeRestarts(timeStep, dt, t);
+   }
+
+   if (do_save_output)
    {
       m.flowsolver->sw_io.Start();
       if (m.wss) m.flowsolver->ComputeWSS(*m.u_gf,*m.p_gf);
@@ -2229,21 +2407,59 @@ bool MFEMSolver::SolveStep()
       m.flowsolver->sw_io.Stop();
    }
 
-	// print out mfem timing data
-	if (timeStep == analysis->m_ntime)
-	{
-      // timing info
-		m.flowsolver->PrintTimingData();
-
-      // write final state as restart files for future use
-      if (m.write_final_state_as_IC)
-      {
-         m.flowsolver->writeRestartFiles(m.final_state_folder,1); // second arg not used here
-         m.flowsolver->writeRestarts(0,0,0);
-      }
-	}
-
 	return true;
+}
+
+void MFEMSolver::AdjustTimeStep()
+{
+   if (!m.use_mfem_step_controller) return;
+
+   FEModel& fem = *GetFEModel();
+   FEAnalysis* analysis = fem.GetCurrentStep();
+   double time = fem.GetCurrentTime();
+   double dt_febio = analysis->m_dt;
+   double dt_new = 1.0, dt_adjusted = 1.0, dt_truncated = 1.0;
+
+   // adjust time step 
+   dt_new = m.time_step_controller.ComputeTimeStep(dt_febio);
+
+   // here I would like to update dtn in the FEBio time controller class
+   // otherwise the stepper will potentially remember a wrong previous time step size
+
+   // check must points
+   auto fe_time_step_controller = analysis->m_timeController;
+   if (fe_time_step_controller->m_must_points.empty() == false) dt_adjusted = fe_time_step_controller->CheckMustPoints(time,dt_new);
+   else dt_adjusted = dt_new;
+
+   // // Truncate time step to a fixed number of decimal places
+   // // this ensure reproducibility in parallel runs with different number of processes
+   // dt_truncated = TruncateToDigits(dt_adjusted, 8);
+   dt_truncated = dt_adjusted;
+
+   // Report new time step size
+	if (abs(dt_truncated - dt_febio) > 1e-10 && time > 0.0)
+   {
+      feLogEx(GetFEModel(), "MFEM AUTO STEPPER: adjusted time step, dt = %lg\n", dt_truncated);
+   }
+
+   // set new time step
+   FETimeInfo &timeInfo = GetFEModel()->GetTime();
+   timeInfo.timeIncrement = dt_truncated;
+   timeInfo.timeStep = dt_truncated;
+   analysis->m_dt = dt_truncated;
+}
+
+void MFEMSolver::PostSolve()
+{
+   // timing info
+   m.flowsolver->PrintTimingData();
+
+   // write final state as restart files for future use
+   if (m.write_final_state_as_IC)
+   {
+      m.flowsolver->writeRestartFiles(m.final_state_folder,1); // second arg not used here
+      m.flowsolver->writeRestarts(0,0,0);
+   }
 }
 
 double ComputeVectorH1Error(mfem::GridFunction *u_gf, mfem::VectorCoefficient *ex_u, mfem::MatrixCoefficient *ex_gradu, const mfem::IntegrationRule *irs[])

@@ -31,6 +31,9 @@
 			<VMS>1</VMS>
 			<Laplace_form>0</Laplace_form>
 			<Zero_mean_pressure>0</Zero_mean_pressure>
+			<pre_partition_mesh>0</pre_partition_mesh>
+			<pre_partition_opt>PartitionMesh</pre_partition_opt>
+			<pre_partition_num_ranks>1</pre_partition_num_ranks>
 			<Immersed_solid>0</Immersed_solid>
 			<Solid_solver_type>MFEM</Solid_solver_type>
 			<Subtract_viscous_stress>1</Subtract_viscous_stress>
@@ -38,21 +41,45 @@
 			<VMS_stabilization_scaling>1</VMS_stabilization_scaling>
 			<Track_node>0</Track_node>
 			<Track_node_position>0,0,0</Track_node_position>
+			<Output_avg_velocity>0</Output_avg_velocity>
+			<NodeRecovery_NodalProjection>1</NodeRecovery_NodalProjection>
+			<NodeRecovery_Elemental>1</NodeRecovery_Elemental>
+			<Stress_measure_nodal_outputs></Stress_measure_nodal_outputs>
+			<Strain_measure_nodal_outputs></Strain_measure_nodal_outputs>
+			<time_stepping_method>GenAlpha</time_stepping_method>
 			<rho_inf>0.5</rho_inf>
+			<convective_cfl_time_step_controller>1</convective_cfl_time_step_controller>
+			<convective_cfl>1.0</convective_cfl>
+			<save_mode>StepBased</save_mode>
 			<step_save>1</step_save>
-         <Save_Wall_Shear_Stress>1</Save_Wall_Shear_Stress>
+			<steady_state_save>0</steady_state_save>
+			<steady_state_step_save>1</steady_state_step_save>
+			<steady_state_time>0</steady_state_time>
+			<write_restart_files>0</write_restart_files>
+			<restart_step_save>1</restart_step_save>
+			<restart_simulation>0</restart_simulation>
+			<restart_step>1</restart_step>
+			<write_final_state_as_IC>0</write_final_state_as_IC>
+			<final_state_folder>InitialConditions</final_state_folder>
+			<start_from_specific_time>0</start_from_specific_time>
+			<start_sim_time>0</start_sim_time>
+			<start_sim_step>0</start_sim_step>
+			<Save_Wall_Shear_Stress>1</Save_Wall_Shear_Stress>
 			<Save_Vorticity>1</Save_Vorticity>
 			<Save_Q_Criterion>1</Save_Q_Criterion>
-         <Output_avg_surface_pressures>1</Output_avg_surface_pressures>
-         <Output_surface_flow_rates>1</Output_surface_flow_rates>
+			<Output_surface_pressures>0</Output_surface_pressures>
+			<Output_surface_flow_rates>1</Output_surface_flow_rates>
+			<HDF5_output>1</HDF5_output>
+			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-06</atol>
 			<rtol>0.001</rtol>
-			<minIt>3</minIt>
-			<maxIt>10</maxIt>
+			<minIt>1</minIt>
+			<maxIt>20</maxIt>
 			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-06</lin_atol>
 			<lin_rtol>0.001</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
+			<prec_type>SIMPLE</prec_type>
 			<inner_solver_type>Iterative</inner_solver_type>
 			<Ainv_atol>1e-06</Ainv_atol>
 			<Ainv_rtol>0.001</Ainv_rtol>
@@ -16897,6 +16924,7 @@
 			<vx>0</vx>
 			<vy>0</vy>
 			<vz type="math">radius = sqrt(X*X + Y*Y); 10*sin(2*pi*t)*sin(2*pi*t)*(1 - radius*radius/4)/(2*pi)</vz>
+			<zero_boundary>0</zero_boundary>
 		</bc>
 	</Boundary>
 	<Loads>
@@ -16907,6 +16935,7 @@
 			<Rd>1</Rd>
 			<C>0.07957747</C>
 			<p_0>0</p_0>
+			<compute_initial_pressure>0</compute_initial_pressure>
 			<p_d>0</p_d>
 		</surface_load>
 	</Loads>

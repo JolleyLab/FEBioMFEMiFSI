@@ -175,7 +175,7 @@ public:
    void SetWeakBCs(const double &time, double dt) const;
    void FormLHS(mfem::Vector &y, mfem::Vector &ydot, double dt) const;
    void FormRHS(mfem::Vector &y, mfem::Vector &ydot, double dt, mfem::Vector &res) const;
-   void SolveLinearSystem() const;
+   bool SolveLinearSystem() const;
    void Correctors(const double &dt, const double &time) const;
    bool CheckConvergence() const;
    
