@@ -117,6 +117,8 @@ list(FILTER HDR_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/Softwa
 
 # Exclude sources from the MFEMTools subdirectory; built separately
 list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/MFEMTools/.*")
+# Exclude test folder from main library build
+list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/test/.*")
 
 # Organize files by folder in IDEs
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
@@ -149,8 +151,14 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # Option to build the MFEMTools subdirectory (off by default)
 option(BUILD_MFEMTOOLS "Build MFEMTools helper/library targets" OFF)
+option(BUILD_UNITTESTS "Build MFEM unit tests" OFF)
 
 # Optionally build tools subdirectory
 if(BUILD_MFEMTOOLS)
     add_subdirectory(MFEMTools)
+endif()
+
+# Optionally build unit tests
+if(BUILD_UNITTESTS)
+   add_subdirectory(test/unit)
 endif()
