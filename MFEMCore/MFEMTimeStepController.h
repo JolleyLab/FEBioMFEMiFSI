@@ -65,7 +65,7 @@ public:
    // If no estimators are registered, returns the input dt.
    virtual double ComputeTimeStep(double dt);
 
-   // Register an estimator object (strategy pattern).
+   // Register an estimator object
    void AddEstimator(std::unique_ptr<MFEMTimeStepEstimator> estimator);
 
    // Register a simple functional rule returning a candidate dt with per-estimator factor C.
@@ -74,7 +74,7 @@ public:
    // Remove all estimators.
    void ClearEstimators();
 
-   // Optional safety factor applied to the final dt (<= 1.0 typical).
+   // Optional safety factor applied to the final dt
    void SetSafetyFactor(double factor);
    double GetSafetyFactor() const;
 

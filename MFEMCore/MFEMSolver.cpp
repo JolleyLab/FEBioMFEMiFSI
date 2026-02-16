@@ -235,8 +235,7 @@ public:
    int orderingtype= Ordering::byVDIM;
 
    int nonlinear_form = ifs_solver::NonlinearFormType::Convective;
-   int viscous_term_type = ifs_solver::ViscousTermType::StressForm;
-   bool LaplaceForm = false;
+   int viscous_term_type = ifs_solver::ViscousTermType::StressForm; // {LaplaceForm = 0, StressForm = 1}
    bool total_integ = true;
    bool zero_mean_pressure = false;
 
@@ -326,7 +325,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.stabilized_VMS, "VMS");
       // drop down menu for stabilization type, for now either VMS or unstabilized
       // ADD_PARAMETER(m.stabilized_LSIC, "LSIC");
-      ADD_PARAMETER(m.LaplaceForm, "Laplace_form");
+      ADD_PARAMETER(m.viscous_term_type, "viscous_term_type")->setEnums("LaplaceForm\0StressForm\0");
       ADD_PARAMETER(m.zero_mean_pressure, "Zero_mean_pressure");
       // pre-partitioning of the mesh
       ADD_PARAMETER(m.pre_partition, "pre_partition_mesh");
@@ -1180,10 +1179,7 @@ bool MFEMSolver::SetupFluid()
    }
 
 	// set viscous term type, default is StressForm
-	if (m.LaplaceForm)
-	{
-		m.flowsolver->SetViscousTermType(ifs_solver::ViscousTermType::LaplaceForm);
-	}
+   m.flowsolver->SetViscousTermType(m.viscous_term_type);
 
    // Set Fluid ICs and BCs
    SetFluidConditions(true);

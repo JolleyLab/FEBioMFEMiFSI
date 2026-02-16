@@ -496,34 +496,34 @@ void IncompressibleFluidSolver::Setup(double dt)
    }
    else
    {
-      #ifndef MFEM_USE_MPI
-      solver = new ExtendedFGMRESSolver();
-      #else
-      solver = new ExtendedFGMRESSolver(vfes->GetComm());
-      #endif
-      static_cast<ExtendedFGMRESSolver *>(solver)->SetMinIter(lin_minIt);
-      static_cast<ExtendedFGMRESSolver *>(solver)->SetAbsTol(lin_atol);
-      static_cast<ExtendedFGMRESSolver *>(solver)->SetRelTol(lin_rtol);
-      static_cast<ExtendedFGMRESSolver *>(solver)->SetMaxIter(lin_maxIt);
-      static_cast<ExtendedFGMRESSolver *>(solver)->SetPrintLevel(lin_pl_solve);
-      // static_cast<ExtendedFGMRESSolver *>(solver)->SetKDim(lin_maxIt);
-
       // #ifndef MFEM_USE_MPI
-      // solver = new FGMRESSolver();
+      // solver = new ExtendedFGMRESSolver();
       // #else
-      // solver = new FGMRESSolver(vfes->GetComm());
+      // solver = new ExtendedFGMRESSolver(vfes->GetComm());
       // #endif
-      // static_cast<FGMRESSolver *>(solver)->SetAbsTol(lin_atol);
-      // static_cast<FGMRESSolver *>(solver)->SetRelTol(lin_rtol);
-      // static_cast<FGMRESSolver *>(solver)->SetMaxIter(lin_maxIt);
-      // static_cast<FGMRESSolver *>(solver)->SetPrintLevel(lin_pl_solve);
-      // // static_cast<FGMRESSolver *>(solver)->SetKDim(lin_maxIt);
+      // static_cast<ExtendedFGMRESSolver *>(solver)->SetMinIter(lin_minIt);
+      // static_cast<ExtendedFGMRESSolver *>(solver)->SetAbsTol(lin_atol);
+      // static_cast<ExtendedFGMRESSolver *>(solver)->SetRelTol(lin_rtol);
+      // static_cast<ExtendedFGMRESSolver *>(solver)->SetMaxIter(lin_maxIt);
+      // static_cast<ExtendedFGMRESSolver *>(solver)->SetPrintLevel(lin_pl_solve);
+      // // static_cast<ExtendedFGMRESSolver *>(solver)->SetKDim(lin_maxIt);
 
-      // // setup linear solver monitor
-      // solver_monitor = new MinItMonitor(lin_minIt);
-      // static_cast<IterativeSolver *>(solver)->SetMonitor(*solver_monitor);
-      // auto iterative_solver = static_cast<IterativeSolver *>(solver);
-      // solver_monitor->SetIterativeSolver(*iterative_solver);
+      #ifndef MFEM_USE_MPI
+      solver = new FGMRESSolver();
+      #else
+      solver = new FGMRESSolver(vfes->GetComm());
+      #endif
+      static_cast<FGMRESSolver *>(solver)->SetAbsTol(lin_atol);
+      static_cast<FGMRESSolver *>(solver)->SetRelTol(lin_rtol);
+      static_cast<FGMRESSolver *>(solver)->SetMaxIter(lin_maxIt);
+      static_cast<FGMRESSolver *>(solver)->SetPrintLevel(lin_pl_solve);
+      // static_cast<FGMRESSolver *>(solver)->SetKDim(lin_maxIt);
+
+      // setup linear solver monitor
+      solver_monitor = new MinItMonitor(lin_minIt);
+      static_cast<IterativeSolver *>(solver)->SetMonitor(*solver_monitor);
+      auto iterative_solver = static_cast<IterativeSolver *>(solver);
+      solver_monitor->SetIterativeSolver(*iterative_solver);
 
       // setup jacobian preconditioner
       Array<FiniteElementSpace *> fes;
