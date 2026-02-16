@@ -110,7 +110,7 @@ void ifs_solver::IncompressibleFluidIntegrator::AssembleElementVector(const Arra
       } 
 
       ///// Compute rm at the integration point /////
-      // rm = rho * (udot + u*gradu - f) + gradp - d2u/dxdx
+      // rm = rho * (udot + u*gradu - f) + gradp - mu*d2u/dxdx
       // rm_inertial = rho * (udot + u*gradu - f)
       double mu_f = dyn_vis->Eval(trans,ip);
       Compute_rm(rm,rm_inertial,mu_f,trans,ip,el);
@@ -328,7 +328,7 @@ void ifs_solver::IncompressibleFluidIntegrator::AssembleElementGrad(const Array<
          EF.MultTranspose(shape_u_lap,u_lap); // u_i,jj
 
          ///// Compute rm at the integration point /////
-         // rm = rho * (udot + u*gradu - f) + gradp - d2u/dxdx
+         // rm = rho * (udot + u*gradu - f) + gradp - mu*d2u/dxdx
          Compute_rm(rm,rm_inertial,mu_f,trans,ip,el);
       }      
 

@@ -20,8 +20,12 @@ Before running the build script, ensure you have:
 - **FEBio installation**
 - **MPI** (for parallel computing support)
 
+### Optional: HDF5 (for .vtkhdf output)
+- Install an MPI-enabled HDF5 library if you want to write `.vtkhdf` output.
+- Provide the install prefix to MFEM via `-DHDF5_DIR=/path/to/hdf5`.
+
 ### macOS support
-- Supported only on Intel macOS (x86_64). Apple Silicon (arm64) is not supported for this build flow.
+- Supported on Intel macOS (x86_64) and Apple Silicon (arm64) via the Rosetta 2 wrapper.
 - On macOS, the script enforces x86_64 and configures CMake-based builds with `clang/clang++` by default. You can override compilers using `--cc` and `--cxx` (e.g., `--cc gcc-13 --cxx g++-13`).
 
 ## Quick Start
@@ -30,6 +34,14 @@ The simplest way to build is:
 
 ```bash
 ./build.sh --febio-dir /path/to/FEBio
+```
+
+### Example Builds
+
+```bash
+#HDF5 support
+./build.sh --febio-dir /path/to/FEBio \
+  --mfem-options "-DMFEM_USE_HDF5=ON -DHDF5_DIR=/path/to/hdf5"
 ```
 
 ## Build Script Options
@@ -83,8 +95,9 @@ The simplest way to build is:
 ## Build Output
 
 After successful build, you'll find:
-- **Plugin library**: `./build/lib/libFEBioMFEMiFSI.so` (Linux/macOS)
+- **Plugin library**: `./build/lib/libFEBioMFEMiFSI.so` (Linux)
 - **Plugin library**: `./build/lib/FEBioMFEMiFSI.dylib` (macOS)
+- **Plugin library**: `./build/lib/FEBioMFEMiFSI.dll` (Windows)
 
 The script creates the following build directory structure:
 

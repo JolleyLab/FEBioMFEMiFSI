@@ -1,0 +1,2 @@
+ADD_iFSI_EXE(TEST_SymEigen symmetric_eigen_test.cpp)
+ADD_iFSI_EXE(TEST_EigenCompareFEBio febio_eigen_compare_test.cpp)

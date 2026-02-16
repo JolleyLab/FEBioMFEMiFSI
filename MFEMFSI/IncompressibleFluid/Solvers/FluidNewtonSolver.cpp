@@ -67,7 +67,7 @@ void FluidNewtonSolver::NewtonSolve(const double &dt, const double &time) const
 
       // Solve
       sw_linsolve->Start();
-      SolveLinearSystem();
+      bool lin_conv = SolveLinearSystem();
       sw_linsolve->Stop();
       PrintLinSolveInfo();
 
@@ -85,17 +85,18 @@ void FluidNewtonSolver::NewtonSolve(const double &dt, const double &time) const
       if (no_error_nonconvergence)
       {
          #ifdef MFEM_USE_MPI
-         if (my_rank == 0) mfem::out << "Newton: No convergence!\n";
+         if (my_rank == 0) MFEM_WARNING("\nNewton: No convergence!\n");
          #else
-         mfem::out << "Newton: No convergence!\n";
+         MFEM_WARNING("\nNewton: No convergence!\n");
          #endif
+         converged = true;
       }
       else
       {
          #ifdef MFEM_USE_MPI
-         if (my_rank == 0) MFEM_ABORT("Newton: No convergence!\n");
+         if (my_rank == 0) MFEM_WARNING("\nNewton: No convergence!\n");
          #else
-         MFEM_ABORT("Newton: No convergence!\n");
+         MFEM_WARNING("\nNewton: No convergence!\n");
          #endif
       }
    }
@@ -227,16 +228,22 @@ void FluidNewtonSolver::FormLHS(Vector &y, Vector &ydot, double dt) const
    prec->SetOperator(*grad);
 }
 
-void FluidNewtonSolver::SolveLinearSystem() const
+bool FluidNewtonSolver::SolveLinearSystem() const
 {
    prec->Mult(r,c);
    if (!direct_solver)
    {
-      if (dynamic_cast<IterativeSolver *>(prec))
+      auto it_solver = dynamic_cast<IterativeSolver *>(prec);
+      if (it_solver)
       {
-         final_it_ls_fs = dynamic_cast<IterativeSolver *>(prec)->GetNumIterations();
-         final_atol_ls_fs = dynamic_cast<IterativeSolver *>(prec)->GetFinalNorm();
-         final_rtol_ls_fs = dynamic_cast<IterativeSolver *>(prec)->GetFinalRelNorm(); 
+         if (it_solver->GetConverged() == false)
+         {
+            MFEM_WARNING("\nLinear solver did not converge!\n");
+            return false;
+         }
+         final_it_ls_fs = it_solver->GetNumIterations();
+         final_atol_ls_fs = it_solver->GetFinalNorm();
+         final_rtol_ls_fs = it_solver->GetFinalRelNorm(); 
       }
       else
       {
@@ -251,6 +258,8 @@ void FluidNewtonSolver::SolveLinearSystem() const
       final_atol_ls_fs = 0;
       final_rtol_ls_fs = 0;
    }
+
+   return true;
 }
 
 void FluidNewtonSolver::Correctors(const double &dt, const double &time) const

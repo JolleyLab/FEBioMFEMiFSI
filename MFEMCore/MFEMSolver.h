@@ -95,6 +95,12 @@ public:
 	double KinematicViscosity() const;
 	double DynamicViscosity() const;
 
+   // time stepping
+   void AdjustTimeStep();
+
+   // Print timing data
+   void PostSolve();
+
 private:
 	Imp& m;
 

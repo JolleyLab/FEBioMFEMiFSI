@@ -1,4 +1,6 @@
 #pragma once
+#include <cmath>
+#include <type_traits>
 #include <FECore/FEModelParam.h>
 #include <FECore/FEMaterialPoint.h>
 #include <FECore/log.h>
@@ -70,3 +72,27 @@ protected:
 private:
    std::ostringstream buffer;
 };
+
+// Truncate a floating-point value to a fixed number of decimal places.
+// This performs truncation (not rounding): values are cut off beyond 'places'.
+// - Leaves NaN/Inf unchanged.
+// Example: TruncateToDigits(3.14159, 2) -> 3.14
+template <typename T>
+inline typename std::enable_if<std::is_floating_point<T>::value, T>::type
+TruncateToDigits(T value, int places)
+{
+   if (!std::isfinite(value)) { return value; }
+   if (places <= 0) { return std::trunc(value); }
+
+   // Limit places to avoid overflow in pow for extreme inputs
+   const int max_places = 18; // safe for double; float effectively smaller
+   const int p = (places > max_places) ? max_places : places;
+
+   const T factor = static_cast<T>(std::pow(10.0, static_cast<double>(p)));
+   const T scaled = value * factor;
+   const T truncated = std::trunc(scaled);
+   return truncated / factor;
+}
+
+template float TruncateToDigits<float>(float value, int places);
+template double TruncateToDigits<double>(double value, int places);

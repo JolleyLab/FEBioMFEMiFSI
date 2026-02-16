@@ -14,6 +14,27 @@ BlockPreconditioner::BlockPreconditioner(Array<int> &offsets_,Array<FiniteElemen
 
    Ad.SetSize(spaces[0]->GetTrueVSize());
    Ad = 0.0;
+
+   // AMG settings
+   amg_set.dim = spaces[0]->GetMesh()->Dimension();
+   if (!HypreUsingGPU())
+   {
+      amg_set.cycle_type = 1; // 1 = V-cycle, 2 = W-cycle
+      amg_set.coarsening = 10;   // 10 = HMIS, 8 = PMIS, 6 = Falgout, 0 = CLJP
+      amg_set.interp = 6;    // 6 = extended+i, 0 = classical
+      amg_set.relax_type = 3; // hybrid gauss-seidel smoother, 18 = l1 jacobi MFEM default
+      amg_set.strength_thresh = amg_set.dim == 3 ? 0.7 : 0.25; // for 3D, 0.25 for 2D
+      amg_set.aggressive_coarsening = 2; // Set aggressive coarsening levels (default 1)
+   }
+   else
+   {
+      amg_set.cycle_type = 1; // 1 = V-cycle, 2 = W-cycle
+      amg_set.coarsening = 8;   // 10 = HMIS, 8 = PMIS, 6 = Falgout, 0 = CLJP
+      amg_set.interp = 6;    // 6 = extended+i, 0 = classical
+      amg_set.relax_type = 3; // hybrid gauss-seidel smoother, 18 = l1 jacobi MFEM default
+      amg_set.strength_thresh = amg_set.dim == 3 ? 0.7 : 0.25; // for 3D, 0.25 for 2D
+      amg_set.aggressive_coarsening = 2; // Set aggressive coarsening levels (default 1)
+   }
 }
 
 void BlockPreconditioner::SetOperator(const mfem::Operator &op)
@@ -72,23 +93,22 @@ void BlockPreconditioner::SetASolver(BlockOperator *jacobian)
             A_prec_amg->SetSystemsOptions(spaces[0]->GetMesh()->Dimension(),spaces[0]->GetOrdering() == Ordering::byNODES ? true : false); // RB 2-7-24
             
             // Additonal AMG options
-            int dim = spaces[0]->GetMesh()->Dimension();
             // Cycle type
-            A_prec_amg->SetCycleType(1); // 1 = V-cycle, 2 = W-cycle
+            A_prec_amg->SetCycleType(amg_set.cycle_type); // 1 = V-cycle, 2 = W-cycle
             // Coarsening method
-            A_prec_amg->SetCoarsening(10);   // 10 = HMIS, 8 = PMIS, 6 = Falgout, 0 = CLJP)
+            A_prec_amg->SetCoarsening(amg_set.coarsening);   // 10 = HMIS, 8 = PMIS, 6 = Falgout, 0 = CLJP)
             // Interp method
-            A_prec_amg->SetInterpolation(6);    // 6 = extended+i, 0 = classical)
+            A_prec_amg->SetInterpolation(amg_set.interp);    // 6 = extended+i, 0 = classical)
             // Smoother/Relaxation type
-            A_prec_amg->SetRelaxType(3); // hybrid gauss-seidel smoother, 18 = l1 jacobi MFEM default
+            A_prec_amg->SetRelaxType(amg_set.relax_type); // hybrid gauss-seidel smoother, 18 = l1 jacobi MFEM default
             // // Truncation factor for interp
             // HYPRE_BoomerAMGSetTruncFactor(A_prec_amg,0.3);
             // Strong threshold for 3D is 0.7, for 2D is 0.25
-            A_prec_amg->SetStrengthThresh(dim == 3 ? 0.7 : 0.25);
+            A_prec_amg->SetStrengthThresh(amg_set.strength_thresh);
             // // Max number of elements per row for interp
             // HYPRE_BoomerAMGSetPMaxElmts(A_prec_amg, 5);
             // Set aggressive coarsening levels (default 1)
-            A_prec_amg->SetAggressiveCoarsening(2);
+            A_prec_amg->SetAggressiveCoarsening(amg_set.aggressive_coarsening);
             
             // A_prec_amg->SetRelaxType(3); // non symm smoother for non symmetric A matrix // RB 11/15/23
             
@@ -190,23 +210,22 @@ void BlockPreconditioner::SetSchurSolver(BlockOperator *jacobian)
             S_prec_amg->SetSystemsOptions(spaces[0]->GetMesh()->Dimension(),spaces[0]->GetOrdering() == Ordering::byNODES ? true : false);
 
             // Additonal AMG options
-            int dim = spaces[0]->GetMesh()->Dimension();
             // Cycle type
-            S_prec_amg->SetCycleType(1); // 1 = V-cycle, 2 = W-cycle
+            S_prec_amg->SetCycleType(amg_set.cycle_type); // 1 = V-cycle, 2 = W-cycle
             // Coarsening method
-            S_prec_amg->SetCoarsening(10);   // 10 = HMIS, 8 = PMIS, 6 = Falgout, 0 = CLJP)
+            S_prec_amg->SetCoarsening(amg_set.coarsening);   // 10 = HMIS, 8 = PMIS, 6 = Falgout, 0 = CLJP)
             // Interp method
-            S_prec_amg->SetInterpolation(6);    // 6 = extended+i, 0 = classical)
+            S_prec_amg->SetInterpolation(amg_set.interp);    // 6 = extended+i, 0 = classical)
             // Smoother/Relaxation type
-            S_prec_amg->SetRelaxType(3); // hybrid gauss-seidel smoother, 18 = l1 jacobi MFEM default
+            S_prec_amg->SetRelaxType(amg_set.relax_type); // hybrid gauss-seidel smoother, 18 = l1 jacobi MFEM default
             // // Truncation factor for interp
             // HYPRE_BoomerAMGESetTruncFactor(S_prec_amg,0.3);
             // Strong threshold for 3D is 0.7, for 2D is 0.25
-            S_prec_amg->SetStrengthThresh(dim == 3 ? 0.7 : 0.25);
+            S_prec_amg->SetStrengthThresh(amg_set.strength_thresh);
             // // Max number of elements per row for interp
             // HYPRE_BoomerAMGSetPMaxElmts(S_prec_amg, 5);
             // Set aggressive coarsening levels (default 1)
-            S_prec_amg->SetAggressiveCoarsening(2);
+            S_prec_amg->SetAggressiveCoarsening(amg_set.aggressive_coarsening);
 
 
             SInvPC = S_prec_amg;

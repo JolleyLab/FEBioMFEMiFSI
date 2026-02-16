@@ -76,7 +76,8 @@ public:
    // Perform a time step (time = t_n+1) so the variables stored in
    // un_gf and pn_gf correspond to the current time after this function
    // is called
-   void Step(double &time, double dt, int cur_step, bool provisional = false);
+   void Step(double &time, double dt, int cur_step, bool provisional);
+   bool Step(double &time, double dt, int cur_step);
 
    /// Remove mean from a Vector.
    /**
@@ -98,13 +99,19 @@ public:
    /// Print timing summary of the solving routine.
    virtual void PrintTimingData();
    void ConvertTimeToFormattedTime(double time_in_seconds, char* time_str, size_t size);
-   mfem::StopWatch sw_io;
+   mfem::StopWatch sw_io, sw_step;
 
    void UpdateParameters(double time, double dt, int current_step_);
    void Predictors(double dt);
    void SetEssentialBCs(const double &time);
    void UpdateVariables(double &time, double &dt);
    void UpdateWindkesselParameters();
+   void GetNewtonSolverConvergenceInfo(int &newton_its, double &newton_res, double &newton_relres)
+   {
+      newton_its = newton_solver->GetNumIterations();
+      newton_res = newton_solver->GetFinalNorm();
+      newton_relres = newton_solver->GetFinalRelNorm();
+   };
 
    //////////////////////////
    /// GET DATA FUNCTIONS ///
@@ -351,9 +358,9 @@ public:
    // set function, with option to set CFL num
    // est dt function
    // method for adaptive time stepping based on CFL_Crit
-   double CFL_crit = 0.5;
+   double CFL_crit = 1.0;
    void SetCFL_Crit(double crit) {CFL_crit = crit;};
-   double est_dt();
+   double estimate_convective_cfl_dt();
    // TO DO^, code can handle changing dt, but need a way to choose dt   
 
    // set rho_infty for gen alpha
@@ -882,9 +889,9 @@ protected:
    // timing
    void RegisterTimers();
    TimerRegistry timer_reg;
-   mfem::StopWatch sw_step, sw_solve, sw_setup, sw_tan, sw_res, sw_linsolve, sw_initiators, sw_correctors;
+   mfem::StopWatch sw_solve, sw_setup, sw_tan, sw_res, sw_linsolve, sw_initiators, sw_correctors;
    mfem::StopWatch sw_fluidtan, sw_fluidres, sw_solidtan, sw_solidres, sw_fsires, sw_fsitan, sw_fsicmat;
-   mfem::StopWatch sw_predictors, sw_essbcs, sw_weakbcs, sw_updates, sw_restarts;
+   mfem::StopWatch sw_predictors, sw_essbcs, sw_weakbcs, sw_restarts, sw_updates;
    bool extended_timing = true;
    bool timers_registered = false;
 
