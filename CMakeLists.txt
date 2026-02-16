@@ -33,6 +33,12 @@ endif()
 # Name of your plugin
 project(FEBioMFEMiFSI)
 
+# Shared CMake helpers/macros for this project
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FEBioMFEMiFSICmakeUtils.cmake)
+
+# Expose main library target name to subdirectories for explicit dependencies
+set(MAIN_SHARED_TARGET FEBioMFEMiFSI CACHE STRING "Main shared library target to link against")
+
 ##### Find FEBio #####
 message(STATUS "Looking for FEBio ...")
 set(FEBio_DIR "" CACHE PATH "Path to FEBio installation.")
@@ -53,7 +59,7 @@ if (FEBio_FOUND)
 else()
    message(FATAL_ERROR "Could not find FEBio. Please set FEBio_DIR to the FEBio installation path.")
 endif()
-set(FEBio_LIBS FEBio::FECore FEBio::FEBioMech FEBio::FEBioXML)
+set(FEBio_LIBS FEBio::FECore FEBio::FEBioMech FEBio::FEBioXML FEBio::FEBioLib)
 
 ##### Find MFEM #####
 # Import MFEM. The following variables can be used to help CMake find MFEM:
@@ -87,7 +93,6 @@ if(WIN32)
 elseif(APPLE)
    add_definitions(-D__APPLE__)
    #  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.13)
-   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup")
 else()
 	add_definitions(-DLINUX)
    add_compile_options(-static-libstdc++ -static-libgcc -w -Wall)
@@ -128,21 +133,23 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
 add_library(FEBioMFEMiFSI SHARED ${HDR_FEBioMFEMiFSI} ${SRC_FEBioMFEMiFSI})
 set_property(TARGET FEBioMFEMiFSI PROPERTY AUTOGEN_BUILD_DIR ${CMAKE_BINARY_DIR}/CMakeFiles/AutoGen/FEBioMFEMiFSI_autogen)
 
-# Link FEBio Libraries (now actual paths)
-target_link_libraries(FEBioMFEMiFSI PRIVATE ${FEBio_LIBS})
-
-# Link MFEM
-target_link_libraries(FEBioMFEMiFSI PRIVATE mfem)
+# Link FEBio & MFEM libraries (make dependencies propagate to consumers)
+target_link_libraries(FEBioMFEMiFSI PUBLIC ${FEBio_LIBS} mfem)
 
 # Propagate MFEM's compile definitions (MFEM_USE_MPI, MFEM_USE_GSLIB, etc.)
 target_compile_definitions(FEBioMFEMiFSI PRIVATE $<TARGET_PROPERTY:mfem,INTERFACE_COMPILE_DEFINITIONS>)
 
 # macOS: ensure loader can find FEBio libs at runtime
 if (APPLE)
+   # Collect rpaths from dependent targets
+   set(_rpaths)
+   foreach(lib ${FEBio_LIBS} mfem)
+      list(APPEND _rpaths "$<TARGET_FILE_DIR:${lib}>")
+   endforeach()
    set_target_properties(FEBioMFEMiFSI PROPERTIES
-   BUILD_WITH_INSTALL_RPATH ON
-   BUILD_RPATH   "${FEBio_LIB_DIR}"
-   INSTALL_RPATH "${FEBio_LIB_DIR}"
+      BUILD_WITH_INSTALL_RPATH ON
+      BUILD_RPATH   "${_rpaths}"
+      INSTALL_RPATH "${_rpaths}"
    )
 endif()
 

@@ -1106,6 +1106,11 @@ bool MFEMSolver::SetupFluid()
 	m.flowsolver->SetNewtonSolveMinIt(m.minIt);
 	m.flowsolver->SetNewtonSolveMaxIt(m.maxIt);
 
+   m.flowsolver->SetPrecAINVAbsTol(m.prec_Ainv_atol);
+   m.flowsolver->SetPrecAINVRelTol(m.prec_Ainv_rtol);
+   m.flowsolver->SetPrecSINVAbsTol(m.prec_Sinv_atol);
+   m.flowsolver->SetPrecSINVRelTol(m.prec_Sinv_rtol);
+
    // flag for no error on non-convergence of newton solver
    // useful for immersed FSI with thin structures and vms stabilization 
    // scaling
