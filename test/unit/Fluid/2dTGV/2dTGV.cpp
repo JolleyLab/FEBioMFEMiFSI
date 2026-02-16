@@ -464,7 +464,6 @@ int main(int argc, char *argv[])
 
    flowsolver->PrintTimingData();
 
-   // delete pmesh;
    delete pmesh;
    delete flowsolver;
 
