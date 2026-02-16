@@ -1,6 +1,6 @@
 #pragma once
 
-#include <FECore/FECallback.h>
+#include <FECore/FECallBack.h>
 
 // run post-solve actions when the model is solved
 bool timing_callback(FEModel* fem, unsigned int nreason, void* pd);
