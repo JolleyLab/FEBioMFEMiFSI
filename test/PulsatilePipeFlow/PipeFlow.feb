@@ -16,10 +16,10 @@
 			<max_retries>5</max_retries>
 			<opt_iter>11</opt_iter>
 			<dtmin>0</dtmin>
-			<dtmax>0.1</dtmax>
+			<dtmax>0.0232</dtmax>
 			<aggressiveness>0</aggressiveness>
 			<cutback>0.5</cutback>
-			<dtforce>0</dtforce>
+			<dtforce>1</dtforce>
 		</time_stepper>
 		<solver type="mfem">
 			<symmetric_stiffness>symmetric</symmetric_stiffness>

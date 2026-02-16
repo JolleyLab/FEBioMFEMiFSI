@@ -60,6 +60,18 @@ protected:
    #endif
    bool direct_solvers = false; // use direct solvers for A and S blocks
 
+   struct AMG_Settings
+   {
+      int dim;
+      int cycle_type;
+      int coarsening;
+      int interp;
+      int relax_type;
+      double strength_thresh; 
+      int aggressive_coarsening;
+   };
+   AMG_Settings amg_set;
+
    double a_atol = 1E-10;
    double a_rtol = 1E-6;
    int a_maxIt = 200;
