@@ -30,6 +30,7 @@ public:
    void Initiator() override;
    void Correctors(mfem::Vector &del) override;
    void Update() override;
+   void UpdateMaterialPointDataForPostProcessing(); // material point data to tn
 
    // residual
    void ComputeSolidResidualAndSpread2Fluid(mfem::Vector &lambda_fsi_vec) override;

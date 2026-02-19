@@ -40,15 +40,7 @@ IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int
    {
       for (int i = 0; i < geom_types.Size(); ++i)
       {
-         if (geom_types[i] == Geometry::PYRAMID)
-         {
-            nxx_flag = false;
-         }
-         // if (geom_types[i] == Geometry::PRISM && immersed_flag)
-         // {
-         //    nxx_flag = false;
-         // }
-         if (geom_types[i] == Geometry::PRISM)
+         if (geom_types[i] == Geometry::PYRAMID || geom_types[i] == Geometry::PRISM)
          {
             nxx_flag = false;
          }
@@ -60,19 +52,9 @@ IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int
    }
 
    MFEM_ASSERT(orderp >= 1, "Order of pressure approx must be >= 1");
-   if (orderv == orderp)
-   {
-      equal_order = true;
-      // For restarting, need to use H1_FECollection for all cases
-      vfec = new H1_FECollection(orderv, pmesh->Dimension());
-      pfec = new H1_FECollection(orderp, pmesh->Dimension());  
-   }
-   else
-   {
-      vfec = new H1_FECollection(orderv, pmesh->Dimension());
-      pfec = new H1_FECollection(orderp, pmesh->Dimension());  
-      
-   }
+   equal_order = orderv == orderp ? true : false;
+   vfec = new H1_FECollection(orderv, pmesh->Dimension());
+   pfec = new H1_FECollection(orderp, pmesh->Dimension()); 
    #ifndef MFEM_USE_MPI
    vfes = new FiniteElementSpace(pmesh, vfec, pmesh->Dimension(),orderingtype);
    pfes = new FiniteElementSpace(pmesh, pfec,1,orderingtype);
@@ -92,17 +74,17 @@ IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int
    {
       // dirichlet bcs
       vel_ess_attr.SetSize(pmesh->bdr_attributes.Max() * vdim);
-      vel_ess_attr = 0; // over dirichlet boundary
+      vel_ess_attr = 0;
       
       pres_ess_attr.SetSize(pmesh->bdr_attributes.Max());
-      pres_ess_attr = 0; // over neumann boundary
+      pres_ess_attr = 0;
 
       // neumann bcs
       vel_nat_attr.SetSize(pmesh->bdr_attributes.Max());
-      vel_nat_attr = 0; // over neumann boundary
+      vel_nat_attr = 0;
 
       neumann_attr.SetSize(pmesh->bdr_attributes.Max());
-      neumann_attr = 0; // over neumann boundary
+      neumann_attr = 0;
       
       // periodic bcs
       periodic_attr.SetSize(pmesh->bdr_attributes.Max());
@@ -353,7 +335,7 @@ void IncompressibleFluidSolver::Setup(double dt)
 
       if (equal_order) MFEM_ASSERT(pspg_flag, "Error: Must use PSPG with equal order elements!");
 
-      // tau_m = tau PSPG = tau_SUPG
+      // tau_m = tau_PSPG = tau_SUPG
       tau_m.kinvis = kin_vis;
       tau_m.dt = &curr_dt;
       tau_m.Set_CI(orderv);
@@ -642,15 +624,15 @@ void IncompressibleFluidSolver::Setup(double dt)
 
    // solution vectors
    newton_solver->SetSolutionVectors(yn,ydotn,ynp1,ydotnp1,yg,ydotg);
-   newton_solver->SetTotalInteg();
+   if (total_integ) newton_solver->SetTotalInteg();
 
    // tell newton solver about the time stepping method
    newton_solver->UseGenAlpha(alpha_f,alpha_m,gamma);
 
-   if(direct_solver) newton_solver->UsingDirectSolver();
+   if (direct_solver) newton_solver->UsingDirectSolver();
 
    // cv bcs
-   if(windkessel_bc) newton_solver->AddWindkesselBC(&windkessel_bcs);
+   if (windkessel_bc) newton_solver->AddWindkesselBC(&windkessel_bcs);
 
    // immersed fsi
    if (IFEM)

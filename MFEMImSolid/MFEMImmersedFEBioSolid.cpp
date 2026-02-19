@@ -415,8 +415,12 @@ void ImmersedFEBioSolid::Update()
       finder_fluid->TransferIndicator(solid_bdr_nodes,*s_gf_fluid,dfes->GetOrdering());
       #endif
    }
+}
 
-   // update material point data to np1 for post-processing
+void ImmersedFEBioSolid::UpdateMaterialPointDataForPostProcessing()
+{
+   // update material point data to current time for post-processing
+   
    // store timeinfo
    FETimeInfo& tp = fem->GetTime();
    FETimeInfo old_tp = tp; // save old time info

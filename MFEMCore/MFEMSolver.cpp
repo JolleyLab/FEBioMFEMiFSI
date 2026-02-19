@@ -2083,6 +2083,10 @@ void MFEMSolver::UpdateSolidOutputs()
    
    if (m.solidsolvertype == SolidSolverType::FEBio)
    {
+      auto immersed_febio_solid_solver = dynamic_cast<ImmersedFEBioSolid*>(immersed_solid_solver);
+      MFEM_ASSERT(immersed_febio_solid_solver, "Expected FEBio solid solver");
+      immersed_febio_solid_solver->UpdateMaterialPointDataForPostProcessing();
+      
       // Default components: compute/update both nodal projection and elemental averages if enabled
       const nodal_avg::StressQuantity stress_components[] = {
          nodal_avg::StressQuantity::CauchyXX,
