@@ -53,7 +53,7 @@ The `--squash` flag keeps your main repo history clean by condensing subtree com
 
 ---
 
-## 4. Pushing Local Changes Upstream
+## 4. Pushing Local Changes Upstream (Developers)
 
 If you make changes inside `MFEMFSI/` and want to contribute them back to the upstream `iFSI` repository:
 
