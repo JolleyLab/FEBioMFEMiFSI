@@ -42,8 +42,8 @@
 			<Track_node>0</Track_node>
 			<Track_node_position>0,0,0</Track_node_position>
 			<Output_avg_velocity>0</Output_avg_velocity>
-			<Stress_nodal_outputs>vonmises,sxx,syy,szz,p1</Stress_nodal_outputs>
-			<Strain_nodal_outputs>vonmises,exx,eyy,ezz,principal1</Strain_nodal_outputs>
+			<Stress_measure_nodal_outputs></Stress_measure_nodal_outputs>
+			<Strain_measure_nodal_outputs></Strain_measure_nodal_outputs>
 			<time_stepping_method>GenAlpha</time_stepping_method>
 			<rho_inf>0.5</rho_inf>
 			<step_save>1</step_save>
@@ -64,7 +64,6 @@
 			<Save_Q_Criterion>0</Save_Q_Criterion>
 			<Output_surface_pressures>0</Output_surface_pressures>
 			<Output_surface_flow_rates>0</Output_surface_flow_rates>
-			<HDF5_output>1</HDF5_output>
 			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-10</atol>
 			<rtol>1e-06</rtol>

@@ -14,9 +14,9 @@
 		<adaptor_re_solve>1</adaptor_re_solve>
 		<time_stepper type="default">
 			<max_retries>5</max_retries>
-			<opt_iter>3</opt_iter>
-			<dtmin>0.0001</dtmin>
-			<dtmax>0.005</dtmax>
+			<opt_iter>11</opt_iter>
+			<dtmin>0</dtmin>
+			<dtmax>0.1</dtmax>
 			<aggressiveness>0</aggressiveness>
 			<cutback>0.5</cutback>
 			<dtforce>0</dtforce>
@@ -42,8 +42,6 @@
 			<Track_node>0</Track_node>
 			<Track_node_position>0,0,0</Track_node_position>
 			<Output_avg_velocity>0</Output_avg_velocity>
-			<NodeRecovery_NodalProjection>0</NodeRecovery_NodalProjection>
-			<NodeRecovery_Elemental>1</NodeRecovery_Elemental>
 			<Stress_measure_nodal_outputs>vm,p1</Stress_measure_nodal_outputs>
 			<Strain_measure_nodal_outputs>vm,p1</Strain_measure_nodal_outputs>
 			<time_stepping_method>GenAlpha</time_stepping_method>
@@ -66,12 +64,11 @@
 			<Save_Q_Criterion>0</Save_Q_Criterion>
 			<Output_surface_pressures>0</Output_surface_pressures>
 			<Output_surface_flow_rates>0</Output_surface_flow_rates>
-			<HDF5_output>1</HDF5_output>
 			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-10</atol>
 			<rtol>1e-06</rtol>
-			<minIt>1</minIt>
-			<maxIt>20</maxIt>
+			<minIt>3</minIt>
+			<maxIt>10</maxIt>
 			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-10</lin_atol>
 			<lin_rtol>1e-06</lin_rtol>

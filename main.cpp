@@ -76,7 +76,7 @@ FECORE_PLUGIN void PluginInitialize(FECoreKernel& fecore)
 		"   \"title\" : \"FEBioMFEM-iFSI\","
 		"   \"info\"  : \"Interface to an MFEM based immersed FSI solver\","
 		"   \"author\": \"Ryan Black, Steve Maas\","
-		"   \"version\": \"1.0\""
+		"   \"version\": \"1.0.0\""
 		"}";
 
 	fecore.CreateModule(new FEMFEMiFSI, "mfemifsi", info);
