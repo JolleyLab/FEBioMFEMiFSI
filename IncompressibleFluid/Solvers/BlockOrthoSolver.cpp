@@ -107,10 +107,7 @@ void BlockOrthoSolver::Mult(const Vector &b, Vector &x) const
    // Orthogonalize input pressure block
    b.GetSubVector(pblock,p_vec);
    Orthogonalize(p_vec, p_ortho);
-   // temp = b;
-   // temp.SetSubVector(pblock,p_ortho); // update pressure block
 
-   // RB 1-15-24
    // copy over velocity block
    const int N = vblock.Size();
    const auto idx = vblock.Read();

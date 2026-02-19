@@ -11,13 +11,6 @@ void NearlyIncompressibleFiberReinforced::ComputeS_iso(DenseMatrix &stress)
    ///////////////////
    // Neo-Hookean Part
 
-   // Compute S = c0 (detC)^(-1/d) (I - 1/d * trC Cinv) + kappa*(J-1)*J*Cinv
-   // isochoric part
-   // stress = Cinv;
-   // stress *= -1.0/d * trC;
-   // stress += Identity_Mat;
-   // stress *= c0_val * pow(detC,-1.0/d);
-
    double fac = -c0_val * pow(detC,-1.0/d) * 1.0/d * trC;
    stress.Set(fac,Cinv);
    stress(0,0) += c0_val * pow(detC,-1.0/d);
@@ -51,14 +44,6 @@ void NearlyIncompressibleFiberReinforced::ComputeSigma_iso(DenseMatrix &stress)
    MFEM_ABORT("TO DO");
 
    stress.SetSize(vdim);
-   // Compute sigma = sigma_iso + sigma_vol
-   // = mu*J^(-5/3)*(b - 1/3 * trb I) + kappa*(J-1)I
-
-   // sigma_iso
-   // stress = Identity_Mat;
-   // stress *= -1.0/d * b.Trace();
-   // stress += b;
-   // stress *= c0_val * pow(J,-(2.0 + d)/d);
    
    stress.Set(c0_val * pow(J,-(2.0 + d)/d),b);
    stress(0,0) -= c0_val * pow(J,-(2.0 + d)/d) * 1.0/d * b.Trace();
@@ -105,13 +90,6 @@ void NearlyIncompressibleFiberReinforced::SetMaterialConstants(const Integration
    {
       fiber_coeff->Eval(m,T,ip);
    }
-
-   // if (T.Attribute == 1)
-   // {
-   //    int temp_test_val = 0;
-   // } 
-   // std::cout << "attr = " << T.Attribute << std::endl;
-   // m.Print();
 }
 
 void NearlyIncompressibleFiberReinforced::ResetMaterialConstants()

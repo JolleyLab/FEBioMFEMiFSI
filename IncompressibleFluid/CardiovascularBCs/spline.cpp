@@ -1,3 +1,4 @@
+// from https://kluge.in-chemnitz.de/opensource/spline/
 /*
  * spline.h
  *
@@ -22,8 +23,6 @@
  * ---------------------------------------------------------------------
  *
  */
-
-// from https://kluge.in-chemnitz.de/opensource/spline/
 
 #include "spline.hpp"
 

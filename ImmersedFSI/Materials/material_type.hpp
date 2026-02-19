@@ -75,6 +75,11 @@ public:
       return F;
    }
 
+   mfem::DenseMatrix &GetE()
+   {
+      return E;
+   }
+
    // method to evaluate PK2 Stress
    virtual void EvalPK2Stress(mfem::DenseMatrix &stress);
 

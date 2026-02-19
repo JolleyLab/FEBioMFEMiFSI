@@ -59,18 +59,4 @@ public:
    {
       return lambda_val + 2.0*mu_val/3.0;   
    };
-   
-   // // assembles local element vector for stress term
-   // virtual void AssembleElementVector(const FiniteElement &el,
-   //                                     ElementTransformation &trans,
-   //                                     const Vector &elfun,
-   //                                     Vector &elvect) override;
-
-   // void AssembleElementMatrix(const FiniteElement &el, ElementTransformation &Trans, DenseMatrix &elmat);
-
-   // // assembles local element grad matrix for stress term
-   // virtual void AssembleElementGrad(const FiniteElement &el,
-   //                                     ElementTransformation &trans,
-   //                                     const Vector &elfun,
-   //                                     DenseMatrix &elmat) override;
 };

@@ -79,7 +79,7 @@ public:
          double val = G.InnerProduct(rm,rm);
          val *= tau_m * tau_m;
 
-         if (abs(val) < eps) val = eps; //////////////////////////////////////////
+         if (abs(val) < eps) val = eps;
          return 1.0/sqrt(val);
       }
       else

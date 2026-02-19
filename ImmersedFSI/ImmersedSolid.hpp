@@ -1,10 +1,13 @@
 #pragma once
 #define IMMERSEDSOLID_VERSION 1.0
 
+#include <map>
+
 #include "mfem.hpp"
 #include "Materials/material_type.hpp"
 #include "ImmersedFSIFindPts.hpp"
 #include "ImmersedSolidIntegrator.hpp"
+#include "../../MFEMImSolid/MFEMNodalAverageOutputs.h"
 #include "../IncompressibleFluid/ifs_bc_containers.hpp"
 
 #ifdef MFEM_USE_MPI
@@ -139,8 +142,9 @@ public:
    virtual void UpdateSolidStateFromRestart();
 
    // Output
-   // compute nodally averaged von mises stress, returned as a scalar gridfunction
-   virtual mfem::GridFunction *ComputeNodallyAveragedVonMisesStress(mfem::GridFunction &d_gf);
+   // compute nodally averaged stress/strain, returned as scalar gridfunctions
+   virtual mfem::GridFunction *ComputeNodallyAveragedStress(nodal_avg::StressQuantity measure, mfem::GridFunction &d_gf, bool elemental_avg = false);
+   virtual mfem::GridFunction *ComputeNodallyAveragedStrain(nodal_avg::StrainQuantity measure, mfem::GridFunction &d_gf, bool elemental_avg = false);
    void BuildInitTransformation(mfem::ElementTransformation &T, const mfem::IntegrationPoint &ip);
 
    virtual ~ImmersedSolid();
@@ -194,6 +198,16 @@ protected:
    // parameters
    int orderd;
    double time, dt;
+
+   #ifdef MFEM_USE_MPI
+   using NodalField = mfem::ParGridFunction;
+   #else
+   using NodalField = mfem::GridFunction;
+   #endif
+
+   // nodal output storage keyed by requested measure
+   std::map<nodal_avg::StressQuantity, NodalField> nodal_stress_fields;
+   std::map<nodal_avg::StrainQuantity, NodalField> nodal_strain_fields;
 
    // Operators
    mfem::SumCoefficient *density_diff = nullptr;
@@ -280,13 +294,17 @@ protected:
 
    // output data
    #ifdef MFEM_USE_MPI
-   mfem::ParGridFunction nodal_stress_gf;
    mfem::ParFiniteElementSpace *nodal_stress_fes = nullptr;
    #else
-   mfem::GridFunction nodal_stress_gf;
    mfem::FiniteElementSpace *nodal_stress_fes = nullptr;
    #endif
    mfem::FiniteElementCollection *nodal_stress_fec = nullptr;
+   mfem::FiniteElementCollection *nodal_strain_fec = nullptr;
+   #ifdef MFEM_USE_MPI
+   mfem::ParFiniteElementSpace *nodal_strain_fes = nullptr;
+   #else
+   mfem::FiniteElementSpace *nodal_strain_fes = nullptr;
+   #endif
    mfem::IsoparametricTransformation *init_trans = nullptr;
 
 };

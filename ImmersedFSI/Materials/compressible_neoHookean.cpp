@@ -8,11 +8,6 @@ void CompressibleNeoHookean::EvalPK2Stress(DenseMatrix &stress)
 {
    stress.SetSize(vdim);
 
-   // Compute S = mu*(I - Cinv) + lambda*ln(J)*Cinv
-   // stress = Identity_Mat;
-   // stress -= Cinv;
-   // stress *= mu_val;
-
    stress.Set(-mu_val,Cinv);
    stress(0,0) += mu_val;
    stress(1,1) += mu_val;
@@ -24,12 +19,6 @@ void CompressibleNeoHookean::EvalPK2Stress(DenseMatrix &stress)
 void CompressibleNeoHookean::EvalCauchyStress(DenseMatrix &stress)
 {
    stress.SetSize(vdim);
-
-   // compute sigma = mu/J (b - I) + (lambda/J)(lnJ) I
-   // stress = b;
-   // stress -= Identity_Mat;
-   // stress *= (mu_val / J);
-   // stress.Add(factor,Identity_Mat);
 
    stress.Set(mu_val / J,b);
    stress(0,0) -= mu_val / J;
