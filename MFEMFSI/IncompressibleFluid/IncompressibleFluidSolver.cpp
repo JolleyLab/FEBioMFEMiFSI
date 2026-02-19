@@ -3367,7 +3367,7 @@ void IncompressibleFluidSolver::writeRestarts(int step, double dt, double time)
       im_solid->writeRestarts(sout, solidmname, dname, ddotname, d2dotname);
    }
 
-   sw_restarts.Start();
+   sw_restarts.Stop();
 }
 
 void IncompressibleFluidSolver::readRestarts(int &step, double &dt, double &time, bool read_bcs)
