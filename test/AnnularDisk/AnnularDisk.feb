@@ -29,7 +29,6 @@
 			<velocity_order>1</velocity_order>
 			<pressure_order>1</pressure_order>
 			<VMS>1</VMS>
-			<Laplace_form>0</Laplace_form>
 			<Zero_mean_pressure>1</Zero_mean_pressure>
 			<pre_partition_mesh>0</pre_partition_mesh>
 			<pre_partition_opt>PartitionMesh</pre_partition_opt>
@@ -67,7 +66,7 @@
 			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-10</atol>
 			<rtol>1e-06</rtol>
-			<minIt>3</minIt>
+			<minIt>2</minIt>
 			<maxIt>10</maxIt>
 			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-10</lin_atol>

@@ -22,7 +22,6 @@
 			<velocity_order>1</velocity_order>
 			<pressure_order>1</pressure_order>
 			<VMS>1</VMS>
-			<Laplace_form>0</Laplace_form>
 			<Zero_mean_pressure>0</Zero_mean_pressure>
 			<pre_partition_mesh>0</pre_partition_mesh>
 			<pre_partition_opt>PartitionMesh</pre_partition_opt>

@@ -29,7 +29,7 @@
 			<velocity_order>1</velocity_order>
 			<pressure_order>1</pressure_order>
 			<VMS>1</VMS>
-			<Laplace_form>0</Laplace_form>
+			<viscous_term_type>StressForm</viscous_term_type>
 			<Zero_mean_pressure>0</Zero_mean_pressure>
 			<pre_partition_mesh>0</pre_partition_mesh>
 			<pre_partition_opt>PartitionMesh</pre_partition_opt>
@@ -46,6 +46,9 @@
 			<Strain_measure_nodal_outputs></Strain_measure_nodal_outputs>
 			<time_stepping_method>GenAlpha</time_stepping_method>
 			<rho_inf>0.5</rho_inf>
+			<convective_cfl_time_step_controller>0</convective_cfl_time_step_controller>
+			<convective_cfl>2</convective_cfl>
+			<save_mode>TimeBased</save_mode>
 			<step_save>1</step_save>
 			<steady_state_save>0</steady_state_save>
 			<steady_state_step_save>1</steady_state_step_save>
@@ -64,14 +67,15 @@
 			<Save_Q_Criterion>0</Save_Q_Criterion>
 			<Output_surface_pressures>0</Output_surface_pressures>
 			<Output_surface_flow_rates>0</Output_surface_flow_rates>
+			<HDF5_output>1</HDF5_output>
 			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-10</atol>
 			<rtol>1e-06</rtol>
-			<minIt>3</minIt>
+			<minIt>2</minIt>
 			<maxIt>10</maxIt>
-			<solver_type>CPARDISO</solver_type>
-			<lin_atol>1e-06</lin_atol>
-			<lin_rtol>0.001</lin_rtol>
+			<solver_type>FGMRES</solver_type>
+			<lin_atol>1e-10</lin_atol>
+			<lin_rtol>1e-06</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
 			<prec_type>SIMPLE</prec_type>
 			<inner_solver_type>Iterative</inner_solver_type>
