@@ -324,21 +324,7 @@ void ImmersedFEBioSolid::Initiator()
 
 void ImmersedFEBioSolid::Correctors(mfem::Vector &del)
 {
-   // project delvdot to solid mesh and update data
-   temp_del_gf.SetFromTrueDofs(del);
-   #ifdef MFEM_USE_GSLIB
-   // finder_fluid->Interpolate(interp_points_in_solid,temp_del_gf,temp_delvdot_ib_gf,orderingtype);
-   finder_fluid->Interpolate(interp_points_in_solid_tn,temp_del_gf,temp_delvdot_ib_gf,orderingtype);
-   #endif
-   #ifdef MFEM_USE_MPI
-   temp_delvdot_ib_gf.ParallelProject(delvdot_ib);
-   #else
-   temp_delvdot_ib_gf.GetTrueDofs(delvdot_ib);
-   #endif
-
-   d2dotnp1.Add(-1.0,delvdot_ib);
-   ddotnp1.Add(-gamma*dt,delvdot_ib); // only updated to keep ddotn_gf current
-   dnp1.Add(-beta*dt*dt,delvdot_ib); // for moving mfem mesh
+   ImmersedSolid::Correctors(del);
 
    ////////////////////////////////////////////////////////////////
 
@@ -389,31 +375,6 @@ void ImmersedFEBioSolid::Correctors(mfem::Vector &del)
       ni.m_rt(0) = d[idx] + ni.m_r0(0);
       ni.m_rt(1) = d[idy] + ni.m_r0(1);
       ni.m_rt(2) = d[idz] + ni.m_r0(2);
-   }
-}
-
-void ImmersedFEBioSolid::Update()
-{
-   // update dn_gf and ddotn_gf in mfem,
-   dn = dnp1;
-   dn_gf.SetFromTrueDofs(dn);
-
-   // update ddotn_gf in mfem
-   ddotn = ddotnp1;
-   ddotn_gf.SetFromTrueDofs(ddotn);
-
-   // update d2dotn_gf in mfem
-   d2dotn = d2dotnp1;
-   d2dotn_gf.SetFromTrueDofs(d2dotn);
-
-   // update solid mesh (if UL formulation) //
-   MoveMesh(dn_gf);
-   UpdatePointSearch(dn_gf,dn);
-   if (stabs_scaling)
-   {
-      #ifdef MFEM_USE_GSLIB
-      finder_fluid->TransferIndicator(solid_bdr_nodes,*s_gf_fluid,dfes->GetOrdering());
-      #endif
    }
 }
 

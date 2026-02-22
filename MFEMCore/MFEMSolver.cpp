@@ -1389,7 +1389,10 @@ bool MFEMSolver::SetupSolid()
    {
       MFEM_ASSERT(fem->Materials() < 3, "MFEM solid solver only supports one material");
 
-      if (m.output_elemental_average) MFEM_ABORT("TODO: Elemental averaging not implemented for immersed MFEM solid solver");
+      if (m.stress_measure_quantities.size() > 0 || m.strain_measure_quantities.size() > 0)
+      {
+         if (m.output_elemental_average) MFEM_WARNING("TODO: Elemental averaging not implemented for immersed MFEM solid solver, outputting at nodes instead");
+      }      
 
       #ifdef MFEM_USE_MPI
       m.flowsolver->AddImmersedSolid(m.solid_pmesh,m.orderd,init_rho_coeff,m.mat_type,m.form_type,m.subtract_viscous_stress,m.stabs_scale);
@@ -2000,7 +2003,6 @@ void MFEMSolver::FinalizeSolid()
    }
    else
    {
-      // Non-FEBio path
       m.stress_measure_quantities = ParseStressQuantityList(m.stress_measure_outputs);
       m.strain_measure_quantities = ParseStrainQuantityList(m.strain_measure_outputs);
       if (!m.stress_measure_quantities.empty() || !m.strain_measure_quantities.empty())

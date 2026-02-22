@@ -53,7 +53,7 @@ void ImmersedSolidIntegrator::AssembleElementVector(const FiniteElement &el,
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
    {
-      int order = 2 * el.GetOrder() + trans.OrderW();
+      int order = 2 * el.GetOrder(); // exact for linear terms
       ir = &IntRules.Get(el.GetGeomType(), order);
    }
 
@@ -301,7 +301,7 @@ void ImmersedSolidIntegrator::AssembleElementGrad(const FiniteElement &el,
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
    {
-      int order = 2 * el.GetOrder() + trans.OrderW();
+      int order = 2 * el.GetOrder(); // exact for linear terms
       ir = &IntRules.Get(el.GetGeomType(), order);
    }
 
@@ -383,14 +383,7 @@ void ImmersedSolidIntegrator::AssembleElementGrad(const FiniteElement &el,
       // get voigt elasticity tensor
       if (dim == 3)
       {
-         if (formulation_type == form_type::UpdatedLagrangian)
-         {
-            D = mat_type->GetElasticityTensorVoigt();
-         }
-         else
-         {
-            D = mat_type->GetElasticityTensorVoigt();
-         }         
+         D = mat_type->GetElasticityTensorVoigt();         
       }
 
       // compute density

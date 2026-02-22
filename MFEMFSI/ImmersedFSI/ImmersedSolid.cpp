@@ -503,10 +503,11 @@ void ImmersedSolid::UpdatePointSearch(const GridFunction &d, const Vector &true_
       mfem::forall(Ndofs, [=] MFEM_HOST_DEVICE (int i) { FV[i] = FV_nodes[id[i]]; });
    }
 
-   /// Reset gslib class data ///
-   #ifdef MFEM_USE_GSLIB
-   finder_fluid->Setup(*fluid_pmesh);
-   #endif
+   // /// Reset gslib class data ///
+   // // TODO: Only needed if fluid mesh moves?
+   // #ifdef MFEM_USE_GSLIB
+   // finder_fluid->Setup(*fluid_pmesh);
+   // #endif
 }
 
 void ImmersedSolid::TrackNodalDisplacement(Vector &coord, Vector &disp, double tol)

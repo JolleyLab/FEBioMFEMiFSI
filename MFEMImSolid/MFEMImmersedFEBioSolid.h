@@ -29,7 +29,6 @@ public:
    void SetWeakBCs(const double &time) override {}; // handled by FEBio
    void Initiator() override;
    void Correctors(mfem::Vector &del) override;
-   void Update() override;
    void UpdateMaterialPointDataForPostProcessing(); // material point data to tn
 
    // residual
