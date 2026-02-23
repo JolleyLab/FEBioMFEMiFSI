@@ -69,10 +69,10 @@ mat_type(mat_), orderingtype(orderingtype_), formulation_type(form_type_), subtr
    dnp1.SetSize(dfes_truevsize);
    dnp1 = 0.0;   
 
-   temp_del_gf.SetSpace(vfes);
-   temp_del_gf = 0.0;
-   temp_delvdot_ib_gf.SetSpace(dfes);
-   temp_delvdot_ib_gf = 0.0;
+   temp_fluid_gf.SetSpace(vfes);
+   temp_fluid_gf = 0.0;
+   temp_solid_gf.SetSpace(dfes);
+   temp_solid_gf = 0.0;
    delvdot_ib.SetSize(dfes_truevsize);
    delvdot_ib = 0.0;
    dtemp_gf.SetSpace(dfes);
@@ -125,6 +125,7 @@ mat_type(mat_), orderingtype(orderingtype_), formulation_type(form_type_), subtr
 
    true_interp_points_in_solid.SetSize(dfes->GetTrueVSize());
    true_interp_points_in_solid = 0.0;
+   nn_solid = dfes->GetTrueVSize() / dfes->GetVDim();
 
    interp_points_in_solid_tn.SetSize(dfes->GetVSize());
    interp_points_in_solid_tn = 0.0;
@@ -135,6 +136,60 @@ mat_type(mat_), orderingtype(orderingtype_), formulation_type(form_type_), subtr
    dynamic_cast<ParGridFunction *>(nodes)->ParallelProject(true_interp_points_in_solid);
    #else
    nodes->GetTrueDofs(true_interp_points_in_solid);
+   #endif
+}
+
+void ImmersedSolid::InterpolateFluidToSolid(const Vector &fluid_vec, Vector &solid_vec, Vector &solid_pts)
+{
+   temp_fluid_gf.SetFromTrueDofs(fluid_vec);
+   #ifdef MFEM_USE_GSLIB
+   finder_fluid->Interpolate(solid_pts,temp_fluid_gf,temp_solid_gf,orderingtype);
+   #endif
+   #ifdef MFEM_USE_MPI
+   temp_solid_gf.ParallelProject(solid_vec);
+   #else
+   temp_solid_gf.GetTrueDofs(solid_vec);
+   #endif
+}
+
+void ImmersedSolid::InterpolateFluidToSolid(const Vector &fluid_vec, Vector &solid_vec)
+{
+   temp_fluid_gf.SetFromTrueDofs(fluid_vec);
+   #ifdef MFEM_USE_GSLIB
+   finder_fluid->Interpolate(temp_fluid_gf,temp_solid_gf);
+   #endif
+   #ifdef MFEM_USE_MPI
+   temp_solid_gf.ParallelProject(solid_vec);
+   #else
+   temp_solid_gf.GetTrueDofs(solid_vec);
+   #endif
+}
+
+void ImmersedSolid::InterpolateFluidToSolid(const Vector &fluid_vec, GridFunction &solid_gf, Vector &solid_pts)
+{
+   temp_fluid_gf.SetFromTrueDofs(fluid_vec);
+   #ifdef MFEM_USE_GSLIB
+   finder_fluid->Interpolate(solid_pts,temp_fluid_gf,solid_gf,orderingtype);
+   #endif
+}
+
+void ImmersedSolid::InterpolateFluidToSolid(const Vector &fluid_vec, GridFunction &solid_gf)
+{
+   temp_fluid_gf.SetFromTrueDofs(fluid_vec);
+   #ifdef MFEM_USE_GSLIB
+   finder_fluid->Interpolate(temp_fluid_gf,solid_gf);
+   #endif
+}
+
+void ImmersedSolid::ComputeMortarIntegral()
+{
+   #ifdef MFEM_USE_GSLIB
+   sw_fsicmat->Start();
+   // Need to search pts again, since C_lam is built from true dofs
+   finder_fluid->BuildCouplingMatrix(true_interp_points_in_solid,vfes,dfes,dfes->GetOrdering());     
+   sw_fsicmat->Stop();    
+   // re-setup for interp points in solid (dofs including shared ones)
+   finder_fluid->FindPoints(interp_points_in_solid,orderingtype);
    #endif
 }
 
@@ -283,11 +338,11 @@ void ImmersedSolid::ComputeSolidResidualAndSpread2Fluid(Vector &lambda_fsi_vec)
    C->Mult(res,lambda_fsi_vec);
 
    // #ifdef MFEM_USE_GSLIB
-   // finder_fluid->SpreadForces(true_interp_points_in_solid,res,temp_del_gf,orderingtype);
+   // finder_fluid->SpreadForces(true_interp_points_in_solid,res,temp_fluid_gf,orderingtype);
    // #ifdef MFEM_USE_MPI
-   // temp_del_gf.ParallelProject(lambda_fsi_vec);
+   // temp_fluid_gf.ParallelProject(lambda_fsi_vec);
    // #else
-   // temp_del_gf.GetTrueDofs(lambda_fsi_vec);
+   // temp_fluid_gf.GetTrueDofs(lambda_fsi_vec);
    // #endif
    // #endif
 
@@ -349,28 +404,19 @@ Operator &ImmersedSolid::FormLHS()
 
 void ImmersedSolid::Predictors(Vector &vf, Vector &vdotf)
 {
+   // Find interpolation points in solid (fixed at tn)
+   finder_fluid->FindPoints(interp_points_in_solid,orderingtype);
+
+   // store tn position of solid
+   interp_points_in_solid_tn = interp_points_in_solid;
+   if (stabs_scaling) solid_bdr_nodes_tn = solid_bdr_nodes;
+
    // set ddotnp1 and d2dotnp1 from fluid predictors for consistency!
    // ddotnp1 = v_np1
-   temp_del_gf.SetFromTrueDofs(vf);
-   #ifdef MFEM_USE_GSLIB
-   finder_fluid->Interpolate(interp_points_in_solid,temp_del_gf,temp_delvdot_ib_gf,orderingtype);
-   #endif
-   #ifdef MFEM_USE_MPI
-   temp_delvdot_ib_gf.ParallelProject(ddotnp1);
-   #else
-   temp_delvdot_ib_gf.GetTrueDofs(ddotnp1);
-   #endif
+   InterpolateFluidToSolid(vf,ddotnp1);
 
    // d2dotnp1 = vdot_np1
-   temp_del_gf.SetFromTrueDofs(vdotf);
-   #ifdef MFEM_USE_GSLIB
-   finder_fluid->Interpolate(interp_points_in_solid,temp_del_gf,temp_delvdot_ib_gf,orderingtype);
-   #endif
-   #ifdef MFEM_USE_MPI
-   temp_delvdot_ib_gf.ParallelProject(d2dotnp1);
-   #else
-   temp_delvdot_ib_gf.GetTrueDofs(d2dotnp1);   
-   #endif
+   InterpolateFluidToSolid(vdotf,d2dotnp1);
 
    auto anp1_R = d2dotnp1.Read();
    auto an_R = d2dotn.Read();
@@ -385,10 +431,6 @@ void ImmersedSolid::Predictors(Vector &vf, Vector &vdotf)
    { 
       dnp1_RW[i] = dn_R[i] + dt_*vn_R[i] + fac_n*an_R[i] + fac_np1*anp1_R[i]; 
    });
-
-   // store tn position of solid
-   interp_points_in_solid_tn = interp_points_in_solid;
-   if (stabs_scaling) solid_bdr_nodes_tn = solid_bdr_nodes;
 }
 
 void ImmersedSolid::SetEssentialBCs(const double &time)
@@ -420,15 +462,16 @@ void ImmersedSolid::Initiator()
 void ImmersedSolid::Correctors(Vector &del)
 {
    // project delvdot to solid mesh
-   temp_del_gf.SetFromTrueDofs(del);
-   #ifdef MFEM_USE_GSLIB
-   finder_fluid->Interpolate(interp_points_in_solid_tn,temp_del_gf,temp_delvdot_ib_gf,orderingtype);
-   #endif
-   #ifdef MFEM_USE_MPI
-   temp_delvdot_ib_gf.ParallelProject(delvdot_ib);
-   #else
-   temp_delvdot_ib_gf.GetTrueDofs(delvdot_ib);
-   #endif
+   if (stabs_scaling)
+   {
+      // need to search solid nodes at tn again since cleared from stabs scaling transfer
+      // TODO: separate finder?
+      InterpolateFluidToSolid(del,delvdot_ib,interp_points_in_solid_tn);
+   }
+   else
+   {
+      InterpolateFluidToSolid(del,delvdot_ib);
+   }
    
    d2dotnp1.Add(-1.0,delvdot_ib);
    ddotnp1.Add(-gamma*dt,delvdot_ib);

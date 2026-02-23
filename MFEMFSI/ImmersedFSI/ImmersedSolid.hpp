@@ -48,14 +48,13 @@ public:
    virtual void UpdatePointSearch(const mfem::GridFunction &d, const mfem::Vector &true_d);
    virtual void MoveMesh(mfem::GridFunction &total_disp_gf);
    virtual mfem::Operator &FormLHS();
-   virtual void ComputeMortarIntegral()
-   {
-      #ifdef MFEM_USE_GSLIB
-      sw_fsicmat->Start();
-      finder_fluid->AssembleCouplingMatrix(true_interp_points_in_solid,vfes,dfes,dfes->GetOrdering());     
-      sw_fsicmat->Stop();    
-      #endif
-   };
+
+   // Transfers
+   virtual void ComputeMortarIntegral(); // C_lambda = fluid dofs x solid dofs
+   void InterpolateFluidToSolid(const mfem::Vector &fluid_vec, mfem::Vector &solid_vec, mfem::Vector &solid_pts);
+   void InterpolateFluidToSolid(const mfem::Vector &fluid_vec, mfem::Vector &solid_vec); // assumes points were searched already
+   void InterpolateFluidToSolid(const mfem::Vector &fluid_vec, mfem::GridFunction &solid_gf, mfem::Vector &solid_pts);
+   void InterpolateFluidToSolid(const mfem::Vector &fluid_vec, mfem::GridFunction &solid_gf); // assumes points were searched already
 
    // Get currrent gridfunctions //
    #ifdef MFEM_USE_MPI
@@ -170,6 +169,7 @@ protected:
    mfem::Mesh *pmesh = nullptr; /// not owned
    mfem::GridFunction orig_nodes, new_nodes; // mesh nodes
    #endif
+   int nn_solid;
 
    // solid properties
    mfem::Coefficient *init_rhos = nullptr;
@@ -248,9 +248,9 @@ protected:
    // Solution vectors and Matrices   
    mfem::Vector res, ddotg, d2dotg, dg, ddotnp1, d2dotnp1, d2dotn, ddotn, dnp1, dn, delvdot_ib;
    #ifdef MFEM_USE_MPI
-   mfem::ParGridFunction dn_gf, ddotn_gf, d2dotn_gf, curr_d2dot, curr_ddot, temp_delvdot_ib_gf, dtemp_gf, temp_del_gf;
+   mfem::ParGridFunction dn_gf, ddotn_gf, d2dotn_gf, curr_d2dot, curr_ddot, temp_solid_gf, dtemp_gf, temp_fluid_gf;
    #else
-   mfem::GridFunction dn_gf, ddotn_gf, d2dotn_gf, curr_d2dot, curr_ddot, temp_delvdot_ib_gf, dtemp_gf, temp_del_gf;
+   mfem::GridFunction dn_gf, ddotn_gf, d2dotn_gf, curr_d2dot, curr_ddot, temp_solid_gf, dtemp_gf, temp_fluid_gf;
    #endif
 
    #ifdef MFEM_USE_MPI

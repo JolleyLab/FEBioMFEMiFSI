@@ -292,11 +292,17 @@ void ImmersedFSIFindPts::Transfer(GridFunction &field_out)
    } // parallel
 }
 
-void ImmersedFSIFindPts::AssembleCouplingMatrix(const Vector &solid_nodes, FiniteElementSpace *fes_in, FiniteElementSpace *fes_out, int orderingtype_)
+void ImmersedFSIFindPts::BuildCouplingMatrix(const Vector &solid_nodes, FiniteElementSpace *fes_in, FiniteElementSpace *fes_out, int orderingtype_)
 {
    // find solid nodes on fluid grid
    FindPoints(solid_nodes, orderingtype_);
+   
+   int nn_solid = solid_nodes.Size() / fes_out->GetVDim();
+   AssembleCouplingMatrix(nn_solid, fes_in, fes_out, orderingtype_);
+}
 
+void ImmersedFSIFindPts::AssembleCouplingMatrix(int nn_solid, FiniteElementSpace *fes_in, FiniteElementSpace *fes_out, int orderingtype_)
+{
    #ifdef MFEM_USE_MPI
    // C = fluid dofs x solid dofs
    // fes_in = fluid fes, fes_out = solid fes
@@ -319,7 +325,7 @@ void ImmersedFSIFindPts::AssembleCouplingMatrix(const Vector &solid_nodes, Finit
    
    HYPRE_IJMatrixInitialize(ij_matrix);
 
-   AssembleC(fes_in,fes_out,solid_nodes,orderingtype_);
+   AssembleC(fes_in,fes_out,nn_solid,orderingtype_);
 
    HYPRE_Int ret = HYPRE_IJMatrixAssemble(ij_matrix);
    ret = HYPRE_IJMatrixGetObject(ij_matrix, (void**)&pcsr_matrix);
@@ -402,7 +408,7 @@ void ImmersedFSIFindPts::AssembleC(FiniteElementSpace *fes_in, FiniteElementSpac
    }
 }
 #else
-void ImmersedFSIFindPts::AssembleC(FiniteElementSpace *fes_in, FiniteElementSpace *fes_out, const Vector &solid_nodes, int ordering_type)
+void ImmersedFSIFindPts::AssembleC(FiniteElementSpace *fes_in, FiniteElementSpace *fes_out, int nn_solid, int ordering_type)
 {
    int ncomp   = fes_in->GetVDim(),
        nptorig = points_cnt,
@@ -420,7 +426,6 @@ void ImmersedFSIFindPts::AssembleC(FiniteElementSpace *fes_in, FiniteElementSpac
       DenseMatrix elmat;
       Array<int> vdofs, vdofs_solid;
       auto par_fes_out = dynamic_cast<ParFiniteElementSpace*>(fes_out);
-      int nn_solid = solid_nodes.Size() / ncomp;
       for (int index = 0; index < npt; index++)
       {
          if (gsl_code[index] == 2) { continue; }
@@ -510,7 +515,6 @@ void ImmersedFSIFindPts::AssembleC(FiniteElementSpace *fes_in, FiniteElementSpac
       array_init(struct out_pt, outpt, nptsend);
       outpt->n=nptsend;
       pt = (struct out_pt *)outpt->ptr;
-      int nn_solid = solid_nodes.Size() / ncomp;
       auto par_fes_out = dynamic_cast<ParFiniteElementSpace*>(fes_out);
       int count_diff_proc = 0;
       for (int index = 0; index < npt; index++)

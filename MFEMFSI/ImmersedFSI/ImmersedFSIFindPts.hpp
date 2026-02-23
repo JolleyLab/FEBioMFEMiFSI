@@ -44,9 +44,11 @@ public:
    void TransferIndicator(const mfem::Vector &point_pos, mfem::GridFunction &field_out, int point_pos_ordering = mfem::Ordering::byNODES);
    void Transfer(mfem::GridFunction &field_out);
 
-   void AssembleCouplingMatrix(const mfem::Vector &solid_nodes, mfem::FiniteElementSpace *fes_in, mfem::FiniteElementSpace *fes_out, int orderingtype_);
+   // Needs true dofs of interp points in solid
+   void BuildCouplingMatrix(const mfem::Vector &solid_nodes, mfem::FiniteElementSpace *fes_in, mfem::FiniteElementSpace *fes_out, int orderingtype_);
+   void AssembleCouplingMatrix(int nn_solid, mfem::FiniteElementSpace *fes_in, mfem::FiniteElementSpace *fes_out, int orderingtype_);
    #ifdef MFEM_USE_MPI
-   void AssembleC(mfem::FiniteElementSpace *fes_in, mfem::FiniteElementSpace *fes_out, const mfem::Vector &solid_nodes, int orderingtype);
+   void AssembleC(mfem::FiniteElementSpace *fes_in, mfem::FiniteElementSpace *fes_out, int nn_solid, int orderingtype);
    #else
    void AssembleC(mfem::FiniteElementSpace *fes_in, mfem::FiniteElementSpace *fes_out);
    #endif
