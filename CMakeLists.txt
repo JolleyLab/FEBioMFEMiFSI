@@ -30,6 +30,10 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+# Options
+option(BUILD_MFEMTOOLS "Build MFEMTools helper/library targets" OFF)
+option(BUILD_UNITTESTS "Build MFEM unit tests" OFF)
+
 # Name of your plugin
 project(FEBioMFEMiFSI)
 
@@ -155,10 +159,6 @@ endif()
 
 # Output the build type
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-
-# Option to build the MFEMTools subdirectory (off by default)
-option(BUILD_MFEMTOOLS "Build MFEMTools helper/library targets" OFF)
-option(BUILD_UNITTESTS "Build MFEM unit tests" OFF)
 
 # Optionally build tools subdirectory
 if(BUILD_MFEMTOOLS)
