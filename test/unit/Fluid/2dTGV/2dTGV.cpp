@@ -397,7 +397,7 @@ int main(int argc, char *argv[])
       }
 
       t+= dt;
-      flowsolver->Step(t,dt,step);
+      flowsolver->Step(t,dt,step,false);
 
       // save data
       pvdc.SetCycle(step);

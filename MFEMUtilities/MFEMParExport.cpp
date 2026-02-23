@@ -6,6 +6,7 @@
 #include <FECore/FEPlotDataStore.h>
 #include <FECore/fecore_enum.h>
 #include <FECore/FEAnalysis.h>
+#include <FECore/FETimeStepController.h>
 #include <FECore/FEMaterial.h>
 #include <FECore/FEInitialCondition.h>
 #include <FECore/log.h>
@@ -165,10 +166,17 @@ void MFEMParExport::WriteControlSection()
    MFEM_ASSERT(num_steps == 1, "Error: TODO for more than one step");
    FEAnalysis *analysis = fem->GetCurrentStep();
    FESolver *solver = analysis->GetFESolver();
+   FETimeStepController* timeController = analysis->m_timeController;
    xml_writer.add_branch("Control");
    {
       // Control parameters
       WriteParameterList(*analysis);
+
+      // Time stepper
+      XMLElement eli_ts;
+      eli_ts.name("time_stepper");
+      timeController->SetName("time_stepper");
+      WriteSectionComponent("Control", eli_ts, *timeController);
 
       // Solver
       XMLElement eli;

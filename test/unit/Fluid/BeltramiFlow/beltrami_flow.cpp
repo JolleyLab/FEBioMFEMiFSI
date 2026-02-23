@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
       }
 
       t += dt;
-      flowsolver->Step(t,dt,step);
+      flowsolver->Step(t,dt,step,false);
 
       if ((step) % 5 == 0 || last_step)
       {

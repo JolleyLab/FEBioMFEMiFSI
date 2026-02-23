@@ -14,10 +14,10 @@ using namespace std;
 using namespace immersed_solid;
 
 #ifdef MFEM_USE_MPI
-IncompressibleFluidSolver::IncompressibleFluidSolver(ParMesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_, bool immersed_flag)
+IncompressibleFluidSolver::IncompressibleFluidSolver(ParMesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_)
    : pmesh(mesh), orderv(orderv), orderp(orderp), kin_vis(kin_vis), orderingtype(ordering_type_)
 #else
-IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_, bool immersed_flag)
+IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_)
    : pmesh(mesh), orderv(orderv), orderp(orderp), kin_vis(kin_vis), orderingtype(ordering_type_)
 #endif
 {
@@ -725,54 +725,17 @@ void IncompressibleFluidSolver::Setup(double dt)
 void IncompressibleFluidSolver::Step(double &time, double dt, int current_step,
                         bool provisional)
 {
-   if (verbose && my_rank == 0)
+   if (!provisional)
    {
-      if (current_step == 1)
+      if (!Step(time, dt, current_step))
       {
-         mfem::out << "---------------------------------------" << std::endl;
-         mfem::out << "             TIME STEPPING             " << std::endl;
-         mfem::out << "---------------------------------------" << std::endl;
+         if (verbose && my_rank == 0)
+         {
+            MFEM_ABORT("Error: Newton solver did not converge at step " + std::to_string(current_step) + " and time " + std::to_string(time));
+         }
+         return;
       }
-
-      if (restarting && current_step == restart_step + 1)
-      {
-         mfem::out << "--------------------------------------------------------------" << std::endl;
-         mfem::out << "RESTARTING SIMULATION FROM:" << std::endl;
-         mfem::out << "    TIME = " << time - dt << std::endl;
-         mfem::out << "    STEP = " << restart_step << std::endl;
-      }
-
-      if (current_step != 1)
-      {
-         mfem::out << "--------------------------------------------------------------" << std::endl;
-      }
-      mfem::out << std::setw(6) << "Step " << std::setw(6) << current_step << std::setw(8) << " Time " << std::setw(8) << " dt " << "\n";
-      
-      mfem::out << std::setw(15) << "           " << std::setw(3) << std::setprecision(2)
-                << std::scientific << time << "  " << std::setw(4) << dt << "\n";
    }
-
-   sw_step.Start();
-
-   // Update parameters //
-   UpdateParameters(time,dt,current_step); 
-
-   // Predictor Step //
-   Predictors(dt);
-
-   // Set Essential BCs //
-   SetEssentialBCs(time); // time = t_n+1
-
-   // Newton Iterations //
-   sw_solve.Start();
-   newton_solver->NewtonSolve(dt,time);
-   sw_solve.Stop();
-   iter_solve = newton_solver->GetNumIterations();
-   res_solve = newton_solver->GetFinalNorm();
-   rel_res_solve = newton_solver->GetFinalRelNorm();
-
-   // Get residuals
-   static_cast<FluidNewtonSolver *>(newton_solver)->GetResiduals(norm,rel_norm,norm_mom,rel_norm_mom,norm_mass,rel_norm_mass);
 
    // Update variables //
    UpdateVariables(time,dt);

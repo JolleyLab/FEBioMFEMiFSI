@@ -63,8 +63,7 @@ public:
 		int orderp,
 		double kin_vis,
 		double fluid_density_,
-		int ordering_type_ = mfem::Ordering::byNODES,
-		bool immersed_flag = false) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, fluid_density_, ordering_type_, immersed_flag) 
+		int ordering_type_ = mfem::Ordering::byNODES) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, fluid_density_, ordering_type_) 
 	{
 		m_fem = fem;
 	}
@@ -1079,15 +1078,15 @@ bool MFEMSolver::SetupFluid()
       feLogError("PARDISO solver is not supported in parallel");
       return false;
       #else
-      m.flowsolver = new FEBio_INS_Solver(fem, m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
+      m.flowsolver = new FEBio_INS_Solver(fem, m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype);
       #endif
    }
    else
    {
       #ifdef MFEM_USE_MPI
-      m.flowsolver = new IncompressibleFluidSolver(m.fluid_pmesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
+      m.flowsolver = new IncompressibleFluidSolver(m.fluid_pmesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype);
       #else
-      m.flowsolver = new IncompressibleFluidSolver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype, m.immersed_solid);
+      m.flowsolver = new IncompressibleFluidSolver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype);
       #endif
    }
    
@@ -2430,8 +2429,10 @@ void MFEMSolver::AdjustTimeStep()
    // adjust time step 
    dt_new = m.time_step_controller.ComputeTimeStep(dt_febio);
 
-   // here I would like to update dtn in the FEBio time controller class
-   // otherwise the stepper will potentially remember a wrong previous time step size
+   // update previous time step in FEBio
+   // not including must-points which could
+   // create small time steps to pass thru a must point
+   // fe_time_step_controller->m_dtp = dt_new;
 
    // check must points
    auto fe_time_step_controller = analysis->m_timeController;
