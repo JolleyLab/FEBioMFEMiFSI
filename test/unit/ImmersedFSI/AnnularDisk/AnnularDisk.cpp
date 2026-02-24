@@ -10,7 +10,6 @@ using namespace std;
 
 struct s_NavierContext
 {
-   // cgs
    double fluid_density = 1.0; // kg/m^3
    double dyn_viscosity = 1.0; // Pa*s
    double kinvis = dyn_viscosity / fluid_density;
@@ -81,7 +80,7 @@ struct s_ImmersedFSIContext
 
    double t_final = 10*dt; // 10 time steps
 
-   bool visualization = true;
+   bool visualization = false;
    int orderingtype = Ordering::byVDIM;
    // int orderingtype = Ordering::byNODES;
 
@@ -257,10 +256,6 @@ int main(int argc, char *argv[])
    flowsolver->SetViscousTermType(ctx.viscous_term_type);
 
    // Set the initial condition. (0 everywhere)
-   
-   // init pressure func for windkessel
-   GridFunction p_init(*flowsolver->GetCurrentPressure()); // copy constructor
-   GridFunctionCoefficient p_init_func(&p_init);
 
    // all homogenous dirichlet conditions for fluid velocity
    Array<int> bdr_attr(flowsolver->GetMesh()->bdr_attributes.Max());

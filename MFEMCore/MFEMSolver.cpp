@@ -2227,7 +2227,7 @@ bool MFEMSolver::SolveStep()
    m.flowsolver->sw_step.Stop();
 
    // Determine whether to save output and/or write restarts
-   bool dtforce = abs(analysis->m_dt0 - dt) < 1e-10 ? true : false;
+   bool dtforce = analysis->m_timeController->m_dtforce;
    bool do_save_output = false;
    bool do_write_restart = false;
    if (!dtforce && m.save_mode_option == Imp::save_mode::TimeBased)
@@ -2432,10 +2432,10 @@ void MFEMSolver::AdjustTimeStep()
    // update previous time step in FEBio
    // not including must-points which could
    // create small time steps to pass thru a must point
-   // fe_time_step_controller->m_dtp = dt_new;
+   auto fe_time_step_controller = analysis->m_timeController;
+   fe_time_step_controller->m_dtp = dt_new;
 
    // check must points
-   auto fe_time_step_controller = analysis->m_timeController;
    if (fe_time_step_controller->m_must_points.empty() == false) dt_adjusted = fe_time_step_controller->CheckMustPoints(time,dt_new);
    else dt_adjusted = dt_new;
 
