@@ -27,12 +27,43 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
       STRING "Choose the type of build." FORCE)
   # Set the possible values of build type for cmake-gui
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
-    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo" "DebugASan")
+endif()
+
+# Add DebugASan build type
+if(CMAKE_BUILD_TYPE STREQUAL "DebugASan")
+  if(NOT APPLE AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(WARNING "DebugASan build type is only fully tested with Clang on macOS/Linux")
+  endif()
+  
+  set(CMAKE_C_FLAGS_DEBUGASAN
+    "${CMAKE_C_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls"
+    CACHE STRING "Flags for DebugASan C" FORCE)
+  set(CMAKE_CXX_FLAGS_DEBUGASAN
+    "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls"
+    CACHE STRING "Flags for DebugASan C++" FORCE)
+  set(CMAKE_EXE_LINKER_FLAGS_DEBUGASAN
+    "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -fsanitize=address"
+    CACHE STRING "Linker flags for DebugASan executables" FORCE)
+  set(CMAKE_SHARED_LINKER_FLAGS_DEBUGASAN
+    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=address"
+    CACHE STRING "Linker flags for DebugASan shared libs" FORCE)
+  
+  mark_as_advanced(
+    CMAKE_C_FLAGS_DEBUGASAN
+    CMAKE_CXX_FLAGS_DEBUGASAN
+    CMAKE_EXE_LINKER_FLAGS_DEBUGASAN
+    CMAKE_SHARED_LINKER_FLAGS_DEBUGASAN
+  )
 endif()
 
 # Options
 option(BUILD_MFEMTOOLS "Build MFEMTools helper/library targets" OFF)
 option(BUILD_UNITTESTS "Build MFEM unit tests" OFF)
+
+# Directories for TPLs
+set(FEBio_DIR "" CACHE PATH "Path to FEBio installation.")
+set(MFEM_DIR "" CACHE PATH "Path to MFEM installation.")
 
 # Name of your plugin
 project(FEBioMFEMiFSI)
@@ -45,7 +76,6 @@ set(MAIN_SHARED_TARGET FEBioMFEMiFSI CACHE STRING "Main shared library target to
 
 ##### Find FEBio #####
 message(STATUS "Looking for FEBio ...")
-set(FEBio_DIR "" CACHE PATH "Path to FEBio installation.")
 
 # Auto-detect FEBio_SOURCE_DIR based on FEBio_DIR if not explicitly set
 if(NOT FEBio_SOURCE_DIR AND FEBio_DIR)
@@ -123,11 +153,14 @@ file(GLOB_RECURSE SRC_FEBioMFEMiFSI CONFIGURE_DEPENDS
 # Exclude TPLs
 list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/Software/.*")
 list(FILTER HDR_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/Software/.*")
-
 # Exclude sources from the MFEMTools subdirectory; built separately
 list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/MFEMTools/.*")
 # Exclude test folder from main library build
 list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/test/.*")
+# Exclude CMake-generated/build trees
+list(FILTER FEBIO_MFEM_IFSI_SOURCES EXCLUDE REGEX ".*/CMakeFiles/.*")
+list(FILTER FEBIO_MFEM_IFSI_SOURCES EXCLUDE REGEX ".*/build[^/]*/.*")
+list(FILTER FEBIO_MFEM_IFSI_SOURCES EXCLUDE REGEX ".*/Testing/.*")
 
 # Organize files by folder in IDEs
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES

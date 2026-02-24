@@ -190,7 +190,7 @@ void IncompressibleFluidSolver::Orthogonalize(Vector &v)
 
    #ifdef MFEM_USE_MPI
    MPI_Allreduce(MPI_IN_PLACE, &global_sum, 1, MPITypeMap<real_t>::mpi_type, MPI_SUM, vfes->GetComm());
-   MPI_Allreduce(MPI_IN_PLACE, &global_size, 1, MPITypeMap<real_t>::mpi_type, MPI_SUM, vfes->GetComm());
+   MPI_Allreduce(MPI_IN_PLACE, &global_size, 1, MPITypeMap<int>::mpi_type, MPI_SUM, vfes->GetComm());
    #endif
 
    v -= global_sum / static_cast<double>(global_size);
@@ -1044,7 +1044,7 @@ void IncompressibleFluidSolver::PrintInfo()
    int fes_size0 = vfes->GlobalTrueVSize();
    int fes_size1 = pfes->GlobalTrueVSize();
    int numelements = pmesh->GetNE();
-   MPI_Allreduce(MPI_IN_PLACE, &numelements, 1, MPI_INT, MPI_SUM, vfes->GetComm());
+   MPI_Allreduce(MPI_IN_PLACE, &numelements, 1, MPITypeMap<int>::mpi_type, MPI_SUM, vfes->GetComm());
    #else
    int fes_size0 = vfes->GetTrueVSize();
    int fes_size1 = pfes->GetTrueVSize();
@@ -1139,7 +1139,7 @@ void IncompressibleFluidSolver::PrintTimingData()
    std::vector<double> sum(times.size());
    MPI_Allreduce(times.data(), sum.data(),
                  static_cast<int>(times.size()),
-                 MPI_DOUBLE, MPI_SUM, vfes->GetComm());
+                 MPITypeMap<real_t>::mpi_type, MPI_SUM, vfes->GetComm());
    int num_procs = Mpi::WorldSize();
    for (size_t i = 0; i < times.size(); ++i) times[i] = sum[i] / static_cast<double>(num_procs);
 #endif
