@@ -63,7 +63,8 @@ public:
 		int orderp,
 		double kin_vis,
 		double fluid_density_,
-		int ordering_type_ = mfem::Ordering::byNODES) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, fluid_density_, ordering_type_) 
+      mfem::Device& device_,
+      int ordering_type_ = mfem::Ordering::byNODES) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, fluid_density_, device_, ordering_type_)
 	{
 		m_fem = fem;
 	}
@@ -219,6 +220,20 @@ public:
    int np = 1; // number of ranks for pre-partitioning
    enum ParallelMesh { PartitionMesh = 0, ReadParallelMesh = 1 };
 
+   // Device configuration
+   enum DeviceType { CPU = 0 };
+   int device_type = DeviceType::CPU;
+   mfem::Device device;
+
+   const char* GetDeviceConfigString() const
+   {
+      switch (device_type)
+      {
+      case DeviceType::CPU:
+      default: return "cpu";
+      }
+   }
+
 public:
    // Material properties
    double fluid_density;
@@ -324,6 +339,7 @@ BEGIN_FECORE_CLASS(MFEMSolver, FESolver)
       ADD_PARAMETER(m.stabilized_VMS, "VMS");
       // drop down menu for stabilization type, for now either VMS or unstabilized
       // ADD_PARAMETER(m.stabilized_LSIC, "LSIC");
+      // ADD_PARAMETER(m.device_type, "device_config")->setEnums("CPU\0");
       ADD_PARAMETER(m.viscous_term_type, "viscous_term_type")->setEnums("LaplaceForm\0StressForm\0");
       ADD_PARAMETER(m.zero_mean_pressure, "Zero_mean_pressure");
       // pre-partitioning of the mesh
@@ -686,6 +702,21 @@ bool MFEMSolver::Init()
    m.customBuffer.fe_model = fem;
    std::ostream customStream(&m.customBuffer);
    mfem::out.rdbuf(customStream.rdbuf());
+
+   // Device configuration
+   #ifdef MFEM_USE_MPI
+   int myid = mfem::Mpi::WorldRank();
+   #else
+   int myid = 0;
+   #endif
+   m.device.Configure(m.GetDeviceConfigString());
+   if (myid == 0)
+   {
+      mfem::out << "-----------------------------------------------------\n";
+      mfem::out << "Using device: " << m.GetDeviceConfigString() << "\n";
+      m.device.Print();
+      mfem::out << "-----------------------------------------------------\n";
+   }
 
    // Initialize the MFEM solver
    if (!CreateMesh()) return false;
@@ -1078,15 +1109,15 @@ bool MFEMSolver::SetupFluid()
       feLogError("PARDISO solver is not supported in parallel");
       return false;
       #else
-      m.flowsolver = new FEBio_INS_Solver(fem, m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype);
+      m.flowsolver = new FEBio_INS_Solver(fem, m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.device, m.orderingtype);
       #endif
    }
    else
    {
       #ifdef MFEM_USE_MPI
-      m.flowsolver = new IncompressibleFluidSolver(m.fluid_pmesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype);
+      m.flowsolver = new IncompressibleFluidSolver(m.fluid_pmesh, (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.device, m.orderingtype);
       #else
-      m.flowsolver = new IncompressibleFluidSolver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.orderingtype);
+      m.flowsolver = new IncompressibleFluidSolver(m.immersed_solid ? static_cast<Mesh*>(m.fluid_mesh) : static_cast<Mesh*>(m.mesh), (int) m.orderv, (int) m.orderp, m.kinvis, m.fluid_density, m.device, m.orderingtype);
       #endif
    }
    

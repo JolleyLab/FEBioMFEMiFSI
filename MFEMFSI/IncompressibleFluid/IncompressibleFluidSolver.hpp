@@ -42,9 +42,9 @@ public:
 
    /// Initialize data structures, set FE space order and kinematic viscosity.
    #ifdef MFEM_USE_MPI
-   IncompressibleFluidSolver(mfem::ParMesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_ = mfem::Ordering::byNODES);
+   IncompressibleFluidSolver(mfem::ParMesh *mesh, int orderv, int orderp, double kin_vis, mfem::Device &device_, int ordering_type_ = mfem::Ordering::byNODES);
    // constructor for dimensional form of equations
-   IncompressibleFluidSolver(mfem::ParMesh *mesh, int orderv, int orderp, double kin_vis, double fluid_density_, int ordering_type_ = mfem::Ordering::byNODES) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, ordering_type_)
+   IncompressibleFluidSolver(mfem::ParMesh *mesh, int orderv, int orderp, double kin_vis, double fluid_density_, mfem::Device &device_, int ordering_type_ = mfem::Ordering::byNODES) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, device_, ordering_type_)
    {
       fluid_density = fluid_density_;
       rhof.constant = fluid_density;
@@ -53,9 +53,9 @@ public:
       dimensional_flag = ifs_solver::dim_flag::Dimensional;
    };
    #else
-   IncompressibleFluidSolver(mfem::Mesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_ = mfem::Ordering::byNODES);
+   IncompressibleFluidSolver(mfem::Mesh *mesh, int orderv, int orderp, double kin_vis, mfem::Device &device_, int ordering_type_ = mfem::Ordering::byNODES);
    // constructor for dimensional form of equations
-   IncompressibleFluidSolver(mfem::Mesh *mesh, int orderv, int orderp, double kin_vis, double fluid_density_, int ordering_type_ = mfem::Ordering::byNODES) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, ordering_type_)
+   IncompressibleFluidSolver(mfem::Mesh *mesh, int orderv, int orderp, double kin_vis, double fluid_density_, mfem::Device &device_, int ordering_type_ = mfem::Ordering::byNODES) : IncompressibleFluidSolver(mesh, orderv, orderp, kin_vis, device_, ordering_type_)
    {
       fluid_density = fluid_density_;
       rhof.constant = fluid_density;
@@ -882,7 +882,7 @@ protected:
    // block solution vectors
    mfem::BlockVector yn, ydotn, ynp1, ydotnp1, yg, ydotg;
    mfem::Array<int> block_trueOffsets;
-   mfem::Device device;
+   mfem::Device *device = nullptr; // not owned
    mfem::MemoryType mt;
 
    // Post-Process

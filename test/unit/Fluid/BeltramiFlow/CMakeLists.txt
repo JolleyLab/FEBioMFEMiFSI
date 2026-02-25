@@ -1,1 +1,1 @@
-ADD_iFSI_EXE(TEST_BeltramiFlow beltrami_flow.cpp)
+ADD_iFSI_EXE(TEST_BeltramiFlow BeltramiFlow.cpp)

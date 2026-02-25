@@ -6,7 +6,7 @@ using namespace mfem;
 using namespace ifs_solver;
 using namespace std;
 
-struct s_NavierContext
+struct IFS_Settings
 {
    double kinvis = 0.025;
    double reynolds = 1.0 / kinvis;
@@ -24,6 +24,7 @@ struct s_NavierContext
    int nonlinear_form = ifs_solver::NonlinearFormType::Convective;
    int viscous_term_type = ifs_solver::ViscousTermType::StressForm; // {LaplaceForm = 0, StressForm = 1}
    int orderingtype = Ordering::byVDIM;
+   std::string device_config = "cpu";
 
    // solver tolerances
    double atol = 1e-10;
@@ -224,6 +225,15 @@ int main(int argc, char *argv[])
    Mpi::Init(argc, argv);
    Hypre::Init();
 
+   // Device configuration
+   Device device(ctx.device_config.c_str());
+   if (Mpi::Root()) 
+   {
+      mfem::out << "Using device: " << ctx.device_config << std::endl;
+      device.Print();
+      mfem::out << std::endl;
+   }
+
    Mesh *mesh = new Mesh("tgv.msh");
    for (int i = 0; i < ctx.ser_ref_levels; ++i)
    {
@@ -243,11 +253,11 @@ int main(int argc, char *argv[])
    IncompressibleFluidSolver *flowsolver = nullptr;    
    if (ctx.equal_order)
    {
-      flowsolver = new IncompressibleFluidSolver(pmesh, ctx.order, ctx.order, ctx.kinvis, ctx.orderingtype);
+      flowsolver = new IncompressibleFluidSolver(pmesh, ctx.order, ctx.order, ctx.kinvis, device, ctx.orderingtype);
    }
    else
    {
-      flowsolver = new IncompressibleFluidSolver(pmesh, ctx.order, ctx.order-1, ctx.kinvis, ctx.orderingtype);
+      flowsolver = new IncompressibleFluidSolver(pmesh, ctx.order, ctx.order-1, ctx.kinvis, device, ctx.orderingtype);
    }
 
    // Time stepping method

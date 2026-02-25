@@ -8,7 +8,7 @@ using namespace mfem;
 using namespace ifs_solver;
 using namespace std;
 
-struct s_NavierContext
+struct IFS_Settings
 {
    double fluid_density = 1.0; // kg/m^3
    double dyn_viscosity = 1.0; // Pa*s
@@ -27,6 +27,7 @@ struct s_NavierContext
    int nonlinear_form = ifs_solver::NonlinearFormType::Convective;
    int viscous_term_type = ifs_solver::ViscousTermType::StressForm; // {LaplaceForm = 0, StressForm = 1}
    int orderingtype = Ordering::byVDIM;
+   std::string device_config = "cpu";
 
    // solver tolerances
    double atol = 1e-10;
@@ -53,7 +54,7 @@ struct s_NavierContext
    int n = 64; // fixed for given solid mesh
 } ctx;
 
-struct s_ImmersedSolidContext
+struct ImmersedSolidSettings
 {
    int order = ctx.order;
 
@@ -70,7 +71,7 @@ struct s_ImmersedSolidContext
    int vol_type = NearlyIncompressibleMaterial::volumetric_energy::ST91;
 } stx;
 
-struct s_ImmersedFSIContext
+struct iFSI_Settings
 {
    double dt = 1e-3;
    int step_save = 1;
@@ -159,6 +160,15 @@ int main(int argc, char *argv[])
    Mpi::Init(argc, argv);
    Hypre::Init();
 
+   // Device configuration
+   Device device(ctx.device_config.c_str());
+   if (Mpi::Root()) 
+   {
+      mfem::out << "Using device: " << ctx.device_config << std::endl;
+      device.Print();
+      mfem::out << std::endl;
+   }
+
    //////////// Initialize and parameters ////////////////
 
    // Read the mesh from the given mesh file.
@@ -210,7 +220,7 @@ int main(int argc, char *argv[])
    delete solid_mesh; // delete serial mesh
 
    // Create the flow solver  
-   IncompressibleFluidSolver *flowsolver = new IncompressibleFluidSolver(fluid_pmesh, ctx.order, ctx.equal_order ? ctx.order : ctx.order - 1, ctx.kinvis, ctx.fluid_density, ctx.orderingtype);
+   IncompressibleFluidSolver *flowsolver = new IncompressibleFluidSolver(fluid_pmesh, ctx.order, ctx.equal_order ? ctx.order : ctx.order - 1, ctx.kinvis, ctx.fluid_density, device, ctx.orderingtype);
 
    // Time stepping method
    flowsolver->SetTimeSteppingMethod(ctx.ts_method);

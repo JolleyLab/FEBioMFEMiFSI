@@ -6,7 +6,7 @@ using namespace mfem;
 using namespace ifs_solver;
 using namespace std;
 
-struct s_NavierContext
+struct IFS_Settings
 {
    // blood properties
    double fluid_density = 1.06; // g/cm^2
@@ -41,6 +41,7 @@ struct s_NavierContext
    int nonlinear_form = ifs_solver::NonlinearFormType::Convective;
    int viscous_term_type = ifs_solver::ViscousTermType::StressForm; // {LaplaceForm = 0, StressForm = 1}
    int orderingtype = Ordering::byVDIM;
+   std::string device_config = "cpu";
 
    // solver tolerances
    double atol = 1e-6;
@@ -151,16 +152,25 @@ int main(int argc, char *argv[])
    Mpi::Init(argc, argv);
    Hypre::Init();
 
+   // Device configuration
+   Device device(ctx.device_config.c_str());
+   if (Mpi::Root()) 
+   {
+      mfem::out << "Using device: " << ctx.device_config << std::endl;
+      device.Print();
+      mfem::out << std::endl;
+   }
+
    std::string mesh_file;
    switch (ctx.mesh_resolution)
    {
-      case s_NavierContext::MeshResolution::Coarse:
+      case IFS_Settings::MeshResolution::Coarse:
          mesh_file = "pipe_coarse.msh";
          break;
-      case s_NavierContext::MeshResolution::Medium:
+      case IFS_Settings::MeshResolution::Medium:
          mesh_file = "pipe_medium.msh";
          break;
-      case s_NavierContext::MeshResolution::Fine:
+      case IFS_Settings::MeshResolution::Fine:
          mesh_file = "pipe_fine.msh";
          break;
       default:
@@ -188,7 +198,7 @@ int main(int argc, char *argv[])
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
 
    // Create the flow solver  
-   IncompressibleFluidSolver *flowsolver = new IncompressibleFluidSolver(pmesh, ctx.order, ctx.equal_order ? ctx.order : ctx.order - 1, ctx.kinvis, ctx.fluid_density, ctx.orderingtype);
+   IncompressibleFluidSolver *flowsolver = new IncompressibleFluidSolver(pmesh, ctx.order, ctx.equal_order ? ctx.order : ctx.order - 1, ctx.kinvis, ctx.fluid_density, device, ctx.orderingtype);
 
    // Time stepping method
    flowsolver->SetTimeSteppingMethod(ctx.ts_method);

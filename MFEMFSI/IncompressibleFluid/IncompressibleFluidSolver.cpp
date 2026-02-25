@@ -14,24 +14,16 @@ using namespace std;
 using namespace immersed_solid;
 
 #ifdef MFEM_USE_MPI
-IncompressibleFluidSolver::IncompressibleFluidSolver(ParMesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_)
+IncompressibleFluidSolver::IncompressibleFluidSolver(ParMesh *mesh, int orderv, int orderp, double kin_vis, Device &device_, int ordering_type_)
    : pmesh(mesh), orderv(orderv), orderp(orderp), kin_vis(kin_vis), orderingtype(ordering_type_)
 #else
-IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int orderp, double kin_vis, int ordering_type_)
+IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int orderp, double kin_vis, Device &device_, int ordering_type_)
    : pmesh(mesh), orderv(orderv), orderp(orderp), kin_vis(kin_vis), orderingtype(ordering_type_)
 #endif
 {
-   // select backend device   
-   // TODO: this should probably be passed into the constructor and set outside the class
-   // also any vectors should be allocated with SetSize(size, memtype)!
-   const char *device_config = "cpu"; // change as needed!
-   // #ifdef MFEM_USE_OPENMP
-   // const char *device_config = "omp";
-   // #else
-   // const char *device_config = "cpu";
-   // #endif
-   device.Configure(device_config);
-   mt = device.GetMemoryType();
+   // use externally configured backend device
+   device = &device_;
+   mt = device_.GetMemoryType();
 
    // check type of elements in mesh
    Array<Geometry::Type> geom_types;
@@ -128,17 +120,17 @@ IncompressibleFluidSolver::IncompressibleFluidSolver(Mesh *mesh, int orderv, int
    block_trueOffsets.PartialSum();
 
    // block vectors containing yn = [un pn] and ydotn = [udotn pdotn]
-   yn.Update(block_trueOffsets,mt);
+   yn.Update(block_trueOffsets);
    yn = 0.0;
-   ynp1.Update(block_trueOffsets,mt);
+   ynp1.Update(block_trueOffsets);
    ynp1 = 0.0;
-   ydotn.Update(block_trueOffsets,mt);
+   ydotn.Update(block_trueOffsets);
    ydotn = 0.0;
-   ydotnp1.Update(block_trueOffsets,mt);
+   ydotnp1.Update(block_trueOffsets);
    ydotnp1 = 0.0;
-   yg.Update(block_trueOffsets,mt);
+   yg.Update(block_trueOffsets);
    yg = 0.0;
-   ydotg.Update(block_trueOffsets,mt);
+   ydotg.Update(block_trueOffsets);
    ydotg = 0.0;
 
    cur_step = 0;
