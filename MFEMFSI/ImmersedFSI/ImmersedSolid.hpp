@@ -50,6 +50,7 @@ public:
    virtual mfem::Operator &FormLHS();
 
    // Transfers
+   virtual void FSITransferSetup(); // compute C_lambda and any other necessary operators for transfer
    virtual void ComputeMortarIntegral(); // C_lambda = fluid dofs x solid dofs
    void InterpolateFluidToSolid(const mfem::Vector &fluid_vec, mfem::Vector &solid_vec, mfem::Vector &solid_pts);
    void InterpolateFluidToSolid(const mfem::Vector &fluid_vec, mfem::Vector &solid_vec); // assumes points were searched already
@@ -268,7 +269,7 @@ protected:
    #ifdef MFEM_USE_GSLIB
    ImmersedFSIFindPts *finder_fluid = nullptr;
    #endif
-   mfem::Vector interp_points_in_solid, true_interp_points_in_solid, interp_points_in_solid_tn; // fluid->solid
+   mfem::Vector interp_points_in_solid, true_interp_points_in_solid; // fluid->solid
 
    // track displacement of a node
    int local_node_num = -1;
@@ -282,7 +283,7 @@ protected:
    mfem::GridFunction *s_gf_fluid = nullptr; // not owned
    bool stabs_scaling = false;
    mfem::SubMesh *solid_bdr_mesh = nullptr;
-   mfem::Vector solid_bdr_nodes, solid_bdr_nodes_tn;
+   mfem::Vector solid_bdr_nodes;
    mfem::Array<int> solid_bdr_tdofs;
 
    // timers

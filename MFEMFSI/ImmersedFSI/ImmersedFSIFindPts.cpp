@@ -199,6 +199,11 @@ void ImmersedFSIFindPts::TransferIndicator(const Vector &point_pos,
                                          int point_pos_ordering)
 {
    FindPoints(point_pos, point_pos_ordering);
+   ComputeTransfer(field_out);
+}
+
+void ImmersedFSIFindPts::ComputeTransfer(GridFunction &field_out)
+{ 
    Transfer(field_out);
 
    #ifdef MFEM_USE_MPI
