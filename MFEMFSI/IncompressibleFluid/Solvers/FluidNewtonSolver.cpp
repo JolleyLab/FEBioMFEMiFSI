@@ -51,11 +51,7 @@ void FluidNewtonSolver::NewtonSolve(const double &dt, const double &time) const
       {
          if (print_newton)
          {
-            #ifdef MFEM_USE_MPI
             if (my_rank == 0) mfem::out << "\n";
-            #else
-            mfem::out << "\n";
-            #endif
          }
          break;
       }       
@@ -82,29 +78,14 @@ void FluidNewtonSolver::NewtonSolve(const double &dt, const double &time) const
 
    if (!converged)
    {
-      if (no_error_nonconvergence)
-      {
-         #ifdef MFEM_USE_MPI
-         if (my_rank == 0) MFEM_WARNING("\nNewton: No convergence!\n");
-         #else
-         MFEM_WARNING("\nNewton: No convergence!\n");
-         #endif
-         converged = true;
-      }
-      else
-      {
-         #ifdef MFEM_USE_MPI
-         if (my_rank == 0) MFEM_WARNING("\nNewton: No convergence!\n");
-         #else
-         MFEM_WARNING("\nNewton: No convergence!\n");
-         #endif
-      }
+      if (my_rank == 0) MFEM_WARNING("\nNewton: No convergence!\n");
+      if (no_error_nonconvergence) converged = true;
    }
 }
 
 void FluidNewtonSolver::PrintNorms() const
 {  
-   rblock.Update(ynp1->GetData(),block_trueOffsets);
+   rblock.Update(*ynp1,block_trueOffsets);
    Vector &unp1 = rblock.GetBlock(0);
    Vector &pnp1 = rblock.GetBlock(1);
    #ifdef MFEM_USE_MPI
@@ -238,7 +219,7 @@ bool FluidNewtonSolver::SolveLinearSystem() const
       {
          if (it_solver->GetConverged() == false)
          {
-            MFEM_WARNING("\nLinear solver did not converge!\n");
+            if (my_rank == 0) MFEM_WARNING("\nLinear solver did not converge!\n");
             return false;
          }
          final_it_ls_fs = it_solver->GetNumIterations();
@@ -266,7 +247,7 @@ void FluidNewtonSolver::Correctors(const double &dt, const double &time) const
 {
    if (IFEM)
    {
-      delblock.Update(c.GetData(),block_trueOffsets);
+      delblock.Update(const_cast<Vector &>(c),block_trueOffsets);
       Vector &delv = delblock.GetBlock(0);
 
       // project update to solid mesh and update quantities
@@ -314,11 +295,7 @@ bool FluidNewtonSolver::CheckConvergence() const
 
 void FluidNewtonSolver::PrintNewtonSolveInfo() const
 {
-   #ifdef MFEM_USE_MPI
    if (print_newton && my_rank == 0)
-   #else
-   if (print_newton)
-   #endif
    {   
       if (it == 0)
       {
@@ -342,11 +319,7 @@ void FluidNewtonSolver::PrintNewtonSolveInfo() const
 
 void FluidNewtonSolver::PrintLinSolveInfo() const
 {
-   #ifdef MFEM_USE_MPI
    if (print_newton && my_rank == 0)
-   #else
-   if (print_newton)
-   #endif
    {
       rel_norm_ls = std::isnan(final_rtol_ls_fs) ? -1.0 : final_rtol_ls_fs;
       mfem::out << "  " << std::setw(5) << std::fixed

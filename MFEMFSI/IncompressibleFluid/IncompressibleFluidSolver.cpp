@@ -470,18 +470,6 @@ void IncompressibleFluidSolver::Setup(double dt)
    }
    else
    {
-      // #ifndef MFEM_USE_MPI
-      // solver = new ExtendedFGMRESSolver();
-      // #else
-      // solver = new ExtendedFGMRESSolver(vfes->GetComm());
-      // #endif
-      // static_cast<ExtendedFGMRESSolver *>(solver)->SetMinIter(lin_minIt);
-      // static_cast<ExtendedFGMRESSolver *>(solver)->SetAbsTol(lin_atol);
-      // static_cast<ExtendedFGMRESSolver *>(solver)->SetRelTol(lin_rtol);
-      // static_cast<ExtendedFGMRESSolver *>(solver)->SetMaxIter(lin_maxIt);
-      // static_cast<ExtendedFGMRESSolver *>(solver)->SetPrintLevel(lin_pl_solve);
-      // // static_cast<ExtendedFGMRESSolver *>(solver)->SetKDim(lin_maxIt);
-
       #ifndef MFEM_USE_MPI
       solver = new FGMRESSolver();
       #else
@@ -681,11 +669,11 @@ void IncompressibleFluidSolver::Setup(double dt)
          #endif
          solver_wrap->SetSolver(*jacobian_prec);
 
-         static_cast<ExtendedFGMRESSolver *>(solver)->SetPreconditioner(*solver_wrap);
+         static_cast<FGMRESSolver *>(solver)->SetPreconditioner(*solver_wrap);
       }
       else
       {
-         static_cast<ExtendedFGMRESSolver *>(solver)->SetPreconditioner(*jacobian_prec);
+         static_cast<FGMRESSolver *>(solver)->SetPreconditioner(*jacobian_prec);
       }
 
       newton_solver->SetSolver(*solver);
@@ -717,25 +705,29 @@ void IncompressibleFluidSolver::Setup(double dt)
 void IncompressibleFluidSolver::Step(double &time, double dt, int current_step,
                         bool provisional)
 {
-   if (!provisional)
+   if (!Step(time, dt, current_step))
    {
-      if (!Step(time, dt, current_step))
+      if (verbose && my_rank == 0)
       {
-         if (verbose && my_rank == 0)
-         {
-            MFEM_ABORT("Error: Newton solver did not converge at step " + std::to_string(current_step) + " and time " + std::to_string(time));
-         }
-         return;
+         MFEM_ABORT("Error: Newton solver did not converge at step " + std::to_string(current_step) + " and time " + std::to_string(time));
       }
+      return;
    }
 
+   if (!provisional) AcceptStep(time, dt, current_step);
+}
+
+void IncompressibleFluidSolver::AcceptStep(double &time, double dt, int current_step)
+{
+   sw_step.Start();
+   
    // Update variables //
    UpdateVariables(time,dt);
 
    // Output to screen and save data //
 
    // Write restarts
-   if (write_restarts && (current_step % restart_save_step == 0) && !provisional)
+   if (write_restarts && (current_step % restart_save_step == 0))
    {
       writeRestarts(current_step,dt,time);
    }

@@ -158,9 +158,9 @@ list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/MFEMTo
 # Exclude test folder from main library build
 list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/test/.*")
 # Exclude CMake-generated/build trees
-list(FILTER FEBIO_MFEM_IFSI_SOURCES EXCLUDE REGEX ".*/CMakeFiles/.*")
-list(FILTER FEBIO_MFEM_IFSI_SOURCES EXCLUDE REGEX ".*/build[^/]*/.*")
-list(FILTER FEBIO_MFEM_IFSI_SOURCES EXCLUDE REGEX ".*/Testing/.*")
+list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX ".*/CMakeFiles/.*")
+list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX ".*/build[^/]*/.*")
+list(FILTER SRC_FEBioMFEMiFSI EXCLUDE REGEX ".*/Testing/.*")
 
 # Organize files by folder in IDEs
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES

@@ -78,6 +78,7 @@ public:
    // is called
    void Step(double &time, double dt, int cur_step, bool provisional);
    bool Step(double &time, double dt, int cur_step);
+   void AcceptStep(double &time, double dt, int cur_step);
 
    /// Remove mean from a Vector.
    /**
