@@ -713,7 +713,7 @@ bool MFEMSolver::Init()
    if (myid == 0)
    {
       mfem::out << "-----------------------------------------------------\n";
-      mfem::out << "Using device: " << m.GetDeviceConfigString() << "\n";
+      mfem::out << "Device Settings:\n";
       m.device.Print();
       mfem::out << "-----------------------------------------------------\n";
    }
@@ -926,29 +926,29 @@ bool MFEMSolver::CreateMesh()
    // print mesh details
    if (m.immersed_solid)
    {
-      feLog("-------------------------------\nFluid Mesh\n");
+      feLog("\nFluid Mesh\n");
       #ifdef MFEM_USE_MPI
       m.fluid_pmesh->PrintInfo();
       #else
       m.fluid_mesh->PrintInfo();
       #endif
-      feLog("-------------------------------\nSolid Mesh\n");
+      feLog("-----------------------------------------------------\nSolid Mesh\n");
       #ifdef MFEM_USE_MPI
       m.solid_pmesh->PrintInfo();
       #else
       m.solid_mesh->PrintInfo();
       #endif
-      feLog("-------------------------------\n");
+      feLog("-----------------------------------------------------\n");
    }
    else
    {
-      feLog("-------------------------------\nFluid Mesh\n");
+      feLog("\nFluid Mesh\n");
       #ifdef MFEM_USE_MPI
       m.fluid_pmesh->PrintInfo();
       #else
       m.mesh->PrintInfo();
       #endif
-      feLog("-------------------------------\n");
+      feLog("-----------------------------------------------------\n");
    }
 
    return true;

@@ -16,10 +16,10 @@
 			<max_retries>5</max_retries>
 			<opt_iter>11</opt_iter>
 			<dtmin>0</dtmin>
-			<dtmax>0.1</dtmax>
+			<dtmax>0.01</dtmax>
 			<aggressiveness>0</aggressiveness>
 			<cutback>0.5</cutback>
-			<dtforce>0</dtforce>
+			<dtforce>1</dtforce>
 		</time_stepper>
 		<solver type="mfem">
 			<symmetric_stiffness>symmetric</symmetric_stiffness>
@@ -29,6 +29,7 @@
 			<velocity_order>1</velocity_order>
 			<pressure_order>1</pressure_order>
 			<VMS>1</VMS>
+			<viscous_term_type>StressForm</viscous_term_type>
 			<Zero_mean_pressure>0</Zero_mean_pressure>
 			<pre_partition_mesh>0</pre_partition_mesh>
 			<pre_partition_opt>PartitionMesh</pre_partition_opt>
@@ -45,6 +46,9 @@
 			<Strain_measure_nodal_outputs></Strain_measure_nodal_outputs>
 			<time_stepping_method>GenAlpha</time_stepping_method>
 			<rho_inf>0.5</rho_inf>
+			<convective_cfl_time_step_controller>0</convective_cfl_time_step_controller>
+			<convective_cfl>2</convective_cfl>
+			<save_mode>TimeBased</save_mode>
 			<step_save>1</step_save>
 			<steady_state_save>0</steady_state_save>
 			<steady_state_step_save>1</steady_state_step_save>

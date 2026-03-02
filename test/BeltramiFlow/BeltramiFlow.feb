@@ -14,6 +14,15 @@
 		<plot_stride>1</plot_stride>
 		<output_stride>1</output_stride>
 		<adaptor_re_solve>1</adaptor_re_solve>
+		<time_stepper type="default">
+			<max_retries>5</max_retries>
+			<opt_iter>11</opt_iter>
+			<dtmin>0</dtmin>
+			<dtmax>1e-05</dtmax>
+			<aggressiveness>0</aggressiveness>
+			<cutback>0.5</cutback>
+			<dtforce>1</dtforce>
+		</time_stepper>
 		<solver type="mfem">
 			<symmetric_stiffness>symmetric</symmetric_stiffness>
 			<equation_scheme>staggered</equation_scheme>
@@ -22,6 +31,7 @@
 			<velocity_order>1</velocity_order>
 			<pressure_order>1</pressure_order>
 			<VMS>1</VMS>
+			<viscous_term_type>StressForm</viscous_term_type>
 			<Zero_mean_pressure>0</Zero_mean_pressure>
 			<pre_partition_mesh>0</pre_partition_mesh>
 			<pre_partition_opt>PartitionMesh</pre_partition_opt>
@@ -34,8 +44,13 @@
 			<Track_node>0</Track_node>
 			<Track_node_position>0,0,0</Track_node_position>
 			<Output_avg_velocity>0</Output_avg_velocity>
+			<Stress_measure_nodal_outputs></Stress_measure_nodal_outputs>
+			<Strain_measure_nodal_outputs></Strain_measure_nodal_outputs>
 			<time_stepping_method>GenAlpha</time_stepping_method>
 			<rho_inf>0.5</rho_inf>
+			<convective_cfl_time_step_controller>0</convective_cfl_time_step_controller>
+			<convective_cfl>2</convective_cfl>
+			<save_mode>TimeBased</save_mode>
 			<step_save>1</step_save>
 			<steady_state_save>0</steady_state_save>
 			<steady_state_step_save>1</steady_state_step_save>
@@ -57,7 +72,7 @@
 			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-06</atol>
 			<rtol>0.001</rtol>
-			<minIt>3</minIt>
+			<minIt>2</minIt>
 			<maxIt>10</maxIt>
 			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-06</lin_atol>
@@ -1738,6 +1753,7 @@
 			<vx type="math">     d = pi * exp(-pi* pi* 10 * t / 4);     -1 * d / 4 * (exp(pi * X / 4) * sin(pi * (Y + 2*Z) / 4) + exp(pi* Z / 4) * cos(pi* (X + 2*Y) / 4))    </vx>
 			<vy type="math">     d = pi * exp(-pi* pi* 10 * t / 4);     -1 * d / 4 * (exp(pi *Y / 4) * sin(pi * (2 * X + Z) / 4) + exp(pi * X / 4) * cos(pi * (Y + 2 * Z) / 4))    </vy>
 			<vz type="math">     d = pi * exp(-pi* pi* 10 * t / 4);     -1 * d / 4 * (exp(pi* Z / 4) * sin(pi* (X + 2 * Y) / 4) + exp(pi * Y / 4) * cos(pi * (2 * X + Z) / 4))    </vz>
+			<zero_boundary>0</zero_boundary>
 		</bc>
 	</Boundary>
 	<Loads>

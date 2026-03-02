@@ -67,7 +67,6 @@
 			<Save_Q_Criterion>1</Save_Q_Criterion>
 			<Output_surface_pressures>1</Output_surface_pressures>
 			<Output_surface_flow_rates>1</Output_surface_flow_rates>
-			<HDF5_output>0</HDF5_output>
 			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-06</atol>
 			<rtol>0.001</rtol>

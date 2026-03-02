@@ -16,10 +16,10 @@
 			<max_retries>5</max_retries>
 			<opt_iter>11</opt_iter>
 			<dtmin>0</dtmin>
-			<dtmax>0.1</dtmax>
+			<dtmax>0.001</dtmax>
 			<aggressiveness>0</aggressiveness>
 			<cutback>0.5</cutback>
-			<dtforce>0</dtforce>
+			<dtforce>1</dtforce>
 		</time_stepper>
 		<solver type="mfem">
 			<symmetric_stiffness>symmetric</symmetric_stiffness>
@@ -67,7 +67,6 @@
 			<Save_Q_Criterion>0</Save_Q_Criterion>
 			<Output_surface_pressures>0</Output_surface_pressures>
 			<Output_surface_flow_rates>0</Output_surface_flow_rates>
-			<HDF5_output>1</HDF5_output>
 			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-10</atol>
 			<rtol>1e-06</rtol>

@@ -67,15 +67,14 @@
 			<Save_Q_Criterion>0</Save_Q_Criterion>
 			<Output_surface_pressures>0</Output_surface_pressures>
 			<Output_surface_flow_rates>0</Output_surface_flow_rates>
-			<HDF5_output>1</HDF5_output>
 			<no_error_nonconvergence>0</no_error_nonconvergence>
 			<atol>1e-10</atol>
-			<rtol>1e-03</rtol>
-			<minIt>1</minIt>
+			<rtol>0.001</rtol>
+			<minIt>2</minIt>
 			<maxIt>10</maxIt>
 			<solver_type>FGMRES</solver_type>
 			<lin_atol>1e-10</lin_atol>
-			<lin_rtol>1e-03</lin_rtol>
+			<lin_rtol>0.001</lin_rtol>
 			<lin_maxIt>200</lin_maxIt>
 			<prec_type>SIMPLE</prec_type>
 			<inner_solver_type>Iterative</inner_solver_type>
