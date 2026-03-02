@@ -216,15 +216,20 @@ int main(int argc, char *argv[])
    ParGridFunction *u_gf = flowsolver->GetCurrentVelocity();
    ParGridFunction *p_gf = flowsolver->GetCurrentPressure();
 
-   ParaViewDataCollection dc("results_beltrami_flow", pmesh);
-   dc.SetDataFormat(VTKFormat::BINARY32);
-   dc.SetHighOrderOutput(true);
-   dc.SetLevelsOfDetail(ctx.order);
-   dc.SetCycle(0);
-   dc.SetTime(t);
-   dc.RegisterField("velocity", u_gf);
-   dc.RegisterField("pressure", p_gf);
-   dc.Save();
+   ParaViewDataCollectionBase *dc = nullptr;
+   #ifdef MFEM_USE_HDF5
+   dc = new ParaViewHDFDataCollection("results_beltrami_flow", pmesh);
+   #else
+   dc = new ParaViewDataCollection("results_beltrami_flow", pmesh);
+   #endif
+   dc->SetDataFormat(VTKFormat::BINARY32);
+   dc->SetHighOrderOutput(true);
+   dc->SetLevelsOfDetail(ctx.order);
+   dc->SetCycle(0);
+   dc->SetTime(t);
+   dc->RegisterField("velocity", u_gf);
+   dc->RegisterField("pressure", p_gf);
+   dc->Save();
 
    MPI_Barrier(pmesh->GetComm()); 
 
@@ -240,9 +245,9 @@ int main(int argc, char *argv[])
 
       if ((step) % 5 == 0 || last_step)
       {
-         dc.SetCycle(step);
-         dc.SetTime(t);
-         dc.Save();
+         dc->SetCycle(step);
+         dc->SetTime(t);
+         dc->Save();
       }
    }
    MPI_Barrier(pmesh->GetComm()); 
@@ -276,6 +281,7 @@ int main(int argc, char *argv[])
 
    flowsolver->PrintTimingData();
 
+   delete dc;
    delete pmesh;
    delete flowsolver;
 

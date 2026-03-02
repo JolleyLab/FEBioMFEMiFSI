@@ -72,7 +72,10 @@ struct IFS_Settings
    // int nx = 384;
    // int ny = 288;
 
-   // int dim = 3; // one option
+   // int dim = 3; // one option   
+   // int problem = 1; // not used in 3d
+   // int nx = 48; // not used in 3d
+   // int ny = 36; // not used in 3d
 } ctx;
 
 struct ImmersedSolidSettings
@@ -310,24 +313,29 @@ int main(int argc, char *argv[])
    ///////////////////////////////////////////////////////////////////////////////////
    // folder names
    std::string folder_name;
-   if (ctx.problem == 1)
+   if (ctx.dim == 2)
    {
-      folder_name = "result_freefall_coarse";
+      if (ctx.problem == 1)
+      {
+         folder_name = "result_freefall_coarse";
+      }
+      else if (ctx.problem == 2)
+      {
+         folder_name = "result_freefall_medium";
+      }
+      else if (ctx.problem == 3)
+      {
+         folder_name = "result_freefall_fine";
+      }   
+      else
+      {
+         folder_name = "result_freefall_veryfine";
+      }
    }
-   else if (ctx.problem == 2)
-   {
-      folder_name = "result_freefall_medium";
-   }
-   else if (ctx.problem == 3)
-   {
-      folder_name = "result_freefall_fine";
-   }   
    else
    {
-      folder_name = "result_freefall_veryfine";
+      folder_name = "result_freefall_3D";
    }
-
-   if (ctx.dim == 3) folder_name += "_3D";
 
    folder_name += "_np" + std::to_string(Mpi::WorldSize());
 
@@ -338,10 +346,14 @@ int main(int argc, char *argv[])
 
    std::string fluid_filename;
    fluid_filename = folder_name + "/fluid";
-   ParaViewDataCollection *fdc = nullptr;
+   ParaViewDataCollectionBase *fdc = nullptr;
    GridFunction *f_fsi_fluid = nullptr;
+   #ifdef MFEM_USE_HDF5
+   fdc = new ParaViewHDFDataCollection(fluid_filename,fluid_pmesh);
+   #else
    fdc = new ParaViewDataCollection(fluid_filename,fluid_pmesh);
-   fdc->SetDataFormat(VTKFormat::BINARY);
+   #endif
+   fdc->SetDataFormat(VTKFormat::BINARY32);
    fdc->SetHighOrderOutput(true);
    fdc->SetLevelsOfDetail(ctx.order);
    fdc->SetPrecision(8);
@@ -362,12 +374,23 @@ int main(int argc, char *argv[])
    ParGridFunction *d_gf = flowsolver->GetImmersedSolidDisplacement();
    ParGridFunction *vib_gf = flowsolver->GetImmersedSolidVelocity();
    ParGridFunction *a_gf = flowsolver->GetImmersedSolidAcceleration();
-   // copy solid mesh for outputting on deformed state
-   ParMesh current_solid_pmesh(*solid_pmesh);
+   // copy solid mesh for TL, alias solid mesh for UL
+   ParMesh *current_solid_pmesh = solid_pmesh;
+   bool owns_current_solid_pmesh = false;
+   if (stx.form_type == ImmersedSolid::form_type::TotalLagrangian)
+   {
+      current_solid_pmesh = new ParMesh(*solid_pmesh);
+      owns_current_solid_pmesh = true;
+   }
    GridFunction temp_gf(d_gf->FESpace());
    temp_gf = 0.0;
-   ParaViewDataCollection *sdc = new ParaViewDataCollection(solid_filename,&current_solid_pmesh);  
-   sdc->SetDataFormat(VTKFormat::BINARY);
+   ParaViewDataCollectionBase *sdc = nullptr;
+   #ifdef MFEM_USE_HDF5
+   sdc = new ParaViewHDFDataCollection(solid_filename,solid_pmesh);
+   #else
+   sdc = new ParaViewDataCollection(solid_filename,solid_pmesh);
+   #endif
+   sdc->SetDataFormat(VTKFormat::BINARY32);
    sdc->SetHighOrderOutput(true);
    sdc->SetLevelsOfDetail(stx.order);
    sdc->SetPrecision(8);
@@ -393,7 +416,7 @@ int main(int argc, char *argv[])
                   Wx, Wy, Ww, Wh, "Rcj");           
          VisualizeField(sout2, vishost, visport, *p_gf, "Pressure",
                      Wx+500, Wy, Ww, Wh, "Rcj");
-         VisualizeMesh(sout3, vishost, visport, current_solid_pmesh, "Solid Mesh",
+         VisualizeMesh(sout3, vishost, visport, *current_solid_pmesh, "Solid Mesh",
             Wx+1000, Wy, Ww, Wh, "pppppppma");
       }
       else
@@ -436,18 +459,12 @@ int main(int argc, char *argv[])
 
          if(sdc)
          {
-            // deform current solid mesh
-            auto nodes = solid_pmesh->GetNodes();
             if(stx.form_type == ImmersedSolid::form_type::TotalLagrangian)
             {
+               auto nodes = solid_pmesh->GetNodes();
                add(1.0,*nodes,1.0,*d_gf,temp_gf);
-               current_solid_pmesh.SetNodes(temp_gf);
+               current_solid_pmesh->SetNodes(temp_gf);
             }
-            else
-            {
-               current_solid_pmesh.SetNodes(*nodes);
-            }
-
             sdc->SetCycle(step);
             sdc->SetTime(t);
             sdc->Save();
@@ -462,7 +479,7 @@ int main(int argc, char *argv[])
                      Wx, Wy, Ww, Wh, "Rcj");           
             VisualizeField(sout2, vishost, visport, *p_gf, "Pressure",
                         Wx+500, Wy, Ww, Wh, "Rcj");
-            VisualizeMesh(sout3, vishost, visport, current_solid_pmesh, "Solid Mesh",
+            VisualizeMesh(sout3, vishost, visport, *current_solid_pmesh, "Solid Mesh",
                Wx+1000, Wy, Ww, Wh, "pppppppma");
          }
          else
@@ -485,6 +502,7 @@ int main(int argc, char *argv[])
    delete fluid_pmesh;
 
    delete mat_type;
+   if (owns_current_solid_pmesh) delete current_solid_pmesh;
    delete solid_pmesh;
 
    delete fdc;

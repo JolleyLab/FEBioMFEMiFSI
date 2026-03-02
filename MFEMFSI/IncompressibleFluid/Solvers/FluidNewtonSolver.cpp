@@ -17,12 +17,6 @@ void FluidNewtonSolver::NewtonSolve(const double &dt, const double &time) const
 
    prec->iterative_mode = false;
 
-   // Fix Cf operator at t_n
-   if (IFEM)
-   {
-      im_solid->ComputeMortarIntegral();
-   }
-
    for (it = 0; true; it++)
    {
       // initiator step

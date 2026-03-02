@@ -81,7 +81,7 @@ struct iFSI_Settings
 
    double t_final = 10*dt; // 10 time steps
 
-   bool visualization = false;
+   bool visualization = true;
    int orderingtype = Ordering::byVDIM;
    // int orderingtype = Ordering::byNODES;
 
@@ -316,10 +316,14 @@ int main(int argc, char *argv[])
 
    std::string fluid_filename;
    fluid_filename = folder_name + "/fluid";
-   ParaViewDataCollection *fdc = nullptr;
+   ParaViewDataCollectionBase *fdc = nullptr;
    GridFunction *f_fsi_fluid = nullptr;
+   #ifdef MFEM_USE_HDF5
+   fdc = new ParaViewHDFDataCollection(fluid_filename,fluid_pmesh);
+   #else
    fdc = new ParaViewDataCollection(fluid_filename,fluid_pmesh);
-   fdc->SetDataFormat(VTKFormat::BINARY);
+   #endif
+   fdc->SetDataFormat(VTKFormat::BINARY32);
    fdc->SetHighOrderOutput(true);
    fdc->SetLevelsOfDetail(ctx.order);
    fdc->SetPrecision(8);
@@ -332,15 +336,15 @@ int main(int argc, char *argv[])
    // visualization
    ParGridFunction *d_gf = flowsolver->GetImmersedSolidDisplacement();
    ParGridFunction *vib_gf = flowsolver->GetImmersedSolidVelocity();
-   // copy solid mesh for outputting on deformed state
-   ParMesh current_solid_pmesh(*solid_pmesh);
-   GridFunction temp_gf(d_gf->FESpace());
-   temp_gf = 0.0;
-
    std::string solid_filename;
    solid_filename = folder_name + "/solid";
-   ParaViewDataCollection *sdc = new ParaViewDataCollection(solid_filename,&current_solid_pmesh);  
-   sdc->SetDataFormat(VTKFormat::BINARY);
+   ParaViewDataCollectionBase *sdc = nullptr;
+   #ifdef MFEM_USE_HDF5
+   sdc = new ParaViewHDFDataCollection(solid_filename,solid_pmesh);  
+   #else
+   sdc = new ParaViewDataCollection(solid_filename,&current_solid_pmesh);
+   #endif
+   sdc->SetDataFormat(VTKFormat::BINARY32);
    sdc->SetHighOrderOutput(true);
    sdc->SetLevelsOfDetail(stx.order);
    sdc->SetPrecision(8);
@@ -367,8 +371,6 @@ int main(int argc, char *argv[])
                      Wx+500, Wy, Ww, Wh, "Rcj");
          VisualizeField(sout3, vishost, visport, *d_gf, "Displacement",
             Wx+1000, Wy, Ww, Wh, "Rcj");
-         // VisualizeMesh(sout3, vishost, visport, current_solid_pmesh, "Solid Mesh",
-         //    Wx+1000, Wy, Ww, Wh, "pppppppma");
       }
       else
       {
@@ -377,9 +379,7 @@ int main(int argc, char *argv[])
          VisualizeField(sout2, vishost, visport, *p_gf, "Pressure",
                      Wx+500, Wy, Ww, Wh, "Rcppppppppppppppppppppppppppppppppp");
          VisualizeField(sout3, vishost, visport, *d_gf, "Displacement",
-                        Wx+1000, Wy, Ww, Wh, "Rcpppppppppppppppppppppppppppppppppm");
-         // VisualizeMesh(sout3, vishost, visport, current_solid_pmesh, "Solid Mesh",
-         // Wx+1000, Wy, Ww, Wh, "Rmmma");        
+                        Wx+1000, Wy, Ww, Wh, "Rcpppppppppppppppppppppppppppppppppm");    
       }
       MPI_Barrier(fluid_pmesh->GetComm()); 
    }
@@ -409,18 +409,6 @@ int main(int argc, char *argv[])
 
          if (sdc)
          {
-            // deform current solid mesh for visualization
-            auto nodes = solid_pmesh->GetNodes();
-            if(stx.form_type == ImmersedSolid::form_type::TotalLagrangian)
-            {
-               add(1.0,*nodes,1.0,*d_gf,temp_gf);
-               current_solid_pmesh.SetNodes(temp_gf);
-            }
-            else
-            {
-               current_solid_pmesh.SetNodes(*nodes);
-            }
-
             sdc->SetCycle(step);
             sdc->SetTime(t);
             sdc->Save();
@@ -437,8 +425,6 @@ int main(int argc, char *argv[])
                         Wx+500, Wy, Ww, Wh, "Rcj");
             VisualizeField(sout3, vishost, visport, *d_gf, "Displacement",
                         Wx+1000, Wy, Ww, Wh, "Rcj");
-            // VisualizeMesh(sout3, vishost, visport, current_solid_pmesh, "Solid Mesh",
-            //    Wx+1000, Wy, Ww, Wh, "pppppppma");
          }
          else
          {
@@ -448,8 +434,6 @@ int main(int argc, char *argv[])
                         Wx+500, Wy, Ww, Wh, "Rcppppppppppppppppppppppppppppppppp");
             VisualizeField(sout3, vishost, visport, *d_gf, "Displacement",
                Wx+1000, Wy, Ww, Wh, "Rcpppppppppppppppppppppppppppppppppm");
-            // VisualizeMesh(sout3, vishost, visport, current_solid_pmesh, "Solid Mesh",
-            // Wx+1000, Wy, Ww, Wh, "Rmmma");  
          } 
          MPI_Barrier(fluid_pmesh->GetComm()); 
       }

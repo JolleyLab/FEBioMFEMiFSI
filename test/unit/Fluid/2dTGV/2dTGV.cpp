@@ -371,15 +371,20 @@ int main(int argc, char *argv[])
    }
 
    // setup output in paraview format
-   ParaViewDataCollection pvdc(fname, pmesh);
-   pvdc.SetDataFormat(VTKFormat::BINARY32);
-   pvdc.SetHighOrderOutput(true);
-   pvdc.SetLevelsOfDetail(ctx.order);
-   pvdc.SetCycle(0);
-   pvdc.SetTime(t);
-   pvdc.RegisterField("Velocity", u_gf);
-   pvdc.RegisterField("Pressure", p_gf);
-   pvdc.Save();
+   ParaViewDataCollectionBase *pvdc = nullptr;
+   #ifdef MFEM_USE_HDF5
+   pvdc = new ParaViewHDFDataCollection(fname, pmesh);
+   #else
+   pvdc = new ParaViewDataCollection(fname, pmesh);
+   #endif
+   pvdc->SetDataFormat(VTKFormat::BINARY32);
+   pvdc->SetHighOrderOutput(true);
+   pvdc->SetLevelsOfDetail(ctx.order);
+   pvdc->SetCycle(0);
+   pvdc->SetTime(t);
+   pvdc->RegisterField("Velocity", u_gf);
+   pvdc->RegisterField("Pressure", p_gf);
+   pvdc->Save();
 
    // setup visualization
    socketstream sout, sout2, sout3, vis_s, vis_us;
@@ -410,9 +415,9 @@ int main(int argc, char *argv[])
       flowsolver->Step(t,dt,step,false);
 
       // save data
-      pvdc.SetCycle(step);
-      pvdc.SetTime(t);
-      pvdc.Save();
+      pvdc->SetCycle(step);
+      pvdc->SetTime(t);
+      pvdc->Save();
 
       if (ctx.visualize)
       {
@@ -474,6 +479,7 @@ int main(int argc, char *argv[])
 
    flowsolver->PrintTimingData();
 
+   delete pvdc;
    delete pmesh;
    delete flowsolver;
 

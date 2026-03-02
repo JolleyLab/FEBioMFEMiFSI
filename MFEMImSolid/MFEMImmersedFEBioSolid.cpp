@@ -133,33 +133,14 @@ void ImmersedFEBioSolid::SetSubMeshMaps(mfem::TransferMap *submeshsolid_to_globa
 
 void ImmersedFEBioSolid::Predictors(mfem::Vector &vf, mfem::Vector &vdotf)
 {
-   // Find interpolation points in solid (fixed at tn)
-   finder_fluid->FindPoints(interp_points_in_solid,orderingtype);
-
-   // store tn position of solid
-   interp_points_in_solid_tn = interp_points_in_solid;
-   if (stabs_scaling) solid_bdr_nodes_tn = solid_bdr_nodes;
-
    // set ddotnp1 and d2dotnp1 from fluid predictors for consistency!
    // ddotnp1 = v_np1
-   // InterpolateFluidToSolid(vf,ddotnp1);
-   // ddotnp1_gf.SetFromTrueDofs(ddotnp1);
-   InterpolateFluidToSolid(vf,ddotnp1_gf);
-   #ifdef MFEM_USE_MPI
-   ddotnp1_gf.ParallelProject(ddotnp1);
-   #else
-   ddotnp1_gf.GetTrueDofs(ddotnp1);
-   #endif
+   InterpolateFluidToSolid(vf,ddotnp1);
+   ddotnp1_gf.SetFromTrueDofs(ddotnp1);
 
    // d2dotnp1 = vdot_np1
-   // InterpolateFluidToSolid(vdotf,d2dotnp1);
-   // d2dotnp1_gf.SetFromTrueDofs(d2dotnp1);
-   InterpolateFluidToSolid(vdotf,d2dotnp1_gf);
-   #ifdef MFEM_USE_MPI
-   d2dotnp1_gf.ParallelProject(d2dotnp1);
-   #else
-   d2dotnp1_gf.GetTrueDofs(d2dotnp1);
-   #endif
+   InterpolateFluidToSolid(vdotf,d2dotnp1);
+   d2dotnp1_gf.SetFromTrueDofs(d2dotnp1);
 
    #ifndef MFEM_USE_MPI
    // transfer gf defined on solid submesh to global mesh (FEBio representation)
@@ -309,23 +290,25 @@ void ImmersedFEBioSolid::Initiator()
    add((1.0 - alpha_f),dn,alpha_f,dnp1,dg);
    dtemp_gf.SetFromTrueDofs(dg);
    MoveMesh(dtemp_gf); // contains current displacements
+   
    // UpdatePointSearch(dtemp_gf,dg); // not needed since motion map for lambda terms fixed at tn
-
    if (stabs_scaling)
    {
+      UpdatePointSearch(dtemp_gf,dg); // need to update for stabs scaling since it depends on current position of solid boundary
+
       #ifdef MFEM_USE_GSLIB
       MFEM_ASSERT(dfes->GetOrdering() == s_gf_fluid->FESpace()->GetOrdering(),"Ordering of solid and fluid gridfunctions must match for special VMS stabs scaling");
-      
-      // finder_fluid->TransferIndicator(solid_bdr_nodes,*s_gf_fluid,dfes->GetOrdering());
-      finder_fluid->TransferIndicator(solid_bdr_nodes_tn,*s_gf_fluid,dfes->GetOrdering());
+      finder_fluid->TransferIndicator(solid_bdr_nodes,*s_gf_fluid,dfes->GetOrdering());
       // note internally s_gf_fluid is zeroed prior to interpolation of s_gf to its fluid counterpart
       #endif
-   }
+   } 
 }
 
 void ImmersedFEBioSolid::Correctors(mfem::Vector &del)
 {
+   // del (fluid) --> delvdot_ib (solid)
    ImmersedSolid::Correctors(del);
+   temp_solid_gf.SetFromTrueDofs(delvdot_ib); // needed below
 
    ////////////////////////////////////////////////////////////////
 
@@ -340,8 +323,7 @@ void ImmersedFEBioSolid::Correctors(mfem::Vector &del)
    *dnp1_global_gf = 0.0;
    submeshsolid_to_global_d->Transfer(dnp1_gf,*dnp1_global_gf);
    mfem::Vector &d = *dnp1_global_gf;
-   #else
-   // del was last to be interpolated so temp_solid_gf has the correct values
+   #else   
    mfem::Vector &delvdot = temp_solid_gf;
    dnp1_gf.SetFromTrueDofs(dnp1);
    mfem::Vector &d = dnp1_gf;

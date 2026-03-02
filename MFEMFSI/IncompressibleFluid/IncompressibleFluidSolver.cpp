@@ -803,6 +803,9 @@ void IncompressibleFluidSolver::UpdateParameters(double time, double dt, int cur
    if (IFEM)
    {
       im_solid->SetTimeAndDt(time,dt);
+
+      // Fix C_lam operator at current time tn
+      im_solid->FSITransferSetup();
    }
 }
 
@@ -1063,8 +1066,13 @@ void IncompressibleFluidSolver::RegisterTimers()
       timer_reg.Add("essbcs",    "ESSBCS",    &sw_essbcs,    "timestep", "", 1);
    }
 
+   if (IFEM)
+   {
+      timer_reg.Add("fsi_cmat", "FSICMAT", &sw_fsicmat, "timestep", "", 1);
+   }
+
    // Level-1 row
-   timer_reg.Add("newton",    "NEWTONSOLVE", &sw_solve,   "timestep", "", 1);
+   timer_reg.Add("newton","NEWTONSOLVE", &sw_solve, "timestep", "", 1);
 
    if (extended_timing)
    {
@@ -1088,12 +1096,6 @@ void IncompressibleFluidSolver::RegisterTimers()
       timer_reg.Add("fluid_tan", "FLUIDTAN", &sw_fluidtan, "timestep", "tangent", 3);
       timer_reg.Add("solid_tan", "SOLIDTAN", &sw_solidtan, "timestep", "tangent", 3);
       timer_reg.Add("fsi_tan",   "FSITAN",   &sw_fsitan,   "timestep", "tangent", 3);
-   }
-
-   // FSICMAT under NEWTONSOLVE (same level as TANGENT/RESIDUAL/LINSOLVE)
-   if (IFEM)
-   {
-      timer_reg.Add("fsi_cmat", "FSICMAT", &sw_fsicmat, "timestep", "newton", 2);
    }
 
    // LINSOLVE (kept at same level under NEWTONSOLVE)

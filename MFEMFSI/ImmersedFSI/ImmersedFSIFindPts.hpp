@@ -42,6 +42,7 @@ public:
    void Spread(const mfem::Vector &field_in, mfem::GridFunction &field_out);
 
    void TransferIndicator(const mfem::Vector &point_pos, mfem::GridFunction &field_out, int point_pos_ordering = mfem::Ordering::byNODES);
+   void ComputeTransfer(mfem::GridFunction &field_out);
    void Transfer(mfem::GridFunction &field_out);
 
    // Needs true dofs of interp points in solid

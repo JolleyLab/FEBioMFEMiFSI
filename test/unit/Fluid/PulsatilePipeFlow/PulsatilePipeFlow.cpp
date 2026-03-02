@@ -292,15 +292,20 @@ int main(int argc, char *argv[])
    ParGridFunction *wss_gf = flowsolver->GetCurrentWSS();
 
    string fname = std::string("results_pipe_flow_np") + std::to_string(Mpi::WorldSize());
-   ParaViewDataCollection dc(fname, pmesh);
-   dc.SetDataFormat(VTKFormat::BINARY32);
-   dc.SetLevelsOfDetail(ctx.order);
-   dc.SetCycle(0);
-   dc.SetTime(t);
-   dc.RegisterField("Velocity", u_gf);
-   dc.RegisterField("Pressure", p_gf);
-   dc.RegisterField("WSS", wss_gf);
-   dc.Save();
+   ParaViewDataCollectionBase *dc = nullptr;
+   #ifdef MFEM_USE_HDF5
+   dc = new ParaViewHDFDataCollection(fname, pmesh);
+   #else
+   dc = new ParaViewDataCollection(fname, pmesh);
+   #endif
+   dc->SetDataFormat(VTKFormat::BINARY32);
+   dc->SetLevelsOfDetail(ctx.order);
+   dc->SetCycle(0);
+   dc->SetTime(t);
+   dc->RegisterField("Velocity", u_gf);
+   dc->RegisterField("Pressure", p_gf);
+   dc->RegisterField("WSS", wss_gf);
+   dc->Save();
 
    // setup visualization
    socketstream sout, sout2, sout3;
@@ -337,9 +342,9 @@ int main(int argc, char *argv[])
       if ((step) % ctx.step_save == 0 || last_step)
       {
          flowsolver->ComputeWSS(*u_gf,*p_gf);
-         dc.SetCycle(step);
-         dc.SetTime(t);
-         dc.Save();
+         dc->SetCycle(step);
+         dc->SetTime(t);
+         dc->Save();
       }
 
       if (ctx.visualization)
@@ -360,6 +365,7 @@ int main(int argc, char *argv[])
 
    flowsolver->PrintTimingData();
 
+   delete dc;
    delete pmesh;
    delete flowsolver;
 
