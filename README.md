@@ -17,6 +17,6 @@ To load the plugin into the FEBio solver, please update your febio.xml file to i
 ## Linking to FEBio Studio
 The plugin can be linked to FEBio Studio via the plugin repository. Click the Plugin Repository button in FEBio Studio, then Load Local Plugin and navigate to your plugin library file.
 
-## Developer notesV
+## Developer notes
 This repository uses **Git subtree** to include the iFSI code. See
 [SUBTREE.md](SUBTREE.md) for the developer workflow.
