@@ -1,7 +1,7 @@
 #include "MFEMParExport.h"
 
 // FEBio Headers
-#include <FEBioXML/XMLWriter.h>
+#include <FECore/XMLWriter.h>
 #include <FEBioLib/FEBioModel.h>
 #include <FECore/FEPlotDataStore.h>
 #include <FECore/fecore_enum.h>
@@ -11,7 +11,7 @@
 #include <FECore/FEInitialCondition.h>
 #include <FECore/log.h>
 #include <FECore/FELoadController.h>
-#include <FEBioXML/XMLReader.h>
+#include <FECore/XMLReader.h>
 
 // MFEM Headers
 #include <mfem.hpp>

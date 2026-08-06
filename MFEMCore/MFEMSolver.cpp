@@ -1577,8 +1577,10 @@ void MFEMSolver::PostProcessOutput()
 	m.pvdc->SetDataFormat(m.output_format);
 	m.pvdc->SetHighOrderOutput(false);
 	m.pvdc->SetLevelsOfDetail(m.orderv);
+   #ifdef MFEM_USE_ZLIB
    m.pvdc->SetCompression(true);
    m.pvdc->SetCompressionLevel(m.compression_level);
+   #endif
    m.pvdc->UseRestartMode(true);
 
 	m.pvdc->SetCycle(curr_step);
@@ -1636,8 +1638,10 @@ void MFEMSolver::PostProcessOutput()
       m.sdc->SetDataFormat(m.output_format);
       m.sdc->SetHighOrderOutput(false);
       m.sdc->SetLevelsOfDetail(m.orderd);
+      #ifdef MFEM_USE_ZLIB
       m.sdc->SetCompression(true);
       m.sdc->SetCompressionLevel(m.compression_level);
+      #endif
       m.sdc->UseRestartMode(true);
 
       m.sdc->SetCycle(curr_step);
