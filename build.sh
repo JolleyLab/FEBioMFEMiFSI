@@ -12,13 +12,17 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Detect number of processors (cross-platform)
+# Detect number of processors (cross-platform), falling back safely when a
+# platform utility is unavailable or restricted.
+NUM_PROCS=1
 if command -v nproc >/dev/null 2>&1; then
-    NUM_PROCS=$(nproc)
+    if DETECTED_PROCS=$(nproc 2>/dev/null); then
+        NUM_PROCS="${DETECTED_PROCS}"
+    fi
 elif command -v sysctl >/dev/null 2>&1; then
-    NUM_PROCS=$(sysctl -n hw.ncpu)
-else
-    NUM_PROCS=1
+    if DETECTED_PROCS=$(sysctl -n hw.ncpu 2>/dev/null); then
+        NUM_PROCS="${DETECTED_PROCS}"
+    fi
 fi
 
 # Get the directory where this script is located
@@ -60,14 +64,13 @@ usage() {
     echo "  --cc CC                     Override C compiler for CMake builds (default: platform-specific)"
     echo "  --cxx CXX                   Override C++ compiler for CMake builds (default: platform-specific)"
     echo "  --mfem-options STR          Pass additional options to MFEM CMake (e.g., '-DMFEM_USE_MPI=ON')"
-    echo "  --update-ifsi               Update iFSI subtree from remote (requires clean working tree)"
     echo "  --clean                     Clean and rebuild both MFEM and FEBioMFEMiFSI plugin"
     echo "  --clean-mfem                Clean and rebuild MFEM only"
     echo "  --clean-plugin              Clean and rebuild FEBioMFEMiFSI plugin only"
     echo "  --help                      Show this help message"
     echo ""
     echo "Example:"
-    echo "  $0 --febio-dir /path/to/FEBio --febio-source-dir /path/to/FEBio/source --gslib-cflags '-O3' --mfem-cxxflags '-O3 -march=native'"
+    echo "  bash $0 --febio-dir /path/to/FEBio --gslib-cflags '-O3' --mfem-cxxflags '-O3 -march=native'"
     exit 0
 }
 
@@ -427,8 +430,6 @@ elif [ "$UPDATE_IFSI" = true ]; then
     
     git subtree pull --prefix=MFEMFSI iFSI main --squash
     echo -e "${GREEN}MFEMFSI subtree updated${NC}"
-else
-    echo -e "${GREEN}Skipping iFSI subtree update (use --update-ifsi to update)${NC}"
 fi
 
 # Build FEBioMFEMiFSI project

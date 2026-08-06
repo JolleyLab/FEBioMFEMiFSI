@@ -6,8 +6,7 @@ This document provides instructions on how to build the FEBioMFEMiFSI project us
 
 The `build.sh` script is a comprehensive build automation tool that:
 1. Fetches and builds all required dependencies (GSLIB, HYPRE, METIS, MFEM)
-2. Updates the git subtree for the iFSI code
-3. Builds the FEBioMFEMiFSI plugin
+2. Builds the FEBioMFEMiFSI plugin
 
 ## Prerequisites
 
@@ -25,8 +24,8 @@ Before running the build script, ensure you have:
 - Provide the install prefix to MFEM via `-DHDF5_DIR=/path/to/hdf5`.
 
 ### macOS support
-- Supported on Intel macOS (x86_64) and Apple Silicon (arm64) via the Rosetta 2 wrapper.
-- On macOS, the script enforces x86_64 and configures CMake-based builds with `clang/clang++` by default. You can override compilers using `--cc` and `--cxx` (e.g., `--cc gcc-13 --cxx g++-13`).
+- Supported on Intel macOS (x86_64) and on Apple Silicon when the shell is running under Rosetta 2.
+- The script requires the active macOS architecture to be x86_64; native arm64 builds are not supported. CMake-based builds use `clang`/`clang++` by default. You can override them with `--cc` and `--cxx` (for example, `--cc gcc-13 --cxx g++-13`).
 
 ## Quick Start
 
@@ -39,7 +38,7 @@ The simplest way to build is:
 ### Example Builds
 
 ```bash
-#HDF5 support
+# HDF5 support
 ./build.sh --febio-dir /path/to/FEBio \
   --mfem-options "-DMFEM_USE_HDF5=ON -DHDF5_DIR=/path/to/hdf5"
 ```
@@ -65,10 +64,6 @@ The simplest way to build is:
 - `--mfem-options STR` - Additional CMake options for MFEM
   - Useful for enabling/disabling specific MFEM features
   - Example: `--mfem-options '-DMFEM_USE_MPI=ON'`
-- `--update-ifsi` - Update iFSI subtree from remote repository
-  - Requires a clean working tree (no uncommitted changes)
-  - Skipped by default; only runs when this flag is provided
-  - The subtree is automatically added on first build if missing
 - `--clean` - Clean and rebuild both MFEM and FEBioMFEMiFSI plugin
   - Does not clean dependencies (GSLIB, HYPRE, METIS)
 - `--clean-mfem` - Clean and rebuild MFEM only
@@ -87,16 +82,11 @@ The simplest way to build is:
 ./build.sh --febio-dir /path/to/FEBio/install --clean-plugin
 ```
 
-### Update iFSI Subtree
-```bash
-./build.sh --febio-dir /path/to/FEBio/install --update-ifsi
-```
-
 ## Build Output
 
 After successful build, you'll find:
 - **Plugin library**: `./build/lib/libFEBioMFEMiFSI.so` (Linux)
-- **Plugin library**: `./build/lib/FEBioMFEMiFSI.dylib` (macOS)
+- **Plugin library**: `./build/lib/libFEBioMFEMiFSI.dylib` (macOS)
 - **Plugin library**: `./build/lib/FEBioMFEMiFSI.dll` (Windows)
 
 The script creates the following build directory structure:
@@ -277,28 +267,7 @@ make
 - Build directory: `${SOFTWARE_DIR}/mfem/build/`
 - MFEM config: `${SOFTWARE_DIR}/mfem/build/MFEMConfig.cmake`
 
-### 5. Update iFSI Subtree (Optional)
-
-If you need to update the MFEMFSI subtree and have a clean working tree:
-
-```bash
-cd "${PROJECT_ROOT}"
-
-# Add remote if not already added
-git remote get-url iFSI || git remote add iFSI https://github.com/ryanblack129/iFSI.git
-git fetch iFSI
-
-# Add or update subtree
-if [ ! -d MFEMFSI ]; then
-  git subtree add --prefix=MFEMFSI iFSI main --squash
-else
-  git subtree pull --prefix=MFEMFSI iFSI main --squash
-fi
-```
-
-**Note:** Git subtree operations require a clean working tree (no uncommitted changes).
-
-### 6. Build FEBioMFEMiFSI Plugin
+### 5. Build FEBioMFEMiFSI Plugin
 
 Build the final plugin linking against FEBio SDK and MFEM with all dependencies.
 
@@ -318,7 +287,7 @@ cd build
 # Configure plugin
 cmake .. \
   -DCMAKE_BUILD_TYPE=Release \
-  -DMFEM_DIR="${SOFTWARE_DIR}/mfem/build-mfem" \
+  -DMFEM_DIR="${SOFTWARE_DIR}/mfem/build" \
   -DFEBio_DIR="${FEBio_DIR}"
 
 # Build
@@ -327,16 +296,16 @@ make
 
 **Output:**
 - Plugin library: `${PROJECT_ROOT}/build/lib/libFEBioMFEMiFSI.so` (Linux)
-- Plugin library: `${PROJECT_ROOT}/build/lib/FEBioMFEMiFSI.dylib` (macOS)
+- Plugin library: `${PROJECT_ROOT}/build/lib/libFEBioMFEMiFSI.dylib` (macOS)
 
 ### Clean Rebuild
 
 To perform a clean rebuild of MFEM and the plugin (without rebuilding dependencies):
 
 ```bash
-rm -rf "${SOFTWARE_DIR}/mfem/build-mfem"
+rm -rf "${SOFTWARE_DIR}/mfem/build"
 rm -rf "${PROJECT_ROOT}/build"
-# Then repeat steps 4 and 6
+# Then repeat steps 4 and 5
 ```
 
 To rebuild everything from scratch:
@@ -344,5 +313,5 @@ To rebuild everything from scratch:
 ```bash
 rm -rf "${SOFTWARE_DIR}"
 rm -rf "${PROJECT_ROOT}/build"
-# Then repeat all steps 1-6
+# Then repeat all steps 1-5
 ```

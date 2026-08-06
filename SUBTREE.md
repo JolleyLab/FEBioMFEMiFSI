@@ -8,7 +8,7 @@ Upstream repository details:
 - **Local remote name:** `iFSI`  
 - **Default branch:** `main`
 
-This guide explains how to **add**, **update**, **push changes**, and **reset** the subtree cleanly.
+This is a developer-only workflow for adding, updating, and pushing the subtree.
 
 ---
 
@@ -43,7 +43,8 @@ This pulls the latest `iFSI` code into your project.
 
 ## 3. Updating the Subtree (pulling upstream changes)
 
-To update your local subtree with the latest code from the `iFSI` repo:
+Commit or stash all working-tree changes before updating the subtree. To update
+your local subtree with the latest code from the `iFSI` repository, run:
 
 ```bash
 git subtree pull --prefix=MFEMFSI iFSI main --squash
@@ -55,7 +56,7 @@ The `--squash` flag keeps your main repo history clean by condensing subtree com
 
 ## 4. Pushing Local Changes Upstream (Developers)
 
-If you make changes inside `MFEMFSI/` and want to contribute them back to the upstream `iFSI` repository:
+After committing changes inside `MFEMFSI/`, push them to the upstream repository:
 
 ```bash
 git subtree push --prefix=MFEMFSI iFSI main
