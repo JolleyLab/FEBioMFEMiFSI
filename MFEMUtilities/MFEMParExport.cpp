@@ -767,7 +767,7 @@ void MFEMParExport::WriteParam(FEParam &p)
          std::ostringstream ss;
          ss.setf(std::ios::scientific);
          ss << std::setprecision(16)
-            << v->x() << ", " << v->y();
+            << v->x << ", " << v->y;
          el.value(ss.str().c_str());
          break;
       }
